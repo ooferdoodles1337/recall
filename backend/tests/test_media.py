@@ -1,0 +1,301 @@
+import io
+import os
+import tempfile
+from pathlib import Path
+
+import numpy as np
+import pytest
+from PIL import Image
+
+
+# --- Test fixtures ---
+
+def make_jpeg_bytes(width=10, height=10) -> bytes:
+    img = Image.new("RGB", (width, height), color=(255, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def make_png_bytes(width=10, height=10) -> bytes:
+    img = Image.new("RGBA", (width, height), color=(0, 255, 0, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def make_webp_bytes(width=10, height=10) -> bytes:
+    img = Image.new("RGB", (width, height), color=(0, 0, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP")
+    return buf.getvalue()
+
+
+def make_static_gif_bytes(width=10, height=10) -> bytes:
+    img = Image.new("RGB", (width, height), color=(255, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="GIF")
+    return buf.getvalue()
+
+
+def make_animated_gif_bytes(width=10, height=10, n_frames=3) -> bytes:
+    # Use distinct RGB colors converted to P so frames are not collapsed by GIF optimizer
+    frames = [Image.new("RGB", (width, height), color=(i * 80, 0, 0)).convert("P") for i in range(n_frames)]
+    buf = io.BytesIO()
+    frames[0].save(
+        buf, format="GIF", save_all=True, append_images=frames[1:], loop=0, duration=100
+    )
+    return buf.getvalue()
+
+
+def make_static_apng_bytes(width=10, height=10) -> bytes:
+    img = Image.new("RGBA", (width, height), color=(255, 0, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def make_animated_apng_bytes(width=10, height=10, n_frames=3) -> bytes:
+    frames = [Image.new("RGBA", (width, height), color=(i * 50, 0, 0, 255)) for i in range(n_frames)]
+    buf = io.BytesIO()
+    frames[0].save(buf, format="PNG", save_all=True, append_images=frames[1:])
+    return buf.getvalue()
+
+
+def make_mp4_bytes(duration_seconds: float = 1.0, fps: int = 10) -> bytes:
+    import imageio.v3 as iio
+    n_frames = max(1, int(duration_seconds * fps))
+    # Use 16x16 frames (divisible by macro_block_size=16) to avoid ffmpeg resizing
+    frames = [np.zeros((16, 16, 3), dtype=np.uint8) for _ in range(n_frames)]
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    tmp.close()
+    iio.imwrite(tmp.name, frames, fps=fps, codec="libx264", pixelformat="yuv420p")
+    data = Path(tmp.name).read_bytes()
+    os.unlink(tmp.name)
+    return data
+
+
+# --- Extension classification ---
+
+def test_classify_jpeg_extensions():
+    from services.media import classify_extension
+    for ext in [".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp"]:
+        assert classify_extension(ext) == "image", f"Expected image for {ext}"
+
+
+def test_classify_png():
+    from services.media import classify_extension
+    assert classify_extension(".png") == "image"
+    assert classify_extension(".apng") == "image"
+
+
+def test_classify_webp_and_gif():
+    from services.media import classify_extension
+    assert classify_extension(".webp") == "image"
+    assert classify_extension(".gif") == "image"
+
+
+def test_classify_video_extensions():
+    from services.media import classify_extension
+    for ext in [".mp4", ".m4v", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm", ".3gp"]:
+        assert classify_extension(ext) == "video", f"Expected video for {ext}"
+
+
+def test_classify_unknown_returns_none():
+    from services.media import classify_extension
+    assert classify_extension(".svg") is None
+    assert classify_extension(".txt") is None
+    assert classify_extension(".pdf") is None
+
+
+# --- Animated detection ---
+
+def test_is_animated_false_for_static_gif(tmp_path):
+    p = tmp_path / "test.gif"
+    p.write_bytes(make_static_gif_bytes())
+    from services.media import is_animated
+    assert is_animated(str(p)) is False
+
+
+def test_is_animated_true_for_animated_gif(tmp_path):
+    p = tmp_path / "test.gif"
+    p.write_bytes(make_animated_gif_bytes())
+    from services.media import is_animated
+    assert is_animated(str(p)) is True
+
+
+def test_is_animated_false_for_static_apng(tmp_path):
+    p = tmp_path / "test.apng"
+    p.write_bytes(make_static_apng_bytes())
+    from services.media import is_animated
+    assert is_animated(str(p)) is False
+
+
+def test_is_animated_true_for_animated_apng(tmp_path):
+    p = tmp_path / "test.apng"
+    p.write_bytes(make_animated_apng_bytes())
+    from services.media import is_animated
+    assert is_animated(str(p)) is True
+
+
+# --- Static image processing ---
+
+def test_process_jpeg_returns_original_bytes(tmp_path):
+    data = make_jpeg_bytes()
+    p = tmp_path / "test.jpg"
+    p.write_bytes(data)
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "image/jpeg"
+    assert result.media_type == "image"
+    assert result.data == data
+
+
+def test_process_png_returns_original_bytes(tmp_path):
+    data = make_png_bytes()
+    p = tmp_path / "test.png"
+    p.write_bytes(data)
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "image/png"
+    assert result.media_type == "image"
+    assert result.data == data
+
+
+def test_process_webp_converts_to_jpeg(tmp_path):
+    p = tmp_path / "test.webp"
+    p.write_bytes(make_webp_bytes())
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "image/jpeg"
+    img = Image.open(io.BytesIO(result.data))
+    assert img.format == "JPEG"
+
+
+def test_process_static_gif_converts_to_jpeg(tmp_path):
+    p = tmp_path / "test.gif"
+    p.write_bytes(make_static_gif_bytes())
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "image/jpeg"
+    assert result.media_type == "image"
+
+
+def test_process_static_apng_returns_png(tmp_path):
+    p = tmp_path / "test.apng"
+    p.write_bytes(make_static_apng_bytes())
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "image/png"
+    assert result.media_type == "image"
+
+
+# --- Animated image to video ---
+
+def test_process_animated_gif_returns_mp4(tmp_path):
+    p = tmp_path / "test.gif"
+    p.write_bytes(make_animated_gif_bytes())
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "video/mp4"
+    assert result.media_type == "video"
+    assert len(result.data) > 0
+
+
+def test_process_animated_apng_returns_mp4(tmp_path):
+    p = tmp_path / "test.apng"
+    p.write_bytes(make_animated_apng_bytes())
+    from services.media import process_image
+    result = process_image(str(p))
+    assert result.mime_type == "video/mp4"
+    assert result.media_type == "video"
+
+
+# --- Video processing ---
+
+def test_process_short_mp4_returns_original_bytes(tmp_path):
+    data = make_mp4_bytes(duration_seconds=1.0)
+    p = tmp_path / "short.mp4"
+    p.write_bytes(data)
+    from services.media import process_video
+    result = process_video(str(p))
+    assert result.mime_type == "video/mp4"
+    assert result.media_type == "video"
+    assert result.data == data
+
+
+def test_process_long_mp4_truncates_to_128s(tmp_path):
+    import imageio.v3 as iio
+    data = make_mp4_bytes(duration_seconds=200.0, fps=2)
+    p = tmp_path / "long.mp4"
+    p.write_bytes(data)
+    from services.media import process_video, MAX_VIDEO_SECONDS
+    result = process_video(str(p))
+    out = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    out.write(result.data)
+    out.close()
+    meta = iio.immeta(out.name, plugin="FFMPEG")
+    os.unlink(out.name)
+    assert meta["duration"] <= MAX_VIDEO_SECONDS + 2  # 2s tolerance for encoding
+
+
+def test_process_avi_converts_to_mp4(tmp_path):
+    import imageio.v3 as iio
+    frames = [np.zeros((10, 10, 3), dtype=np.uint8) for _ in range(5)]
+    avi_path = str(tmp_path / "test.avi")
+    iio.imwrite(avi_path, frames, fps=5, codec="rawvideo")
+    from services.media import process_video
+    result = process_video(avi_path)
+    assert result.mime_type == "video/mp4"
+    assert result.media_type == "video"
+
+
+# --- Metadata extraction ---
+
+def test_extract_image_metadata_dimensions(tmp_path):
+    data = make_jpeg_bytes(width=100, height=80)
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(data)
+    from services.media import extract_metadata
+    meta = extract_metadata(str(p))
+    assert meta.filename == "photo.jpg"
+    assert meta.size_bytes == len(data)
+    assert meta.width == 100
+    assert meta.height == 80
+    assert meta.duration_seconds is None
+
+
+def test_extract_video_metadata_duration(tmp_path):
+    data = make_mp4_bytes(duration_seconds=2.0, fps=10)
+    p = tmp_path / "clip.mp4"
+    p.write_bytes(data)
+    from services.media import extract_metadata
+    meta = extract_metadata(str(p))
+    assert meta.filename == "clip.mp4"
+    assert meta.size_bytes == len(data)
+    assert meta.duration_seconds is not None
+    assert meta.duration_seconds > 0
+    assert meta.width == 16
+    assert meta.height == 16
+
+
+def test_metadata_to_text_contains_image_fields(tmp_path):
+    data = make_jpeg_bytes(width=100, height=80)
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(data)
+    from services.media import extract_metadata
+    text = extract_metadata(str(p)).to_text()
+    assert "photo.jpg" in text
+    assert "100x80" in text
+    assert "MB" in text
+
+
+def test_metadata_to_text_contains_video_fields(tmp_path):
+    data = make_mp4_bytes(duration_seconds=2.0, fps=10)
+    p = tmp_path / "clip.mp4"
+    p.write_bytes(data)
+    from services.media import extract_metadata
+    text = extract_metadata(str(p)).to_text()
+    assert "clip.mp4" in text
+    assert "duration" in text
+    assert "16x16" in text
