@@ -4,7 +4,6 @@ import io
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -32,28 +31,6 @@ class ProcessedFile:
     data: bytes
     mime_type: str
     media_type: str  # "image" or "video"
-
-
-@dataclass
-class FileMetadata:
-    filename: str
-    size_bytes: int
-    modified: str
-    width: Optional[int] = None
-    height: Optional[int] = None
-    duration_seconds: Optional[float] = None
-
-    def to_text(self) -> str:
-        parts = [
-            f"filename: {self.filename}",
-            f"size: {self.size_bytes / 1024 / 1024:.2f}MB",
-            f"modified: {self.modified}",
-        ]
-        if self.width is not None and self.height is not None:
-            parts.append(f"dimensions: {self.width}x{self.height}")
-        if self.duration_seconds is not None:
-            parts.append(f"duration: {self.duration_seconds:.1f}s")
-        return " | ".join(parts)
 
 
 def classify_extension(ext: str) -> Optional[str]:
@@ -125,32 +102,3 @@ def process_video(path: str) -> ProcessedFile:
         return ProcessedFile(data=Path(tmp.name).read_bytes(), mime_type="video/mp4", media_type="video")
     finally:
         os.unlink(tmp.name)
-
-
-def extract_metadata(path: str) -> FileMetadata:
-    p = Path(path)
-    stat = p.stat()
-    modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d")
-    ext = p.suffix.lower()
-
-    if ext in VIDEO_EXTENSIONS:
-        meta = iio.immeta(path, plugin="FFMPEG")
-        size = meta.get("size", None)  # (width, height)
-        return FileMetadata(
-            filename=p.name,
-            size_bytes=stat.st_size,
-            modified=modified,
-            width=size[0] if size else None,
-            height=size[1] if size else None,
-            duration_seconds=meta.get("duration", None),
-        )
-
-    with Image.open(path) as img:
-        width, height = img.size
-    return FileMetadata(
-        filename=p.name,
-        size_bytes=stat.st_size,
-        modified=modified,
-        width=width,
-        height=height,
-    )

@@ -9,7 +9,6 @@ from services.media import (
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
     classify_extension,
-    extract_metadata,
     process_image,
     process_video,
 )
@@ -36,23 +35,11 @@ def index_file(path: str, force: bool) -> None:
 
     try:
         processed = process_image(path) if ext in IMAGE_EXTENSIONS else process_video(path)
-        metadata = extract_metadata(path)
-
         content_embedding = gemini.embed_content(processed.data, processed.mime_type)
-        metadata_embedding = gemini.embed_text(metadata.to_text())
 
         chroma.upsert_content(
             file_id=file_id,
             embedding=content_embedding,
-            path=path,
-            filename=p.name,
-            mime_type=processed.mime_type,
-            media_type=processed.media_type,
-        )
-        chroma.upsert_metadata(
-            file_id=file_id,
-            embedding=metadata_embedding,
-            document=metadata.to_text(),
             path=path,
             filename=p.name,
             mime_type=processed.mime_type,
@@ -63,7 +50,10 @@ def index_file(path: str, force: bool) -> None:
         log.error("failed (%s): %s", type(exc).__name__, path)
 
 
-def run(force: bool) -> None:
+def run(force: bool, db_path: str | None = None) -> None:
+    if db_path is not None:
+        chroma.configure(db_path)
+
     media_dir = Path(MEDIA_DIR)
     if not media_dir.exists():
         log.error("media directory not found: %s", MEDIA_DIR)
@@ -77,5 +67,10 @@ def run(force: bool) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Index media files into ChromaDB")
     parser.add_argument("--force", action="store_true", help="Re-index already-indexed files")
+    parser.add_argument(
+        "--db-path",
+        default=None,
+        help="Path to the ChromaDB persistent directory (default: data/databases)",
+    )
     args = parser.parse_args()
-    run(force=args.force)
+    run(force=args.force, db_path=args.db_path)

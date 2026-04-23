@@ -1,8 +1,16 @@
 import chromadb
 
-_client = chromadb.PersistentClient(path="data/chroma_db")
+DEFAULT_DB_PATH = "data/databases"
+
+_client = chromadb.PersistentClient(path=DEFAULT_DB_PATH)
 content_collection = _client.get_or_create_collection("media_content")
-metadata_collection = _client.get_or_create_collection("media_metadata")
+
+
+def configure(path: str) -> None:
+    """Switch to a different persistent ChromaDB directory (creates it if missing)."""
+    global _client, content_collection
+    _client = chromadb.PersistentClient(path=path)
+    content_collection = _client.get_or_create_collection("media_content")
 
 
 def upsert_content(
@@ -20,24 +28,5 @@ def upsert_content(
     )
 
 
-def upsert_metadata(
-    file_id: str,
-    embedding: list[float],
-    document: str,
-    path: str,
-    filename: str,
-    mime_type: str,
-    media_type: str,
-) -> None:
-    metadata_collection.upsert(
-        ids=[file_id],
-        embeddings=[embedding],
-        documents=[document],
-        metadatas=[{"path": path, "filename": filename, "mime_type": mime_type, "media_type": media_type}],
-    )
-
-
 def is_indexed(file_id: str) -> bool:
-    in_content = len(content_collection.get(ids=[file_id])["ids"]) > 0
-    in_metadata = len(metadata_collection.get(ids=[file_id])["ids"]) > 0
-    return in_content and in_metadata
+    return len(content_collection.get(ids=[file_id])["ids"]) > 0
