@@ -1,2 +1,6 @@
 import os
-os.environ.setdefault("GEMINI_API_KEY", "test-key")
+import pytest
+
+@pytest.fixture(autouse=True, scope="session")
+def set_test_env():
+    os.environ.setdefault("GEMINI_API_KEY", "test-key")
