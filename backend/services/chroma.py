@@ -20,11 +20,15 @@ def upsert_content(
     filename: str,
     mime_type: str,
     media_type: str,
+    extra_metadata: dict | None = None,
 ) -> None:
+    metadata: dict = {"path": path, "filename": filename, "mime_type": mime_type, "media_type": media_type}
+    if extra_metadata:
+        metadata.update(extra_metadata)
     content_collection.upsert(
         ids=[file_id],
         embeddings=[embedding],
-        metadatas=[{"path": path, "filename": filename, "mime_type": mime_type, "media_type": media_type}],
+        metadatas=[metadata],
     )
 
 

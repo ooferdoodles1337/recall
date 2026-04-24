@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from services import chroma, gemini
+from services import chroma, gemini, metadata as metadata_svc
 from services.media import (
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
@@ -36,6 +36,7 @@ def index_file(path: str, force: bool) -> None:
     try:
         processed = process_image(path) if ext in IMAGE_EXTENSIONS else process_video(path)
         content_embedding = gemini.embed_content(processed.data, processed.mime_type)
+        file_metadata = metadata_svc.extract(path)
 
         chroma.upsert_content(
             file_id=file_id,
@@ -44,6 +45,7 @@ def index_file(path: str, force: bool) -> None:
             filename=p.name,
             mime_type=processed.mime_type,
             media_type=processed.media_type,
+            extra_metadata=file_metadata,
         )
         log.info("indexed: %s", path)
     except Exception as exc:

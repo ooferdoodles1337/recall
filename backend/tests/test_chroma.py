@@ -35,3 +35,24 @@ def test_is_indexed_true_when_in_content():
 def test_is_indexed_false_when_missing():
     from services.chroma import is_indexed
     assert is_indexed("data/media/missing.jpg") is False
+
+
+def test_upsert_content_merges_extra_metadata():
+    import services.chroma as chroma
+    chroma.upsert_content(
+        file_id="data/media/geo.jpg",
+        embedding=[0.1] * 3072,
+        path="data/media/geo.jpg",
+        filename="geo.jpg",
+        mime_type="image/jpeg",
+        media_type="image",
+        extra_metadata={"EXIF_Make": "Sony", "geo_city": "Tokyo", "geo_country": "Japan"},
+    )
+    result = chroma.content_collection.get(
+        ids=["data/media/geo.jpg"], include=["metadatas"]
+    )
+    meta = result["metadatas"][0]
+    assert meta["EXIF_Make"] == "Sony"
+    assert meta["geo_city"] == "Tokyo"
+    assert meta["geo_country"] == "Japan"
+    assert meta["filename"] == "geo.jpg"

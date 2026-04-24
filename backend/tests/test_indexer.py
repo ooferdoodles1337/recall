@@ -25,6 +25,7 @@ def mock_services(monkeypatch):
     content_col = ephemeral.get_or_create_collection("media_content")
     monkeypatch.setattr("services.chroma.content_collection", content_col)
     monkeypatch.setattr("services.gemini.embed_content", lambda data, mime: [0.1] * 3072)
+    monkeypatch.setattr("services.metadata.extract", lambda path: {})
     return {"content": content_col}
 
 
@@ -76,3 +77,20 @@ def test_run_indexes_all_files_in_media_dir(media_root, mock_services, monkeypat
     run(force=False)
     result = mock_services["content"].get(ids=["data/media/photo.jpg"])
     assert result["ids"] == ["data/media/photo.jpg"]
+
+
+def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeypatch):
+    monkeypatch.chdir(media_root)
+    monkeypatch.setattr(
+        "services.indexer.metadata_svc.extract",
+        lambda path: {"EXIF_Make": "Nikon", "geo_city": "Paris", "geo_country": "France"},
+    )
+    from services.indexer import index_file
+    index_file("data/media/photo.jpg", force=True)
+    result = mock_services["content"].get(
+        ids=["data/media/photo.jpg"], include=["metadatas"]
+    )
+    meta = result["metadatas"][0]
+    assert meta["EXIF_Make"] == "Nikon"
+    assert meta["geo_city"] == "Paris"
+    assert meta["geo_country"] == "France"
