@@ -1,3 +1,4 @@
+import hashlib
 import io
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -5,6 +6,14 @@ from unittest.mock import MagicMock
 import chromadb
 import pytest
 from PIL import Image
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 @pytest.fixture
@@ -31,21 +40,25 @@ def mock_services(monkeypatch):
 
 def test_index_file_upserts_content_collection(media_root, mock_services, monkeypatch):
     monkeypatch.chdir(media_root)
+    from services.chroma import get_id_by_hash
     from services.indexer import index_file
     index_file("data/media/photo.jpg", force=False)
-    result = mock_services["content"].get(ids=["data/media/photo.jpg"])
-    assert result["ids"] == ["data/media/photo.jpg"]
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    assert get_id_by_hash(content_hash) is not None
 
 
 def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch):
     monkeypatch.chdir(media_root)
     from services.chroma import upsert_content
     from services.indexer import index_file
-    file_id = "data/media/photo.jpg"
-    upsert_content(file_id, [0.1] * 3072, file_id, "photo.jpg", "image/jpeg", "image")
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    upsert_content(
+        "existing-uuid", [0.1] * 3072, "data/media/photo.jpg", "photo.jpg",
+        "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
+    )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
     monkeypatch.setattr("services.gemini.embed_content", embed_mock)
-    index_file(file_id, force=False)
+    index_file("data/media/photo.jpg", force=False)
     embed_mock.assert_not_called()
 
 
@@ -53,11 +66,14 @@ def test_index_file_force_reindexes_existing(media_root, mock_services, monkeypa
     monkeypatch.chdir(media_root)
     from services.chroma import upsert_content
     from services.indexer import index_file
-    file_id = "data/media/photo.jpg"
-    upsert_content(file_id, [0.1] * 3072, file_id, "photo.jpg", "image/jpeg", "image")
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    upsert_content(
+        "existing-uuid", [0.1] * 3072, "data/media/photo.jpg", "photo.jpg",
+        "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
+    )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
     monkeypatch.setattr("services.gemini.embed_content", embed_mock)
-    index_file(file_id, force=True)
+    index_file("data/media/photo.jpg", force=True)
     embed_mock.assert_called_once()
 
 
@@ -73,10 +89,11 @@ def test_index_file_skips_unsupported_extension(media_root, mock_services, monke
 
 def test_run_indexes_all_files_in_media_dir(media_root, mock_services, monkeypatch):
     monkeypatch.chdir(media_root)
+    from services.chroma import get_id_by_hash
     from services.indexer import run
     run(force=False)
-    result = mock_services["content"].get(ids=["data/media/photo.jpg"])
-    assert result["ids"] == ["data/media/photo.jpg"]
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    assert get_id_by_hash(content_hash) is not None
 
 
 def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeypatch):
@@ -85,11 +102,12 @@ def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeyp
         "services.indexer.metadata_svc.extract",
         lambda path: {"EXIF_Make": "Nikon", "geo_city": "Paris", "geo_country": "France"},
     )
+    from services.chroma import get_id_by_hash
     from services.indexer import index_file
     index_file("data/media/photo.jpg", force=True)
-    result = mock_services["content"].get(
-        ids=["data/media/photo.jpg"], include=["metadatas"]
-    )
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    item_id = get_id_by_hash(content_hash)
+    result = mock_services["content"].get(ids=[item_id], include=["metadatas"])
     meta = result["metadatas"][0]
     assert meta["EXIF_Make"] == "Nikon"
     assert meta["geo_city"] == "Paris"
