@@ -24,6 +24,7 @@ MEDIA_DIR = "data/media"
 THUMBNAILS_DIR = "data/thumbnails"
 
 
+
 def _file_hash(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -76,27 +77,47 @@ def index_file(path: str, force: bool) -> None:
         log.error("failed (%s): %s", type(exc).__name__, path)
 
 
-def run(force: bool, db_path: str | None = None) -> None:
+def run(
+    force: bool,
+    annotate: bool = False,
+    db_path: str | None = None,
+    media_dir: str | None = None,
+) -> None:
     if db_path is not None:
         chroma.configure(db_path)
 
-    media_dir = Path(MEDIA_DIR)
-    if not media_dir.exists():
-        log.error("media directory not found: %s", MEDIA_DIR)
+    resolved_media_dir = Path(media_dir) if media_dir else Path(MEDIA_DIR)
+    if not resolved_media_dir.exists():
+        log.error("media directory not found: %s", resolved_media_dir)
         return
-    files = [f for f in media_dir.rglob("*") if f.is_file()]
-    log.info("found %d files in %s", len(files), MEDIA_DIR)
+    files = [f for f in resolved_media_dir.rglob("*") if f.is_file()]
+    log.info("found %d files in %s", len(files), resolved_media_dir)
     for f in files:
         index_file(str(f), force=force)
+
+    if annotate:
+        from services import annotator
+        log.info("starting annotation pass")
+        annotator.annotate_unannotated()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Index media files into ChromaDB")
     parser.add_argument("--force", action="store_true", help="Re-index already-indexed files")
     parser.add_argument(
+        "--annotate",
+        action="store_true",
+        help="Annotate unannotated items with descriptions and search terms via Gemini",
+    )
+    parser.add_argument(
         "--db-path",
         default=None,
         help="Path to the ChromaDB persistent directory (default: data/databases)",
     )
+    parser.add_argument(
+        "--media-dir",
+        default=None,
+        help="Path to media directory (default: data/media)",
+    )
     args = parser.parse_args()
-    run(force=args.force, db_path=args.db_path)
+    run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir)

@@ -70,6 +70,23 @@ def get_random_ids(n: int) -> list[str]:
     return random.sample(all_ids, min(n, len(all_ids)))
 
 
+def get_all_items_with_metadata() -> list[dict]:
+    result = _collection().get(include=["metadatas"])
+    return [
+        {"id": id_, "metadata": meta}
+        for id_, meta in zip(result["ids"], result["metadatas"])
+    ]
+
+
+def update_metadata(file_id: str, patch: dict) -> None:
+    item = get_item(file_id)
+    if item is None:
+        raise ValueError(f"Item not found: {file_id}")
+    existing = item["metadata"] or {}
+    merged = {**existing, **patch}
+    _collection().update(ids=[file_id], metadatas=[merged])
+
+
 def get_stats() -> dict:
     result = _collection().get(include=["metadatas"])
     total = len(result["ids"])
