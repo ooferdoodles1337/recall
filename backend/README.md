@@ -44,7 +44,7 @@ backend/
       chroma_db/    # persistent ChromaDB vector store
 ```
 
-The `data/databases/chroma_db/` and `data/thumbnails/` directories are distributed together to demo participants (as a zip). They place both at their respective paths and run the server — no indexing needed.
+The entire `data/` directory is distributed to demo participants as a zip. They extract it at `backend/data/` and run the server — no indexing needed.
 
 ## Indexing (maintainer only)
 
