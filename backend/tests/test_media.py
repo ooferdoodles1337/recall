@@ -248,3 +248,45 @@ def test_process_avi_converts_to_mp4(tmp_path):
     result = process_video(avi_path)
     assert result.mime_type == "video/mp4"
     assert result.media_type == "video"
+
+
+# --- Thumbnail generation ---
+
+def test_generate_thumbnail_image_returns_webp(tmp_path):
+    p = tmp_path / "test.jpg"
+    p.write_bytes(make_jpeg_bytes(width=640, height=480))
+    from services.media import generate_thumbnail
+    result = generate_thumbnail(str(p), "image")
+    thumb = Image.open(io.BytesIO(result))
+    assert thumb.format == "WEBP"
+    assert max(thumb.size) <= 320
+
+
+def test_generate_thumbnail_image_preserves_aspect_ratio(tmp_path):
+    p = tmp_path / "test.jpg"
+    p.write_bytes(make_jpeg_bytes(width=640, height=320))
+    from services.media import generate_thumbnail
+    result = generate_thumbnail(str(p), "image")
+    thumb = Image.open(io.BytesIO(result))
+    assert thumb.size == (320, 160)
+
+
+def test_generate_thumbnail_small_image_not_upscaled(tmp_path):
+    p = tmp_path / "test.jpg"
+    p.write_bytes(make_jpeg_bytes(width=100, height=80))
+    from services.media import generate_thumbnail
+    result = generate_thumbnail(str(p), "image")
+    thumb = Image.open(io.BytesIO(result))
+    assert thumb.size == (100, 80)
+
+
+def test_generate_thumbnail_video_returns_webp():
+    import numpy as np
+    from unittest.mock import patch
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    with patch("services.media.iio.imread", return_value=frame):
+        from services.media import generate_thumbnail
+        result = generate_thumbnail("fake.mp4", "video")
+    thumb = Image.open(io.BytesIO(result))
+    assert thumb.format == "WEBP"
+    assert max(thumb.size) <= 320

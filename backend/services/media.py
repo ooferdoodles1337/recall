@@ -79,6 +79,19 @@ def _animated_to_mp4(path: str) -> bytes:
         os.unlink(tmp.name)
 
 
+def generate_thumbnail(path: str, media_type: str) -> bytes:
+    if media_type == "video":
+        frame = iio.imread(path, index=0, plugin="FFMPEG")
+        img = Image.fromarray(frame).convert("RGB")
+    else:
+        with Image.open(path) as raw:
+            img = raw.convert("RGB")
+    img.thumbnail((320, 320), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP")
+    return buf.getvalue()
+
+
 def process_video(path: str) -> ProcessedFile:
     ext = Path(path).suffix.lower()
     meta = iio.immeta(path, plugin="FFMPEG")
