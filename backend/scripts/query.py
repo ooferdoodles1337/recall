@@ -55,7 +55,7 @@ def main() -> None:
     parser.add_argument(
         "--db-path",
         default=None,
-        help="Path to the ChromaDB persistent directory (default: data/databases/chroma_db)",
+        help="Path to the ChromaDB persistent directory (default: backend/data/databases/chroma_db)",
     )
     parser.add_argument(
         "-n",

@@ -17,7 +17,7 @@ def test_upsert_content_stores_embedding_and_metadata():
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
-        path="data/media/foo.jpg",
+        path="backend/data/media/foo.jpg",
         filename="foo.jpg",
         mime_type="image/jpeg",
         media_type="image",
@@ -31,7 +31,7 @@ def test_upsert_content_stores_embedding_and_metadata():
 def test_get_id_by_hash_returns_id_when_indexed():
     from services.chroma import upsert_content, get_id_by_hash
     upsert_content(
-        TEST_UUID, [0.1] * 3072, "data/media/foo.jpg", "foo.jpg", "image/jpeg", "image",
+        TEST_UUID, [0.1] * 3072, "backend/data/media/foo.jpg", "foo.jpg", "image/jpeg", "image",
         extra_metadata={"content_hash": TEST_HASH},
     )
     assert get_id_by_hash(TEST_HASH) == TEST_UUID
@@ -47,7 +47,7 @@ def test_upsert_content_merges_extra_metadata():
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
-        path="data/media/geo.jpg",
+        path="backend/data/media/geo.jpg",
         filename="geo.jpg",
         mime_type="image/jpeg",
         media_type="image",

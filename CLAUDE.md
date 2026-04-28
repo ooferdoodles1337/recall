@@ -42,7 +42,7 @@ uv run python scripts/query.py "your query here"
 uv add <package>
 ```
 
-`.env` lives at the **repo root** (not inside `backend/`). Required key: `GEMINI_API_KEY`.
+`.env` lives at the **repo root** (not inside `backend/`). Required key: `GEMINI_API_KEY`. Set `DATA_DIR=./backend/data` if you need to override the default data location.
 
 ## Architecture
 

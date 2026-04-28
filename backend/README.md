@@ -9,6 +9,7 @@ FastAPI backend for the Recall user-testing demo. Provides semantic search over 
 2. Create `.env` at the **repo root** (one level above `backend/`) and fill in your key:
    ```
    GEMINI_API_KEY=your_key_here
+   DATA_DIR=./backend/data
    ```
 
 3. Install dependencies (run from `backend/`):
@@ -33,6 +34,19 @@ uv run uvicorn main:app --reload
 
 The server starts at `http://localhost:8000`. Interactive API docs are at `/docs`.
 
+For a barebones browser-based tester that stays separate from the main frontend, open `http://localhost:8000/tester`. It can hit the existing GET endpoints, show the raw response, and preview thumbnails or original media for returned items.
+
+If your distributed media/database live outside `backend/data`, set runtime paths before starting the server:
+
+```bash
+RECALL_DB_PATH=/absolute/path/to/chroma_db \
+RECALL_MEDIA_DIR=/absolute/path/to/media \
+RECALL_THUMBNAILS_DIR=/absolute/path/to/thumbnails \
+uv run uvicorn main:app --reload
+```
+
+`RECALL_DB_PATH` should point at the Chroma directory that contains the collection, not the `chroma.sqlite3` file itself.
+
 ## Data layout
 
 ```
@@ -44,11 +58,11 @@ backend/
       chroma_db/    # persistent ChromaDB vector store
 ```
 
-The entire `data/` directory is distributed to demo participants as a zip. They extract it at `backend/data/` and run the server — no indexing needed.
+The entire `backend/data/` directory is distributed to demo participants as a zip. They extract it at `backend/data/` and run the server — no indexing needed.
 
 ## Indexing (maintainer only)
 
-Run this once to build the ChromaDB from the media files in `data/media/`:
+Run this once to build the ChromaDB from the media files in `backend/data/media/`:
 
 ```bash
 uv run python -m services.indexer
@@ -57,17 +71,17 @@ uv run python -m services.indexer
 Options:
 - `--force` — re-index files that are already indexed
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and search terms for any unannotated items (requires `GEMINI_API_KEY`)
-- `--db-path <path>` — use a different ChromaDB directory (default: `data/databases/chroma_db`)
-- `--media-dir <path>` — scan a different media directory (default: `data/media`)
+- `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
+- `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
 
 The indexer:
-1. Recursively scans `data/media/` for supported files
+1. Recursively scans `backend/data/media/` for supported files
 2. Computes a SHA-256 hash of the raw file bytes
 3. Skips files whose hash is already in the DB (idempotent without `--force`)
 4. Processes images/videos into an embeddable format (transcodes if needed)
 5. Embeds content via `gemini-embedding-2`
 6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
-7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `data/thumbnails/{uuid}.webp`
+7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
 8. Upserts into ChromaDB using a UUID primary key; `content_hash` and `thumbnail_path` are stored in metadata
 9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each item's metadata
 
@@ -114,9 +128,9 @@ Semantic (vector) search over the indexed media collection using a natural-langu
         "filename": "IMG_4821.jpg",
         "mime_type": "image/jpeg",
         "media_type": "image",
-        "path": "/data/media/IMG_4821.jpg",
+        "path": "/backend/data/media/IMG_4821.jpg",
         "content_hash": "e3b0c44298fc1c149afb...",
-        "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
+        "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
         "description": "A wide-angle beach scene at golden hour...",
         "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
         "geo_city": "Kuta",
@@ -231,9 +245,9 @@ Returns the stored metadata for a single item without serving the file.
     "filename": "IMG_4821.jpg",
     "mime_type": "image/jpeg",
     "media_type": "image",
-    "path": "/data/media/IMG_4821.jpg",
+    "path": "/backend/data/media/IMG_4821.jpg",
     "content_hash": "e3b0c44298fc1c149afb...",
-    "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
+    "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
     "description": "A wide-angle beach scene at golden hour...",
     "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
     "geo_city": "Kuta",

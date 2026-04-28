@@ -122,7 +122,7 @@ def _build_pack_request(pack: list[tuple[str, bytes, str]]) -> dict:
 
 def _submit_via_file(packs: list[list[tuple[str, bytes, str]]]) -> object:
     client = _get_annotation_client()
-    jsonl_path = Path("data/annotation_requests.jsonl")
+    jsonl_path = Path("backend/data/annotation_requests.jsonl")
     jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
     with jsonl_path.open("w") as f:

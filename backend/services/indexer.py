@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import logging
+import os
 import uuid
 from pathlib import Path
 
@@ -20,8 +21,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-MEDIA_DIR = "data/media"
-THUMBNAILS_DIR = "data/thumbnails"
+MEDIA_DIR = os.getenv("RECALL_MEDIA_DIR", "backend/data/media")
+THUMBNAILS_DIR = os.getenv("RECALL_THUMBNAILS_DIR", "backend/data/thumbnails")
 
 
 
@@ -112,12 +113,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--db-path",
         default=None,
-        help="Path to the ChromaDB persistent directory (default: data/databases)",
+        help="Path to the ChromaDB persistent directory (default: backend/data/databases)",
     )
     parser.add_argument(
         "--media-dir",
         default=None,
-        help="Path to media directory (default: data/media)",
+        help="Path to media directory (default: backend/data/media)",
     )
     args = parser.parse_args()
     run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir)

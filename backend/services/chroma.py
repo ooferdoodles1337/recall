@@ -1,8 +1,9 @@
+import os
 import random
 
 import chromadb
 
-DEFAULT_DB_PATH = "data/databases/chroma_db"
+DEFAULT_DB_PATH = os.getenv("RECALL_DB_PATH", "backend/data/databases/chroma_db")
 
 _client: chromadb.ClientAPI | None = None
 content_collection: chromadb.Collection | None = None

@@ -19,7 +19,7 @@ def _seed(extra=None):
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
-        path="data/media/foo.jpg",
+        path="backend/data/media/foo.jpg",
         filename="foo.jpg",
         mime_type="image/jpeg",
         media_type="image",
