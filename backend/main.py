@@ -4,12 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import collection, media, search, trials
-from services import chroma
+from services import chroma, text_index
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     chroma.configure()
+    text_index.build()
     yield
 
 
