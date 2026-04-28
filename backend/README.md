@@ -9,7 +9,6 @@ FastAPI backend for the Recall user-testing demo. Provides semantic search over 
 2. Create `.env` at the **repo root** (one level above `backend/`) and fill in your key:
    ```
    GEMINI_API_KEY=your_key_here
-   DATA_DIR=./backend/data
    ```
 
 3. Install dependencies (run from `backend/`):
@@ -36,17 +35,6 @@ The server starts at `http://localhost:8000`. Interactive API docs are at `/docs
 
 For a barebones browser-based tester that stays separate from the main frontend, open `http://localhost:8000/tester`. It can hit the existing GET endpoints, show the raw response, and preview thumbnails or original media for returned items.
 
-If your distributed media/database live outside `backend/data`, set runtime paths before starting the server:
-
-```bash
-RECALL_DB_PATH=/absolute/path/to/chroma_db \
-RECALL_MEDIA_DIR=/absolute/path/to/media \
-RECALL_THUMBNAILS_DIR=/absolute/path/to/thumbnails \
-uv run uvicorn main:app --reload
-```
-
-`RECALL_DB_PATH` should point at the Chroma directory that contains the collection, not the `chroma.sqlite3` file itself.
-
 ## Data layout
 
 ```
@@ -71,8 +59,10 @@ uv run python -m services.indexer
 Options:
 - `--force` — re-index files that are already indexed
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and search terms for any unannotated items (requires `GEMINI_API_KEY`)
-- `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
-- `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
+- `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`); also settable via `RECALL_DB_PATH`
+- `--media-dir <path>` — scan a different media directory (default: `backend/data/media`); also settable via `RECALL_MEDIA_DIR`
+
+Set `RECALL_THUMBNAILS_DIR` to write thumbnails somewhere other than `backend/data/thumbnails`.
 
 The indexer:
 1. Recursively scans `backend/data/media/` for supported files
