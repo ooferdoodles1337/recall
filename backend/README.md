@@ -56,7 +56,9 @@ uv run python -m services.indexer
 
 Options:
 - `--force` — re-index files that are already indexed
+- `--annotate` — after indexing, run the annotation pass to generate descriptions and search terms for any unannotated items (requires `GEMINI_API_KEY`)
 - `--db-path <path>` — use a different ChromaDB directory (default: `data/databases/chroma_db`)
+- `--media-dir <path>` — scan a different media directory (default: `data/media`)
 
 The indexer:
 1. Recursively scans `data/media/` for supported files
@@ -67,6 +69,7 @@ The indexer:
 6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `data/thumbnails/{uuid}.webp`
 8. Upserts into ChromaDB using a UUID primary key; `content_hash` and `thumbnail_path` are stored in metadata
+9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each item's metadata
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
@@ -87,16 +90,16 @@ Returns `{"status": "ok"}`. Use to verify the server is up.
 
 ---
 
-### `GET /search`
+### `GET /search/semantic`
 
-Semantic search over the indexed media collection.
+Semantic (vector) search over the indexed media collection using a natural-language query.
 
 **Query params**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `q` | string | required | Natural-language search query |
-| `n` | int 1–50 | `5` | Number of results to return |
+| `n` | int ≥ 1 | `5` | Number of results to return |
 
 **Response**
 
@@ -114,6 +117,8 @@ Semantic search over the indexed media collection.
         "path": "/data/media/IMG_4821.jpg",
         "content_hash": "e3b0c44298fc1c149afb...",
         "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
+        "description": "A wide-angle beach scene at golden hour...",
+        "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
         "geo_city": "Kuta",
         "geo_country": "Indonesia"
       }
@@ -122,13 +127,70 @@ Semantic search over the indexed media collection.
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail), plus any extracted EXIF fields and reverse-geocoded `geo_*` fields.
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail). Annotated items additionally include `description` (a natural-language description of the content) and `search_terms` (a JSON-encoded list of keyword phrases). Any extracted EXIF fields and reverse-geocoded `geo_*` fields are also present when available.
+
+---
+
+### `GET /search/suggest`
+
+Returns autocomplete suggestions for a partial query. Backed by an in-memory index of `search_terms` from all annotated items — no ChromaDB or Gemini calls. Use on every keystroke.
+
+**Query params**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `q` | string | required | Partial search query |
+| `n` | int ≥ 1 | `5` | Maximum number of suggestions to return |
+
+Suggestions are prefix matches first; fuzzy matches fill any remaining slots.
+
+**Response**
+
+```json
+{
+  "suggestions": [
+    "sunset beach",
+    "sunset silhouette",
+    "sunset over mountains"
+  ]
+}
+```
+
+---
+
+### `GET /search/text`
+
+Keyword search against the `search_terms` index. Tries exact match → prefix union → fuzzy union and returns all matched items.
+
+**Query params**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `q` | string | required | Search query |
+| `n` | int ≥ 1 | `10` | Maximum number of results to return |
+
+**Response**
+
+```json
+{
+  "query": "golden hour beach",
+  "results": [
+    {
+      "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+      "distance": null,
+      "metadata": { ... }
+    }
+  ]
+}
+```
+
+`distance` is `null` for text matches — there is no cosine score, unlike semantic search.
 
 ---
 
 ### `GET /media/{id}`
 
-Serves the raw media file for a given UUID. The UUID comes from the `id` field in `/search` results.
+Serves the raw media file for a given UUID. The UUID comes from the `id` field in any search response.
 
 ```
 GET /media/3f4a8b2c-1234-5678-abcd-ef0123456789
@@ -158,7 +220,7 @@ Returns the stored metadata for a single item without serving the file.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `id` | string | Item UUID (same as the `id` field from `/search`) |
+| `id` | string | Item UUID (same as the `id` field from any search endpoint) |
 
 **Response**
 
@@ -172,6 +234,8 @@ Returns the stored metadata for a single item without serving the file.
     "path": "/data/media/IMG_4821.jpg",
     "content_hash": "e3b0c44298fc1c149afb...",
     "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
+    "description": "A wide-angle beach scene at golden hour...",
+    "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
     "geo_city": "Kuta",
     "geo_country": "Indonesia"
   }
@@ -188,7 +252,7 @@ Returns a random sample of items from the collection to use as trial targets for
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `n` | int 1–50 | `5` | Number of targets to return |
+| `n` | int ≥ 1 | `5` | Number of targets to return |
 
 **Response**
 
