@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Any
 
@@ -40,7 +41,7 @@ def _first_int(result: dict, keys: list[str]) -> int | None:
 
 
 _DURATION_KEYS = [
-    "Composite_Duration",
+    "Duration",
     "QuickTime_Duration",
     "Track_Duration",
     "Movie_Duration",
@@ -57,12 +58,10 @@ def _parse_duration(value: Any) -> float | None:
     if not isinstance(value, str):
         return None
     value = value.strip()
-    # Try simple numeric string first
     try:
         return float(value)
     except ValueError:
         pass
-    # Parse H:MM:SS or MM:SS (optional milliseconds)
     parts = value.split(":")
     if len(parts) == 2:
         try:
@@ -85,43 +84,69 @@ def _parse_duration(value: Any) -> float | None:
 def _normalize_dimensions_and_duration(
     result: dict[str, str | int | float | bool],
 ) -> dict[str, str | int | float | bool]:
+    # 1. Composite first, then container-specific, then EXIF/File
     width = _first_int(
         result,
         [
+            "Composite_ImageWidth",
+            "ImageWidth",
+            "QuickTime_ImageWidth",
+            "Track_ImageWidth",
+            "Matroska_ImageWidth",
+            "RIFF_ImageWidth",
+            "ASF_ImageWidth",
+            "FLV_ImageWidth",
             "EXIF_ImageWidth",
             "EXIF_ExifImageWidth",
             "File_ImageWidth",
-            "Composite_ImageWidth",
-            "QuickTime_ImageWidth",
-            "Track_ImageWidth",
-            "RIFF_ImageWidth",
-            "Matroska_ImageWidth",
-            "ASF_ImageWidth",
-            "FLV_ImageWidth",
         ],
     )
     height = _first_int(
         result,
         [
+            "Composite_ImageHeight",
+            "ImageHeight",
+            "QuickTime_ImageHeight",
+            "Track_ImageHeight",
+            "Matroska_ImageHeight",
+            "RIFF_ImageHeight",
+            "ASF_ImageHeight",
+            "FLV_ImageHeight",
             "EXIF_ImageHeight",
             "EXIF_ExifImageHeight",
             "File_ImageHeight",
-            "Composite_ImageHeight",
-            "QuickTime_ImageHeight",
-            "Track_ImageHeight",
-            "RIFF_ImageHeight",
-            "Matroska_ImageHeight",
-            "ASF_ImageHeight",
-            "FLV_ImageHeight",
         ],
     )
+
     duration = None
-    for key in _DURATION_KEYS:
-        val = result.get(key)
-        if val is not None:
-            duration = _parse_duration(val)
-            if duration is not None:
-                break
+
+    # 1. Prefer Composite (already normalized by ExifTool)
+    composite_val = result.get("Composite_Duration")
+    if composite_val is not None:
+        duration = _parse_duration(composite_val)
+
+    # 2. Try XMP structured duration
+    if duration is None:
+        scale = result.get("XMP_DurationScale")
+        value = result.get("XMP_DurationValue")
+        if scale is not None and value is not None:
+            try:
+                duration = float(value) * float(scale)
+            except (ValueError, TypeError):
+                duration = None
+
+    # 3. Scan remaining keys and pick the longest valid duration
+    # (some tags like Track_Duration may be shorter than Movie_Duration)
+    if duration is None:
+        best_duration = 0.0
+        for key in _DURATION_KEYS:
+            val = result.get(key)
+            if val is not None:
+                parsed = _parse_duration(val)
+                if parsed is not None and parsed > best_duration:
+                    best_duration = parsed
+        if best_duration > 0:
+            duration = best_duration
 
     normalized: dict[str, str | int | float | bool] = {}
     if width is not None:
@@ -133,10 +158,14 @@ def _normalize_dimensions_and_duration(
     return normalized
 
 
+# Shared geocoder instance — created once at import time (no network call).
+_geocoder = Nominatim(user_agent="recall-indexer")
+
+
+@functools.lru_cache(maxsize=1024)
 def _reverse_geocode(lat: float, lon: float) -> dict[str, str]:
     try:
-        geocoder = Nominatim(user_agent="recall-indexer")
-        location = geocoder.reverse((lat, lon), language="en", timeout=5)
+        location = _geocoder.reverse((lat, lon), language="en", timeout=5)
         if location is None:
             return {}
         addr = location.raw.get("address", {})

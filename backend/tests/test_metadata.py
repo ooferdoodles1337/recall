@@ -86,13 +86,11 @@ def test_extract_adds_geo_fields_when_gps_present(tmp_path):
         }
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata.Nominatim") as mock_nominatim_cls:
+         patch("services.metadata._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        mock_geocoder = MagicMock()
-        mock_nominatim_cls.return_value = mock_geocoder
         mock_geocoder.reverse.return_value = mock_location
         from services.metadata import extract
         result = extract(str(p))
@@ -107,14 +105,14 @@ def test_extract_skips_geocoding_when_no_gps(tmp_path):
     p.write_bytes(b"fake")
     raw = {"EXIF:Make": "Canon"}
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata.Nominatim") as mock_nominatim_cls:
+         patch("services.metadata._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         from services.metadata import extract
         result = extract(str(p))
-    mock_nominatim_cls.assert_not_called()
+    mock_geocoder.reverse.assert_not_called()
     assert "geo_city" not in result
     assert "geo_country" not in result
 
@@ -136,13 +134,11 @@ def test_extract_uses_town_fallback_when_no_city(tmp_path):
         }
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata.Nominatim") as mock_nominatim_cls:
+         patch("services.metadata._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        mock_geocoder = MagicMock()
-        mock_nominatim_cls.return_value = mock_geocoder
         mock_geocoder.reverse.return_value = mock_location
         from services.metadata import extract
         result = extract(str(p))
@@ -159,14 +155,12 @@ def test_extract_returns_partial_result_when_geocoding_fails(tmp_path):
         "Composite:GPSLongitude": -74.0060,
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata.Nominatim") as mock_nominatim_cls:
+         patch("services.metadata._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         from geopy.exc import GeocoderTimedOut
-        mock_geocoder = MagicMock()
-        mock_nominatim_cls.return_value = mock_geocoder
         mock_geocoder.reverse.side_effect = GeocoderTimedOut("timeout")
         from services.metadata import extract
         result = extract(str(p))
@@ -189,6 +183,26 @@ def test_extract_normalizes_width_height_from_exif(tmp_path):
     assert result["height"] == 1080
 
 
+def test_extract_prefers_composite_over_exif_dimensions(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {
+        "Composite:ImageWidth": 3840,
+        "Composite:ImageHeight": 2160,
+        "EXIF:ImageWidth": 1920,
+        "EXIF:ImageHeight": 1080,
+    }
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["width"] == 3840
+    assert result["height"] == 2160
+
+
 def test_extract_normalizes_width_height_from_file_fallback(tmp_path):
     p = tmp_path / "video.mp4"
     p.write_bytes(b"fake")
@@ -202,6 +216,21 @@ def test_extract_normalizes_width_height_from_file_fallback(tmp_path):
         result = extract(str(p))
     assert result["width"] == 1280
     assert result["height"] == 720
+
+
+def test_extract_normalizes_width_height_from_generic_image_tags(tmp_path):
+    p = tmp_path / "photo.png"
+    p.write_bytes(b"fake")
+    raw = {"ImageWidth": 800, "ImageHeight": 600}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["width"] == 800
+    assert result["height"] == 600
 
 
 def test_extract_normalizes_duration_from_quicktime(tmp_path):
@@ -230,6 +259,59 @@ def test_extract_parses_duration_time_string(tmp_path):
         from services.metadata import extract
         result = extract(str(p))
     assert result["duration_s"] == 83.5
+
+
+def test_extract_prefers_composite_duration(tmp_path):
+    p = tmp_path / "movie.mov"
+    p.write_bytes(b"fake")
+    raw = {
+        "Composite:Duration": 120.0,
+        "QuickTime:Duration": 60.0,
+        "Track:Duration": 58.5,
+    }
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["duration_s"] == 120.0
+
+
+def test_extract_prefers_longest_duration_when_no_composite(tmp_path):
+    p = tmp_path / "movie.mov"
+    p.write_bytes(b"fake")
+    raw = {
+        "Track:Duration": 58.5,
+        "Movie:Duration": 120.0,
+        "QuickTime:Duration": 60.0,
+    }
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["duration_s"] == 120.0
+
+
+def test_extract_parses_xmp_duration(tmp_path):
+    p = tmp_path / "media.mp4"
+    p.write_bytes(b"fake")
+    raw = {
+        "XMP:DurationScale": 0.001,
+        "XMP:DurationValue": 90500,
+    }
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["duration_s"] == 90.5
 
 
 def test_extract_skips_normalization_when_dimensions_absent(tmp_path):
