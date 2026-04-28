@@ -9,18 +9,22 @@ router = APIRouter()
 
 
 @router.get("/info")
-def get_item_info(id: str = Query(..., description="File ID from search results")):
+def get_item_info(id: str = Query(..., description="Item UUID from search results")):
     item = chroma.get_item(id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
 
-@router.get("/{file_path:path}")
-def serve_media(file_path: str):
-    if not file_path.startswith("data/media/"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    p = Path(file_path)
+@router.get("/{id}")
+def serve_media(id: str):
+    item = chroma.get_item(id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    path = (item["metadata"] or {}).get("path")
+    if not path:
+        raise HTTPException(status_code=404, detail="Path missing from item metadata")
+    p = Path(path)
     if not p.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="File not found on disk")
     return FileResponse(p)

@@ -59,11 +59,14 @@ Options:
 
 The indexer:
 1. Recursively scans `data/media/` for supported files
-2. Skips already-indexed files (idempotent without `--force`)
-3. Processes images/videos into an embeddable format (transcodes if needed)
-4. Embeds content via `gemini-embedding-2`
-5. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
-6. Upserts the embedding + metadata into ChromaDB
+2. Computes a SHA-256 hash of the raw file bytes
+3. Skips files whose hash is already in the DB (idempotent without `--force`)
+4. Processes images/videos into an embeddable format (transcodes if needed)
+5. Embeds content via `gemini-embedding-2`
+6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
+7. Upserts into ChromaDB using a UUID primary key; `content_hash` is stored in metadata
+
+On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
 **Supported formats**
 
@@ -114,16 +117,16 @@ Semantic search over the indexed media collection.
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `metadata` contains all stored EXIF fields plus any reverse-geocoded `geo_*` fields.
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID. `metadata` contains all stored EXIF fields plus any reverse-geocoded `geo_*` fields, and always includes `content_hash` (SHA-256 of the original file).
 
 ---
 
-### `GET /media/{file_path}`
+### `GET /media/{id}`
 
-Serves the raw media file. `file_path` is the `id` value returned by `/search` (e.g. `data/media/IMG_4821.jpg`). Only paths under `data/media/` are served; anything else returns 403.
+Serves the raw media file for a given UUID. The UUID comes from the `id` field in `/search` results.
 
 ```
-GET /media/data/media/IMG_4821.jpg
+GET /media/3f4a8b2c-1234-5678-abcd-ef0123456789
 → image/jpeg bytes
 ```
 
@@ -137,7 +140,7 @@ Returns the stored metadata for a single item without serving the file.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `id` | string | File ID (same as the `id` field from `/search`) |
+| `id` | string | Item UUID (same as the `id` field from `/search`) |
 
 **Response**
 

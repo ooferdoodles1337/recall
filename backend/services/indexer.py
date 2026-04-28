@@ -1,5 +1,7 @@
 import argparse
+import hashlib
 import logging
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -20,23 +22,36 @@ log = logging.getLogger(__name__)
 MEDIA_DIR = "data/media"
 
 
+def _file_hash(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def index_file(path: str, force: bool) -> None:
     p = Path(path)
-    file_id = str(p)
     ext = p.suffix.lower()
 
     if classify_extension(ext) is None:
         log.warning("skipped (unsupported): %s", path)
         return
 
-    if not force and chroma.is_indexed(file_id):
+    content_hash = _file_hash(path)
+    existing_id = chroma.get_id_by_hash(content_hash)
+
+    if not force and existing_id is not None:
         log.info("skipped (already indexed): %s", path)
         return
+
+    file_id = existing_id or str(uuid.uuid4())
 
     try:
         processed = process_image(path) if ext in IMAGE_EXTENSIONS else process_video(path)
         content_embedding = gemini.embed_content(processed.data, processed.mime_type)
         file_metadata = metadata_svc.extract(path)
+        file_metadata["content_hash"] = content_hash
 
         chroma.upsert_content(
             file_id=file_id,

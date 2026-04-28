@@ -40,8 +40,11 @@ def upsert_content(
     )
 
 
-def is_indexed(file_id: str) -> bool:
-    return len(_collection().get(ids=[file_id])["ids"]) > 0
+def get_id_by_hash(content_hash: str) -> str | None:
+    result = _collection().get(where={"content_hash": content_hash}, include=[])
+    if not result["ids"]:
+        return None
+    return result["ids"][0]
 
 
 def search(
