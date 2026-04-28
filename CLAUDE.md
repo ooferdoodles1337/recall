@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Recall is a personal-media semantic-search app built as a user-testing demo. A pre-indexed ChromaDB is distributed to participants; they run only the API server. `frontend/` is currently empty — all active work is in `backend/`.
+Recall is a personal-media semantic-search app built as a user-testing demo. A pre-indexed ChromaDB is distributed to participants; they run only the API server.
+
+## Project layout
+
+- `backend/` — FastAPI server, indexing tools, and all runtime services.
+- `frontend/` — React + TypeScript + Vite demo UI (not empty).
 
 ## Commands
 
@@ -24,7 +29,11 @@ uv run uvicorn main:app --reload
 # Requires indexing dependencies: uv sync --group indexing
 uv run python -m services.indexer
 uv run python -m services.indexer --force         # re-index existing
+uv run python -m services.indexer --annotate      # annotate unannotated items
 uv run python -m services.indexer --db-path PATH  # custom DB location
+
+# Run annotator standalone
+uv run python -m services.annotator
 
 # CLI search tool (for debugging)
 uv run python scripts/query.py "your query here"
@@ -41,12 +50,17 @@ uv add <package>
 
 **Indexing (offline, maintainer only):**
 `services/indexer.py` → SHA-256 hash for dedup → `services/media.py` (transcode to JPEG/MP4) → `services/gemini.py` (embed via `gemini-embedding-2`) → `services/metadata.py` (EXIF + reverse geocode) → `services/chroma.py` (upsert with UUID primary key)
+Optional: `services/annotator.py` (Gemini batch annotation → `description` + `search_terms` metadata)
 
 **Search (runtime):**
-`GET /search?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → returns UUIDs + metadata
+- `GET /search/semantic?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → returns UUIDs + metadata
+- `GET /search/text?q=` → `services/text_index.py` (exact/prefix/fuzzy term match) → `services/chroma.py` (fetch items) → returns UUIDs + metadata
+- `GET /search/suggest?q=` → `services/text_index.py` (prefix + fuzzy autocomplete) → returns search term suggestions
 
 **Media serving (runtime):**
 `GET /media/{uuid}` → `services/chroma.py` (lookup path from metadata) → `FileResponse`
+`GET /media/{uuid}/thumbnail` → `services/chroma.py` (lookup `thumbnail_path`) → `FileResponse`
+`GET /media/info?id={uuid}` → returns metadata without serving the file
 
 ### Key invariants
 
