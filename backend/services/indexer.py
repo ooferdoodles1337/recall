@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+import config
 from services import chroma, gemini, metadata as metadata_svc
 from services.media import (
     IMAGE_EXTENSIONS,
@@ -21,8 +22,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-MEDIA_DIR = os.getenv("RECALL_MEDIA_DIR", "backend/data/media")
-THUMBNAILS_DIR = os.getenv("RECALL_THUMBNAILS_DIR", "backend/data/thumbnails")
+MEDIA_DIR = os.getenv("RECALL_MEDIA_DIR", str(config.MEDIA_DIR))
+THUMBNAILS_DIR = os.getenv("RECALL_THUMBNAILS_DIR", str(config.THUMBS_DIR))
 
 
 
@@ -113,12 +114,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--db-path",
         default=None,
-        help="Path to the ChromaDB persistent directory (default: backend/data/databases)",
+        help=f"Path to the ChromaDB persistent directory (default: {config.DB_PATH})",
     )
     parser.add_argument(
         "--media-dir",
         default=None,
-        help="Path to media directory (default: backend/data/media)",
+        help=f"Path to media directory (default: {config.MEDIA_DIR})",
     )
     args = parser.parse_args()
     run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir)

@@ -2,7 +2,9 @@ import random
 
 import chromadb
 
-DEFAULT_DB_PATH = "backend/data/databases/chroma_db"
+from config import DB_PATH
+
+DEFAULT_DB_PATH = str(DB_PATH)
 
 _client: chromadb.ClientAPI | None = None
 content_collection: chromadb.Collection | None = None

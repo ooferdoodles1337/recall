@@ -10,6 +10,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
+import config
 from services import chroma
 
 load_dotenv()
@@ -122,7 +123,7 @@ def _build_pack_request(pack: list[tuple[str, bytes, str]]) -> dict:
 
 def _submit_via_file(packs: list[list[tuple[str, bytes, str]]]) -> object:
     client = _get_annotation_client()
-    jsonl_path = Path("backend/data/annotation_requests.jsonl")
+    jsonl_path = config.DATA_DIR / "annotation_requests.jsonl"
     jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
     with jsonl_path.open("w") as f:
