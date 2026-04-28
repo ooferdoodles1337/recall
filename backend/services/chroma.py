@@ -17,6 +17,17 @@ def configure(path: str | None = None) -> None:
     content_collection = _client.get_or_create_collection("media_content")
 
 
+def reset_collection() -> None:
+    """Delete and recreate the media_content collection, removing all indexed data."""
+    global content_collection
+    client = _client
+    if client is None:
+        configure()
+        client = _client
+    client.delete_collection("media_content")
+    content_collection = client.get_or_create_collection("media_content")
+
+
 def _collection() -> chromadb.Collection:
     if content_collection is None:
         configure()
