@@ -21,6 +21,7 @@ uv run pytest tests/test_metadata.py -v
 uv run uvicorn main:app --reload
 
 # Index media files into ChromaDB (maintainer only)
+# Requires indexing dependencies: uv sync --group indexing
 uv run python -m services.indexer
 uv run python -m services.indexer --force         # re-index existing
 uv run python -m services.indexer --db-path PATH  # custom DB location
