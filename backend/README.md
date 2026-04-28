@@ -6,24 +6,24 @@ FastAPI backend for the Recall user-testing demo. Provides semantic search over 
 
 1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
-2. Install ExifTool (required for metadata extraction during indexing):
-   ```bash
-   # Ubuntu/Debian
-   sudo apt install libimage-exiftool-perl
-   # macOS
-   brew install exiftool
-   # Windows: download from https://exiftool.org
-   ```
-
-3. Copy `.env` and fill in your key:
+2. Create `.env` at the **repo root** (one level above `backend/`) and fill in your key:
    ```
    GEMINI_API_KEY=your_key_here
    ```
 
-4. Install dependencies:
+3. Install dependencies (run from `backend/`):
    ```bash
    uv sync
    ```
+
+> **Maintainers only:** indexing also requires ExifTool for metadata extraction.
+> ```bash
+> # Ubuntu/Debian
+> sudo apt install libimage-exiftool-perl
+> # macOS
+> brew install exiftool
+> # Windows: https://exiftool.org
+> ```
 
 ## Running the server
 
@@ -39,11 +39,12 @@ The server starts at `http://localhost:8000`. Interactive API docs are at `/docs
 backend/
   data/
     media/          # source media files (images and videos)
+    thumbnails/     # WebP thumbnails, one per indexed item ({uuid}.webp)
     databases/
       chroma_db/    # persistent ChromaDB vector store
 ```
 
-The ChromaDB directory is what gets distributed to demo participants (as a zip). They place it at `data/databases/chroma_db/` and run the server — no indexing needed.
+The `data/databases/chroma_db/` and `data/thumbnails/` directories are distributed together to demo participants (as a zip). They place both at their respective paths and run the server — no indexing needed.
 
 ## Indexing (maintainer only)
 
@@ -64,7 +65,8 @@ The indexer:
 4. Processes images/videos into an embeddable format (transcodes if needed)
 5. Embeds content via `gemini-embedding-2`
 6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
-7. Upserts into ChromaDB using a UUID primary key; `content_hash` is stored in metadata
+7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `data/thumbnails/{uuid}.webp`
+8. Upserts into ChromaDB using a UUID primary key; `content_hash` and `thumbnail_path` are stored in metadata
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
@@ -103,12 +105,15 @@ Semantic search over the indexed media collection.
   "query": "sunset at the beach",
   "results": [
     {
-      "id": "data/media/IMG_4821.jpg",
+      "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
       "distance": 0.312,
       "metadata": {
         "filename": "IMG_4821.jpg",
         "mime_type": "image/jpeg",
         "media_type": "image",
+        "path": "/data/media/IMG_4821.jpg",
+        "content_hash": "e3b0c44298fc1c149afb...",
+        "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
         "geo_city": "Kuta",
         "geo_country": "Indonesia"
       }
@@ -117,7 +122,7 @@ Semantic search over the indexed media collection.
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID. `metadata` contains all stored EXIF fields plus any reverse-geocoded `geo_*` fields, and always includes `content_hash` (SHA-256 of the original file).
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail), plus any extracted EXIF fields and reverse-geocoded `geo_*` fields.
 
 ---
 
@@ -129,6 +134,19 @@ Serves the raw media file for a given UUID. The UUID comes from the `id` field i
 GET /media/3f4a8b2c-1234-5678-abcd-ef0123456789
 → image/jpeg bytes
 ```
+
+---
+
+### `GET /media/{id}/thumbnail`
+
+Serves the pre-generated WebP thumbnail for a given UUID. The thumbnail is a 320 px (longest-edge) WebP image. For video items, the thumbnail is the first frame.
+
+```
+GET /media/3f4a8b2c-1234-5678-abcd-ef0123456789/thumbnail
+→ image/webp bytes
+```
+
+Returns 404 if the item does not exist or has no thumbnail (items indexed before this feature was added will lack one).
 
 ---
 
@@ -146,11 +164,14 @@ Returns the stored metadata for a single item without serving the file.
 
 ```json
 {
-  "id": "data/media/IMG_4821.jpg",
+  "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
   "metadata": {
     "filename": "IMG_4821.jpg",
     "mime_type": "image/jpeg",
     "media_type": "image",
+    "path": "/data/media/IMG_4821.jpg",
+    "content_hash": "e3b0c44298fc1c149afb...",
+    "thumbnail_path": "/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
     "geo_city": "Kuta",
     "geo_country": "Indonesia"
   }
@@ -176,7 +197,7 @@ Returns a random sample of items from the collection to use as trial targets for
   "n": 5,
   "targets": [
     {
-      "id": "data/media/IMG_4821.jpg",
+      "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
       "metadata": { ... }
     }
   ]
