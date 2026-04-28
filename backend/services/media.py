@@ -69,6 +69,9 @@ def _animated_to_mp4(path: str) -> bytes:
         for i in range(getattr(img, "n_frames", 1)):
             img.seek(i)
             frame = img.convert("RGB")
+            w, h = frame.size
+            if w % 2 != 0 or h % 2 != 0:
+                frame = frame.resize((w + (w % 2), h + (h % 2)), Image.Resampling.LANCZOS)
             frames.append(np.array(frame))
     tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     tmp.close()
@@ -79,8 +82,15 @@ def _animated_to_mp4(path: str) -> bytes:
         os.unlink(tmp.name)
 
 
+ANIMATED_IMAGE_EXTS = {".gif", ".apng"}
+
+
 def generate_thumbnail(path: str, media_type: str) -> bytes:
-    if media_type == "video":
+    ext = Path(path).suffix.lower()
+    if ext in ANIMATED_IMAGE_EXTS:
+        with Image.open(path) as raw:
+            img = raw.convert("RGB")
+    elif media_type == "video":
         frame = iio.imread(path, index=0, plugin="FFMPEG")
         img = Image.fromarray(frame).convert("RGB")
     else:
