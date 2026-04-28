@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recall API Tester</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+
+      body {
+        font-family: system-ui, sans-serif;
+        line-height: 1.4;
+        margin: 0;
+        padding: 16px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      .panel {
+        border: 1px solid rgba(127, 127, 127, 0.4);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: end;
+      }
+
+      label {
+        display: flex;
+        flex: 1 1 180px;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 180px;
+      }
+
+      input,
+      select,
+      button {
+        font: inherit;
+        padding: 8px;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      #status {
+        margin-top: 12px;
+        font-weight: 600;
+      }
+
+      #status.error {
+        color: #b00020;
+      }
+
+      pre {
+        background: rgba(127, 127, 127, 0.08);
+        border-radius: 8px;
+        margin: 0;
+        max-height: 360px;
+        overflow: auto;
+        padding: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      #results {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      }
+
+      .card {
+        background: rgba(127, 127, 127, 0.06);
+        border: 1px solid rgba(127, 127, 127, 0.4);
+        border-radius: 8px;
+        overflow: hidden;
+        padding: 8px;
+      }
+
+      .thumb,
+      .thumb-fallback {
+        aspect-ratio: 1 / 1;
+        background: rgba(127, 127, 127, 0.12);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+      }
+
+      .thumb {
+        display: block;
+        object-fit: cover;
+      }
+
+      .thumb-fallback {
+        font-size: 13px;
+      }
+
+      .card h3 {
+        font-size: 14px;
+        margin: 8px 0 4px;
+        word-break: break-word;
+      }
+
+      .meta {
+        font-size: 12px;
+        opacity: 0.8;
+        word-break: break-word;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      #preview-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      #preview-media img,
+      #preview-media video {
+        display: block;
+        max-height: 60vh;
+        max-width: 100%;
+      }
+
+      .placeholder {
+        background: rgba(127, 127, 127, 0.08);
+        border: 1px dashed rgba(127, 127, 127, 0.5);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Recall API Tester</h1>
+    <p>Simple single-file UI for hitting the backend directly and previewing the media it returns.</p>
+
+    <div class="panel">
+      <form id="request-form">
+        <div class="row">
+          <label>
+            API base URL
+            <input id="base-url" type="url" placeholder="http://localhost:8000">
+          </label>
+
+          <label>
+            Endpoint
+            <select id="preset">
+              <option value="health">GET /health</option>
+              <option value="collection_stats">GET /collection/stats</option>
+              <option value="semantic">GET /search/semantic</option>
+              <option value="text">GET /search/text</option>
+              <option value="suggest">GET /search/suggest</option>
+              <option value="trials">GET /trials</option>
+              <option value="media_info">GET /media/info</option>
+              <option value="custom">Custom GET path</option>
+            </select>
+          </label>
+
+          <label id="query-field">
+            <span id="query-label">Query</span>
+            <input id="query-value" type="text" placeholder="golden hour beach">
+          </label>
+
+          <label id="limit-field">
+            Limit n
+            <input id="limit-value" type="number" min="1" step="1" value="5">
+          </label>
+
+          <label id="custom-field" hidden>
+            Custom path
+            <input id="custom-path" type="text" placeholder="/media/<uuid>/thumbnail">
+          </label>
+
+          <button type="submit">Run request</button>
+        </div>
+      </form>
+
+      <p>Use a search endpoint first, then click a result card to load the thumbnail and original file.</p>
+      <div id="status">Ready.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Response</h2>
+      <pre id="response-output">Run a request to inspect the raw response.</pre>
+    </div>
+
+    <div class="panel">
+      <h2>Preview</h2>
+      <p id="preview-summary">Select a result to preview its media.</p>
+      <div id="preview-links"></div>
+      <div id="preview-media">
+        <div class="placeholder">No media selected.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Results</h2>
+      <div id="results">
+        <div class="placeholder">Search results and trial targets will appear here.</div>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        binaryObjectUrl: null,
+      };
+
+      const elements = {
+        baseUrl: document.getElementById("base-url"),
+        customField: document.getElementById("custom-field"),
+        customPath: document.getElementById("custom-path"),
+        limitField: document.getElementById("limit-field"),
+        limitValue: document.getElementById("limit-value"),
+        preset: document.getElementById("preset"),
+        previewLinks: document.getElementById("preview-links"),
+        previewMedia: document.getElementById("preview-media"),
+        previewSummary: document.getElementById("preview-summary"),
+        queryField: document.getElementById("query-field"),
+        queryLabel: document.getElementById("query-label"),
+        queryValue: document.getElementById("query-value"),
+        requestForm: document.getElementById("request-form"),
+        responseOutput: document.getElementById("response-output"),
+        results: document.getElementById("results"),
+        status: document.getElementById("status"),
+      };
+
+      const presetConfig = {
+        health: {
+          buildPath: () => "/health",
+          showCustom: false,
+          showLimit: false,
+          showQuery: false,
+        },
+        collection_stats: {
+          buildPath: () => "/collection/stats",
+          showCustom: false,
+          showLimit: false,
+          showQuery: false,
+        },
+        semantic: {
+          buildPath: ({ limit, query }) => `/search/semantic?${new URLSearchParams({ q: query, n: limit })}`,
+          placeholder: "golden hour beach",
+          queryLabel: "Query",
+          showCustom: false,
+          showLimit: true,
+          showQuery: true,
+        },
+        text: {
+          buildPath: ({ limit, query }) => `/search/text?${new URLSearchParams({ q: query, n: limit })}`,
+          placeholder: "sunset beach",
+          queryLabel: "Query",
+          showCustom: false,
+          showLimit: true,
+          showQuery: true,
+        },
+        suggest: {
+          buildPath: ({ limit, query }) => `/search/suggest?${new URLSearchParams({ q: query, n: limit })}`,
+          placeholder: "sun",
+          queryLabel: "Query",
+          showCustom: false,
+          showLimit: true,
+          showQuery: true,
+        },
+        trials: {
+          buildPath: ({ limit }) => `/trials?${new URLSearchParams({ n: limit })}`,
+          showCustom: false,
+          showLimit: true,
+          showQuery: false,
+        },
+        media_info: {
+          buildPath: ({ query }) => `/media/info?${new URLSearchParams({ id: query })}`,
+          placeholder: "item UUID",
+          queryLabel: "Item ID",
+          showCustom: false,
+          showLimit: false,
+          showQuery: true,
+        },
+        custom: {
+          buildPath: ({ customPath }) => customPath,
+          showCustom: true,
+          showLimit: false,
+          showQuery: false,
+        },
+      };
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function setStatus(message, isError = false) {
+        elements.status.textContent = message;
+        elements.status.classList.toggle("error", isError);
+      }
+
+      function setResponseOutput(value) {
+        elements.responseOutput.textContent = value;
+      }
+
+      function clearBinaryPreview() {
+        if (state.binaryObjectUrl) {
+          URL.revokeObjectURL(state.binaryObjectUrl);
+          state.binaryObjectUrl = null;
+        }
+      }
+
+      function showEmptyResults(message) {
+        elements.results.innerHTML = `<div class="placeholder">${escapeHtml(message)}</div>`;
+      }
+
+      function showEmptyPreview(message) {
+        clearBinaryPreview();
+        elements.previewSummary.textContent = message;
+        elements.previewLinks.innerHTML = "";
+        elements.previewMedia.innerHTML = `<div class="placeholder">${escapeHtml(message)}</div>`;
+      }
+
+      function normalizedBaseUrl() {
+        const baseUrl = elements.baseUrl.value.trim() || window.location.origin;
+        return baseUrl.replace(/\/+$/, "");
+      }
+
+      function buildAbsoluteUrl(path) {
+        const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+        return new URL(normalizedPath, `${normalizedBaseUrl()}/`).toString();
+      }
+
+      function updateFormState() {
+        const config = presetConfig[elements.preset.value];
+        elements.queryField.hidden = !config.showQuery;
+        elements.limitField.hidden = !config.showLimit;
+        elements.customField.hidden = !config.showCustom;
+        elements.queryLabel.textContent = config.queryLabel || "Query";
+        elements.queryValue.placeholder = config.placeholder || "";
+      }
+
+      function showBinaryPreview(url, contentType, summary) {
+        elements.previewSummary.textContent = summary;
+        elements.previewLinks.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Open original response</a>`;
+
+        const media = contentType.startsWith("video/")
+          ? document.createElement("video")
+          : document.createElement("img");
+        media.src = url;
+        if (media.tagName === "VIDEO") {
+          media.controls = true;
+        }
+
+        elements.previewMedia.innerHTML = "";
+        elements.previewMedia.append(media);
+      }
+
+      function showFetchedBinaryPreview(blob, contentType, sourceUrl) {
+        clearBinaryPreview();
+        state.binaryObjectUrl = URL.createObjectURL(blob);
+        showBinaryPreview(state.binaryObjectUrl, contentType, `Previewing ${contentType} from ${sourceUrl}`);
+        elements.previewLinks.innerHTML = `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Open original response</a>`;
+      }
+
+      function renderSuggestions(suggestions) {
+        if (!Array.isArray(suggestions) || suggestions.length === 0) {
+          showEmptyResults("No suggestions returned.");
+          return;
+        }
+
+        const list = document.createElement("ul");
+        for (const suggestion of suggestions) {
+          const item = document.createElement("li");
+          item.textContent = suggestion;
+          list.append(item);
+        }
+
+        elements.results.innerHTML = "";
+        elements.results.append(list);
+      }
+
+      function buildPreviewLinks(itemId) {
+        const encodedId = encodeURIComponent(itemId);
+        const thumbUrl = buildAbsoluteUrl(`/media/${encodedId}/thumbnail`);
+        const mediaUrl = buildAbsoluteUrl(`/media/${encodedId}`);
+        const infoUrl = buildAbsoluteUrl(`/media/info?id=${encodedId}`);
+        return { infoUrl, mediaUrl, thumbUrl };
+      }
+
+      function showItemPreview(item) {
+        const itemId = item.id;
+        const metadata = item.metadata || {};
+        const mediaType = metadata.media_type || metadata.mime_type || "media";
+        const title = metadata.filename || itemId;
+        const { infoUrl, mediaUrl, thumbUrl } = buildPreviewLinks(itemId);
+
+        elements.queryValue.value = itemId;
+        elements.previewSummary.textContent = `${title} (${mediaType})`;
+        elements.previewLinks.innerHTML = [
+          `<a href="${escapeHtml(thumbUrl)}" target="_blank" rel="noreferrer">Thumbnail</a>`,
+          `<a href="${escapeHtml(mediaUrl)}" target="_blank" rel="noreferrer">Original media</a>`,
+          `<a href="${escapeHtml(infoUrl)}" target="_blank" rel="noreferrer">Metadata</a>`,
+        ].join(" ");
+
+        clearBinaryPreview();
+        elements.previewMedia.innerHTML = "";
+
+        if ((metadata.media_type || "").startsWith("video") || (metadata.mime_type || "").startsWith("video/")) {
+          const video = document.createElement("video");
+          video.controls = true;
+          video.src = mediaUrl;
+          elements.previewMedia.append(video);
+          return;
+        }
+
+        const image = document.createElement("img");
+        image.src = mediaUrl;
+        image.alt = title;
+        elements.previewMedia.append(image);
+      }
+
+      function renderItems(items) {
+        if (!Array.isArray(items) || items.length === 0) {
+          showEmptyResults("No items returned.");
+          showEmptyPreview("No media selected.");
+          return;
+        }
+
+        elements.results.innerHTML = "";
+
+        for (const item of items) {
+          const card = document.createElement("div");
+          const metadata = item.metadata || {};
+          const title = metadata.filename || item.id;
+          const thumbUrl = buildAbsoluteUrl(`/media/${encodeURIComponent(item.id)}/thumbnail`);
+          const mediaUrl = buildAbsoluteUrl(`/media/${encodeURIComponent(item.id)}`);
+          const image = document.createElement("img");
+          image.className = "thumb";
+          image.loading = "lazy";
+          image.alt = title;
+          image.src = thumbUrl;
+          image.addEventListener("error", () => {
+            const fallback = document.createElement("div");
+            fallback.className = "thumb-fallback";
+            fallback.textContent = "No thumbnail";
+            image.replaceWith(fallback);
+          }, { once: true });
+
+          const heading = document.createElement("h3");
+          heading.textContent = title;
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.innerHTML = [
+            `<div><strong>ID:</strong> ${escapeHtml(item.id)}</div>`,
+            `<div><strong>Type:</strong> ${escapeHtml(metadata.media_type || metadata.mime_type || "unknown")}</div>`,
+            item.distance == null ? "" : `<div><strong>Distance:</strong> ${escapeHtml(item.distance)}</div>`,
+          ].join("");
+
+          const actions = document.createElement("div");
+          actions.className = "actions";
+
+          const previewButton = document.createElement("button");
+          previewButton.type = "button";
+          previewButton.textContent = "Preview";
+          previewButton.addEventListener("click", () => showItemPreview(item));
+
+          const infoButton = document.createElement("button");
+          infoButton.type = "button";
+          infoButton.textContent = "Load info";
+          infoButton.addEventListener("click", () => {
+            elements.preset.value = "media_info";
+            updateFormState();
+            elements.queryValue.value = item.id;
+            void runCurrentRequest();
+          });
+
+          const mediaLink = document.createElement("a");
+          mediaLink.href = mediaUrl;
+          mediaLink.rel = "noreferrer";
+          mediaLink.target = "_blank";
+          mediaLink.textContent = "Open media";
+
+          actions.append(previewButton, infoButton, mediaLink);
+          card.className = "card";
+          card.append(image, heading, meta, actions);
+          elements.results.append(card);
+        }
+
+        showItemPreview(items[0]);
+      }
+
+      function handleJsonResponse(data) {
+        if (Array.isArray(data?.results)) {
+          renderItems(data.results);
+          return;
+        }
+
+        if (Array.isArray(data?.targets)) {
+          renderItems(data.targets);
+          return;
+        }
+
+        if (Array.isArray(data?.suggestions)) {
+          renderSuggestions(data.suggestions);
+          showEmptyPreview("Suggestions do not include media previews.");
+          return;
+        }
+
+        if (data?.id && data?.metadata) {
+          renderItems([data]);
+          return;
+        }
+
+        showEmptyResults("This response does not include previewable items.");
+        showEmptyPreview("This response does not include media previews.");
+      }
+
+      async function runCurrentRequest() {
+        const config = presetConfig[elements.preset.value];
+        const query = elements.queryValue.value.trim();
+        const customPath = elements.customPath.value.trim();
+        const rawLimit = Number.parseInt(elements.limitValue.value, 10);
+        const limit = String(Number.isFinite(rawLimit) && rawLimit >= 1 ? rawLimit : 1);
+
+        if (config.showQuery && !query) {
+          setStatus("This endpoint needs a query or item ID.", true);
+          return;
+        }
+
+        if (config.showCustom && !customPath) {
+          setStatus("Enter a custom GET path such as /health or /media/<uuid>/thumbnail.", true);
+          return;
+        }
+
+        const path = config.buildPath({ customPath, limit, query });
+        const url = buildAbsoluteUrl(path);
+        setStatus(`GET ${url}`);
+
+        try {
+          const response = await fetch(url);
+          const contentType = response.headers.get("content-type") || "";
+
+          setStatus(`${response.status} ${response.statusText} - ${url}`, !response.ok);
+
+          if (contentType.includes("application/json")) {
+            const data = await response.json();
+            setResponseOutput(JSON.stringify(data, null, 2));
+            handleJsonResponse(data);
+            return;
+          }
+
+          if (contentType.startsWith("image/") || contentType.startsWith("video/")) {
+            const blob = await response.blob();
+            setResponseOutput(`Binary response: ${contentType} (${blob.size} bytes)`);
+            showFetchedBinaryPreview(blob, contentType, url);
+            showEmptyResults("Binary endpoint response previewed above.");
+            return;
+          }
+
+          const text = await response.text();
+          setResponseOutput(text || `[empty response] (${contentType || "unknown content type"})`);
+          showEmptyResults("This response does not include previewable items.");
+          showEmptyPreview("This response does not include media previews.");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(message, true);
+          setResponseOutput(message);
+          showEmptyResults("Request failed.");
+          showEmptyPreview("Request failed.");
+        }
+      }
+
+      elements.baseUrl.value = window.location.origin;
+      elements.requestForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        void runCurrentRequest();
+      });
+      elements.preset.addEventListener("change", updateFormState);
+      updateFormState();
+    </script>
+  </body>
+</html>
