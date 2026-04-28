@@ -11,6 +11,7 @@ from services.media import (
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
     classify_extension,
+    generate_thumbnail,
     process_image,
     process_video,
 )
@@ -20,6 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
 MEDIA_DIR = "data/media"
+THUMBNAILS_DIR = "data/thumbnails"
 
 
 def _file_hash(path: str) -> str:
@@ -52,6 +54,13 @@ def index_file(path: str, force: bool) -> None:
         content_embedding = gemini.embed_content(processed.data, processed.mime_type)
         file_metadata = metadata_svc.extract(path)
         file_metadata["content_hash"] = content_hash
+
+        thumbnail_bytes = generate_thumbnail(path, processed.media_type)
+        thumbnails_dir = Path(THUMBNAILS_DIR)
+        thumbnails_dir.mkdir(parents=True, exist_ok=True)
+        thumbnail_path = str(thumbnails_dir / f"{file_id}.webp")
+        Path(thumbnail_path).write_bytes(thumbnail_bytes)
+        file_metadata["thumbnail_path"] = thumbnail_path
 
         chroma.upsert_content(
             file_id=file_id,

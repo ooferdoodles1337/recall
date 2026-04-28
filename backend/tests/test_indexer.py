@@ -96,6 +96,40 @@ def test_run_indexes_all_files_in_media_dir(media_root, mock_services, monkeypat
     assert get_id_by_hash(content_hash) is not None
 
 
+def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services, monkeypatch):
+    monkeypatch.chdir(media_root)
+    from services.chroma import get_id_by_hash
+    from services.indexer import index_file
+    index_file("data/media/photo.jpg", force=False)
+    content_hash = _sha256(media_root / "data" / "media" / "photo.jpg")
+    item_id = get_id_by_hash(content_hash)
+    result = mock_services["content"].get(ids=[item_id], include=["metadatas"])
+    meta = result["metadatas"][0]
+    assert "thumbnail_path" in meta
+    assert meta["thumbnail_path"].endswith(".webp")
+
+
+def test_index_file_writes_thumbnail_webp_to_disk(media_root, mock_services, monkeypatch):
+    monkeypatch.chdir(media_root)
+    from services.indexer import index_file
+    # force=True ensures the thumbnail write path is exercised regardless of shared
+    # EphemeralClient state between tests (ChromaDB EphemeralClient shares in-process state)
+    index_file("data/media/photo.jpg", force=True)
+    thumbnails = list((media_root / "data" / "thumbnails").glob("*.webp"))
+    assert len(thumbnails) == 1
+
+
+def test_index_file_force_overwrites_thumbnail(media_root, mock_services, monkeypatch):
+    monkeypatch.chdir(media_root)
+    from services.indexer import index_file
+    index_file("data/media/photo.jpg", force=True)
+    thumbnails_before = list((media_root / "data" / "thumbnails").glob("*.webp"))
+    assert len(thumbnails_before) == 1
+    index_file("data/media/photo.jpg", force=True)
+    thumbnails_after = list((media_root / "data" / "thumbnails").glob("*.webp"))
+    assert len(thumbnails_after) == 1  # still one — overwritten, not duplicated
+
+
 def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeypatch):
     monkeypatch.chdir(media_root)
     monkeypatch.setattr(
