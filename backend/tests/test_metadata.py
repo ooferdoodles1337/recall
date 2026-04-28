@@ -172,3 +172,77 @@ def test_extract_returns_partial_result_when_geocoding_fails(tmp_path):
         result = extract(str(p))
     assert result["EXIF_Make"] == "Canon"
     assert "geo_city" not in result
+
+
+def test_extract_normalizes_width_height_from_exif(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {"EXIF:ImageWidth": 1920, "EXIF:ImageHeight": 1080}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["width"] == 1920
+    assert result["height"] == 1080
+
+
+def test_extract_normalizes_width_height_from_file_fallback(tmp_path):
+    p = tmp_path / "video.mp4"
+    p.write_bytes(b"fake")
+    raw = {"File:ImageWidth": 1280, "File:ImageHeight": 720}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["width"] == 1280
+    assert result["height"] == 720
+
+
+def test_extract_normalizes_duration_from_quicktime(tmp_path):
+    p = tmp_path / "movie.mov"
+    p.write_bytes(b"fake")
+    raw = {"QuickTime:Duration": 62.5}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["duration_s"] == 62.5
+
+
+def test_extract_parses_duration_time_string(tmp_path):
+    p = tmp_path / "clip.avi"
+    p.write_bytes(b"fake")
+    raw = {"RIFF:Duration": "0:01:23.500"}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["duration_s"] == 83.5
+
+
+def test_extract_skips_normalization_when_dimensions_absent(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {"EXIF:Make": "Canon"}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert "width" not in result
+    assert "height" not in result
+    assert "duration_s" not in result
