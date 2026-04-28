@@ -1,7 +1,6 @@
 import argparse
 import hashlib
 import logging
-import os
 import uuid
 from pathlib import Path
 
@@ -11,7 +10,6 @@ import config
 from services import chroma, gemini, metadata as metadata_svc
 from services.media import (
     IMAGE_EXTENSIONS,
-    VIDEO_EXTENSIONS,
     classify_extension,
     generate_thumbnail,
     process_image,
@@ -22,25 +20,26 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-MEDIA_DIR = os.getenv("RECALL_MEDIA_DIR", str(config.MEDIA_DIR))
-THUMBNAILS_DIR = os.getenv("RECALL_THUMBNAILS_DIR", str(config.THUMBS_DIR))
 
-
-
-def _file_hash(path: str) -> str:
+def _file_hash(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with path.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
 
 
-def index_file(path: str, force: bool) -> None:
-    p = Path(path)
-    ext = p.suffix.lower()
+def index_file(path: Path, force: bool) -> None:
+    ext = path.suffix.lower()
 
     if classify_extension(ext) is None:
         log.warning("skipped (unsupported): %s", path)
+        return
+
+    try:
+        rel_path = str(path.relative_to(config.DATA_DIR))
+    except ValueError:
+        log.error("file is outside DATA_DIR and cannot be indexed portably: %s", path)
         return
 
     content_hash = _file_hash(path)
@@ -53,23 +52,23 @@ def index_file(path: str, force: bool) -> None:
     file_id = existing_id or str(uuid.uuid4())
 
     try:
-        processed = process_image(path) if ext in IMAGE_EXTENSIONS else process_video(path)
+        path_str = str(path)
+        processed = process_image(path_str) if ext in IMAGE_EXTENSIONS else process_video(path_str)
         content_embedding = gemini.embed_content(processed.data, processed.mime_type)
-        file_metadata = metadata_svc.extract(path)
+        file_metadata = metadata_svc.extract(path_str)
         file_metadata["content_hash"] = content_hash
 
-        thumbnail_bytes = generate_thumbnail(path, processed.media_type)
-        thumbnails_dir = Path(THUMBNAILS_DIR)
-        thumbnails_dir.mkdir(parents=True, exist_ok=True)
-        thumbnail_path = str(thumbnails_dir / f"{file_id}.webp")
-        Path(thumbnail_path).write_bytes(thumbnail_bytes)
-        file_metadata["thumbnail_path"] = thumbnail_path
+        thumbnail_bytes = generate_thumbnail(path_str, processed.media_type)
+        config.THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+        thumbnail_abs = config.THUMBS_DIR / f"{file_id}.webp"
+        thumbnail_abs.write_bytes(thumbnail_bytes)
+        file_metadata["thumbnail_path"] = str(thumbnail_abs.relative_to(config.DATA_DIR))
 
         chroma.upsert_content(
             file_id=file_id,
             embedding=content_embedding,
-            path=path,
-            filename=p.name,
+            path=rel_path,
+            filename=path.name,
             mime_type=processed.mime_type,
             media_type=processed.media_type,
             extra_metadata=file_metadata,
@@ -84,18 +83,27 @@ def run(
     annotate: bool = False,
     db_path: str | None = None,
     media_dir: str | None = None,
+    reset: bool = False,
 ) -> None:
     if db_path is not None:
         chroma.configure(db_path)
 
-    resolved_media_dir = Path(media_dir) if media_dir else Path(MEDIA_DIR)
+    if reset:
+        chroma.reset_collection()
+        if config.THUMBS_DIR.exists():
+            for f in config.THUMBS_DIR.iterdir():
+                if f.is_file():
+                    f.unlink()
+        log.info("reset: cleared database and thumbnails")
+
+    resolved_media_dir = Path(media_dir).resolve() if media_dir else config.MEDIA_DIR
     if not resolved_media_dir.exists():
         log.error("media directory not found: %s", resolved_media_dir)
         return
     files = [f for f in resolved_media_dir.rglob("*") if f.is_file()]
     log.info("found %d files in %s", len(files), resolved_media_dir)
     for f in files:
-        index_file(str(f), force=force)
+        index_file(f, force=force)
 
     if annotate:
         from services import annotator
@@ -119,7 +127,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--media-dir",
         default=None,
-        help=f"Path to media directory (default: {config.MEDIA_DIR})",
+        help=f"Path to media directory, must be inside DATA_DIR (default: {config.MEDIA_DIR})",
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Wipe the database and all thumbnails before indexing",
     )
     args = parser.parse_args()
-    run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir)
+    run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir, reset=args.reset)

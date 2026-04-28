@@ -1,8 +1,7 @@
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
+import config
 from services import chroma
 
 router = APIRouter()
@@ -24,7 +23,7 @@ def serve_thumbnail(id: str):
     thumbnail_path = (item["metadata"] or {}).get("thumbnail_path")
     if not thumbnail_path:
         raise HTTPException(status_code=404, detail="Thumbnail not available")
-    p = Path(thumbnail_path)
+    p = config.DATA_DIR / thumbnail_path
     if not p.is_file():
         raise HTTPException(status_code=404, detail="Thumbnail file not found on disk")
     return FileResponse(p, media_type="image/webp")
@@ -38,7 +37,7 @@ def serve_media(id: str):
     path = (item["metadata"] or {}).get("path")
     if not path:
         raise HTTPException(status_code=404, detail="Path missing from item metadata")
-    p = Path(path)
+    p = config.DATA_DIR / path
     if not p.is_file():
         raise HTTPException(status_code=404, detail="File not found on disk")
     return FileResponse(p)

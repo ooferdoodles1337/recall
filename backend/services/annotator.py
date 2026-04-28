@@ -66,7 +66,7 @@ def _load_item_bytes(item: dict) -> tuple[str, bytes, str] | None:
         log.warning("item %s missing path or mime_type", item["id"])
         return None
     try:
-        data = Path(path).read_bytes()
+        data = (config.DATA_DIR / path).read_bytes()
         return (item["id"], data, mime_type)
     except Exception as exc:
         log.error("failed to load %s: %s", path, exc)
