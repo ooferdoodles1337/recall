@@ -42,6 +42,10 @@ def mock_services(media_root, monkeypatch):
     content_col = ephemeral.get_or_create_collection("media_content")
     monkeypatch.setattr("services.chroma.content_collection", content_col)
     monkeypatch.setattr("services.gemini.embed_content", lambda data, mime: [0.1] * 3072)
+    monkeypatch.setattr(
+        "services.gemini.embed_content_batch",
+        lambda items: {key: [0.1] * 3072 for key, _, _ in items},
+    )
     monkeypatch.setattr("services.metadata.extract", lambda path: {})
     return {"content": content_col, "data_dir": media_root / "data"}
 

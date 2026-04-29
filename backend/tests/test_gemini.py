@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 
@@ -47,3 +48,58 @@ def test_embed_content_passes_bytes_as_part():
     contents = call_kwargs["contents"]
     assert len(contents) == 1
     assert isinstance(contents[0], types.Part)
+
+
+def _make_batch_client(result_lines: list[str]):
+    """Build a mock client that simulates a successful batch embeddings job."""
+    uploaded_file = MagicMock()
+    uploaded_file.name = "files/test-upload"
+
+    batch_job = MagicMock()
+    batch_job.name = "batches/test-job"
+    batch_job.state.name = "JOB_STATE_SUCCEEDED"
+    dest = MagicMock()
+    dest.file_name = "files/test-result"
+    batch_job.dest = dest
+
+    mock_client = MagicMock()
+    mock_client.files.upload.return_value = uploaded_file
+    mock_client.batches.create_embeddings.return_value = batch_job
+    mock_client.batches.get.return_value = batch_job
+    mock_client.files.download.return_value = "\n".join(result_lines).encode("utf-8")
+    return mock_client
+
+
+def test_embed_content_batch_returns_embeddings():
+    items = [("k1", b"\xff\xd8\xff", "image/jpeg"), ("k2", b"\x89PNG", "image/png")]
+    result_lines = [
+        json.dumps({"key": "k1", "response": {"embedding": {"values": [0.1] * 3072}}}),
+        json.dumps({"key": "k2", "response": {"embedding": {"values": [0.2] * 3072}}}),
+    ]
+    with patch("services.gemini._client", _make_batch_client(result_lines)):
+        from services.gemini import embed_content_batch
+        result = embed_content_batch(items)
+
+    assert set(result.keys()) == {"k1", "k2"}
+    assert len(result["k1"]) == 3072
+    assert result["k1"][0] == 0.1
+    assert result["k2"][0] == 0.2
+
+
+def test_embed_content_batch_raises_on_failure():
+    batch_job = MagicMock()
+    batch_job.name = "batches/failing-job"
+    batch_job.state.name = "JOB_STATE_FAILED"
+
+    mock_client = MagicMock()
+    uploaded_file = MagicMock()
+    uploaded_file.name = "files/test-upload"
+    mock_client.files.upload.return_value = uploaded_file
+    mock_client.batches.create_embeddings.return_value = batch_job
+    mock_client.batches.get.return_value = batch_job
+
+    import pytest
+    with patch("services.gemini._client", mock_client):
+        from services.gemini import embed_content_batch
+        with pytest.raises(RuntimeError, match="JOB_STATE_FAILED"):
+            embed_content_batch([("k1", b"data", "image/jpeg")])
