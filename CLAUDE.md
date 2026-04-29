@@ -28,12 +28,10 @@ uv run uvicorn main:app --reload
 # Index media files into ChromaDB (maintainer only)
 # Requires indexing dependencies: uv sync --group indexing
 uv run python -m services.indexer
-uv run python -m services.indexer --force         # re-index existing
-uv run python -m services.indexer --annotate      # annotate unannotated items
+uv run python -m services.indexer --force         # re-index existing files
+uv run python -m services.indexer --annotate      # annotate unannotated items after indexing
 uv run python -m services.indexer --db-path PATH  # custom DB location
-
-# Run annotator standalone
-uv run python -m services.annotator
+uv run python -m services.indexer --reset         # wipe DB and thumbnails, then index
 
 # CLI search tool (for debugging)
 uv run python scripts/query.py "your query here"
@@ -42,15 +40,25 @@ uv run python scripts/query.py "your query here"
 uv add <package>
 ```
 
-`.env` lives at the **repo root** (not inside `backend/`). Required key: `GEMINI_API_KEY`. Set `DATA_DIR=./backend/data` if you need to override the default data location.
+`.env` lives at the **repo root** (not inside `backend/`). Required keys:
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | yes | Embedding and Gemini batch annotation |
+| `DATA_DIR` | no | Override default data directory (`./backend/data`) |
+| `OPENROUTER_API_KEY` | no | Use OpenRouter for annotation instead of Gemini |
+| `OPENROUTER_MODEL` | no | OpenRouter model (default: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`) |
 
 ## Architecture
 
 ### Data flow
 
 **Indexing (offline, maintainer only):**
-`services/indexer.py` → SHA-256 hash for dedup → `services/media.py` (transcode to JPEG/MP4) → `services/gemini.py` (embed via `gemini-embedding-2`) → `services/metadata.py` (EXIF + reverse geocode) → `services/chroma.py` (upsert with UUID primary key)
-Optional: `services/annotator.py` (Gemini batch annotation → `description` + `search_terms` metadata)
+`services/indexer.py` preprocesses all files first (SHA-256 dedup, `services/media.py` transcode, `services/metadata.py` EXIF + geocode, thumbnail generation), then submits all embeddings to `services/gemini.py` in one Gemini Batch API call (`gemini-embedding-2`), then upserts results to `services/chroma.py` (UUID primary key).
+
+Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotated items and calls one of two backends:
+- **Gemini** (default): `services/gemini.py` `annotate_packs_batch()` — submits all packs in one Gemini Batch API job, model `gemini-3.1-flash-lite-preview`
+- **OpenRouter** (set `OPENROUTER_API_KEY`): `services/openrouter.py` `annotate_packs()` — synchronous, one request per pack; images max 8 per pack, videos 1 per pack
 
 **Search (runtime):**
 - `GET /search/semantic?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → returns UUIDs + metadata
@@ -69,6 +77,8 @@ Optional: `services/annotator.py` (Gemini batch annotation → `description` + `
 - **ChromaDB metadata values** must be `str | int | float | bool` only. `metadata.py._sanitize_value` enforces this. EXIF keys with colons/spaces/dashes are flattened to underscores (e.g. `EXIF:Make` → `EXIF_Make`).
 - **Embedding dimension** is 3072 (gemini-embedding-2). Test fixtures use `[0.1] * 3072`.
 - Videos longer than 128 s are truncated before embedding. Animated GIF/PNG are converted to MP4.
+- **`services/gemini.py`** has two sections: embedding (`_client`, default API) and annotation batch (`_annotation_client`, v1alpha API). They use separate client instances because annotation requires `http_options={"api_version": "v1alpha"}`.
+- **`services/openrouter.py`** is a thin provider used only when `OPENROUTER_API_KEY` is set. It is considered experimental/backburner — free-tier models can return empty responses unpredictably.
 
 ### Test isolation
 
