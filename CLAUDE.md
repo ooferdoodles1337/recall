@@ -66,6 +66,7 @@ Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotat
 - `GET /search/suggest?q=` → `services/text_index.py` (prefix + fuzzy autocomplete) → returns search term suggestions
 
 **Media serving (runtime):**
+`GET /media/library` → `services/chroma.py` (all metadata sorted by `taken_sort`) → returns IDs + metadata for chronological gallery loading
 `GET /media/{uuid}` → `services/chroma.py` (lookup path from metadata) → `FileResponse`
 `GET /media/{uuid}/thumbnail` → `services/chroma.py` (lookup `thumbnail_path`) → `FileResponse`
 `GET /media/info?id={uuid}` → returns metadata without serving the file
@@ -75,6 +76,7 @@ Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotat
 - **ChromaDB primary key** is a UUID (not the file path). The file path is stored in metadata as `path`.
 - **Dedup** is by `content_hash` (SHA-256 of raw file bytes), stored in metadata. `--force` re-indexes by reusing the existing UUID for that hash, so no duplicates are created.
 - **ChromaDB metadata values** must be `str | int | float | bool` only. `metadata.py._sanitize_value` enforces this. EXIF keys with colons/spaces/dashes are flattened to underscores (e.g. `EXIF:Make` → `EXIF_Make`).
+- **Chronological gallery fields** are normalized at index time: `taken_at`, `taken_date`, `taken_year_month`, `taken_sort`, and `taken_source`. Frontend loads all metadata with `/media/library`, groups by `taken_date`, and lazy-loads thumbnails by UUID.
 - **Embedding dimension** is 3072 (gemini-embedding-2). Test fixtures use `[0.1] * 3072`.
 - Videos longer than 128 s are truncated before embedding. Animated GIF/PNG are converted to MP4.
 - **`services/gemini.py`** has two sections: embedding (`_client`, default API) and annotation batch (`_annotation_client`, v1alpha API). They use separate client instances because annotation requires `http_options={"api_version": "v1alpha"}`.

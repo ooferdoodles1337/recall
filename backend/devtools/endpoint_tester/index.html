@@ -176,6 +176,7 @@
               <option value="text">GET /search/text</option>
               <option value="suggest">GET /search/suggest</option>
               <option value="trials">GET /trials</option>
+              <option value="media_library">GET /media/library</option>
               <option value="media_info">GET /media/info</option>
               <option value="custom">Custom GET path</option>
             </select>
@@ -290,6 +291,12 @@
           buildPath: ({ limit }) => `/trials?${new URLSearchParams({ n: limit })}`,
           showCustom: false,
           showLimit: true,
+          showQuery: false,
+        },
+        media_library: {
+          buildPath: () => "/media/library",
+          showCustom: false,
+          showLimit: false,
           showQuery: false,
         },
         media_info: {
