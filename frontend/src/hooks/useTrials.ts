@@ -9,7 +9,7 @@ interface UseTrialsReturn {
   currentTarget: MediaItem | null
   isLoading: boolean
   error: string | null
-  loadTrials: () => Promise<void>
+  loadTrials: () => Promise<MediaItem[]>
   advance: () => void
   isComplete: boolean
 }
@@ -28,8 +28,10 @@ export function useTrials(): UseTrialsReturn {
       const items = await fetchTrials(TRIAL_COUNT)
       setTargets(items)
       setCurrentIndex(0)
+      return items
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load trials')
+      return []
     } finally {
       setIsLoading(false)
     }

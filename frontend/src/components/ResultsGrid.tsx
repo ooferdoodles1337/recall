@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { mediaUrl } from '../api'
+import { thumbnailUrl } from '../api'
 import type { SearchResult } from '../types'
 
 interface Props {
@@ -12,8 +11,6 @@ interface Props {
 // If the selection is wrong, the tile flashes a red border briefly.
 // Correct selection is determined by App.tsx (onSelect triggers the check).
 export default function ResultsGrid({ results, onSelect }: Props) {
-  const [wrongId, setWrongId] = useState<string | null>(null)
-
   const handleClick = (id: string) => {
     onSelect(id)
     // TODO: App.tsx will call back with whether it was correct.
@@ -27,9 +24,9 @@ export default function ResultsGrid({ results, onSelect }: Props) {
         <button
           key={r.id}
           onClick={() => handleClick(r.id)}
-          className={wrongId === r.id ? 'TODO ring-2 ring-red-500' : ''}
+          className="TODO"
         >
-          <img src={mediaUrl(r.id)} alt={r.metadata.filename} className="aspect-square object-cover w-full" />
+          <img src={thumbnailUrl(r.id)} alt={r.metadata.filename} className="aspect-square object-cover w-full" />
         </button>
       ))}
     </div>

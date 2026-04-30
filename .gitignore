@@ -7,3 +7,6 @@ backend/.venv/
 .claude/
 .vscode/
 docs/superpowers/
+.codex
+frontend/node_modules/
+frontend/dist/

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchSearch } from '../api'
 import { SEARCH_DEBOUNCE_MS } from '../constants'
 import type { SearchResult } from '../types'
@@ -13,12 +13,22 @@ interface UseSearchReturn {
   reset: () => void       // call at the start of each new trial
 }
 
-export function useSearch(): UseSearchReturn {
+interface SearchCompleteEvent {
+  query: string
+  resultCount: number
+}
+
+export function useSearch(onSearchComplete?: (event: SearchCompleteEvent) => void): UseSearchReturn {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [history, setHistory] = useState<string[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onSearchCompleteRef = useRef(onSearchComplete)
+
+  useEffect(() => {
+    onSearchCompleteRef.current = onSearchComplete
+  }, [onSearchComplete])
 
   useEffect(() => {
     if (!query.trim()) {
@@ -31,9 +41,11 @@ export function useSearch(): UseSearchReturn {
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const res = await fetchSearch(query.trim())
+        const trimmedQuery = query.trim()
+        const res = await fetchSearch(trimmedQuery)
         setResults(res)
-        setHistory((prev) => [query.trim(), ...prev.filter((h) => h !== query.trim())])
+        setHistory((prev) => [trimmedQuery, ...prev.filter((h) => h !== trimmedQuery)])
+        onSearchCompleteRef.current?.({ query: trimmedQuery, resultCount: res.length })
       } catch {
         // TODO: surface error state
       } finally {
@@ -46,14 +58,22 @@ export function useSearch(): UseSearchReturn {
     }
   }, [query])
 
-  const clearHistory = () => setHistory([])
+  const clearHistory = useCallback(() => setHistory([]), [])
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setQuery('')
     setResults([])
     setHistory([])
     if (debounceRef.current) clearTimeout(debounceRef.current)
-  }
+  }, [])
 
-  return { query, setQuery, results, isLoading, history, clearHistory, reset }
+  return useMemo(() => ({
+    query,
+    setQuery,
+    results,
+    isLoading,
+    history,
+    clearHistory,
+    reset,
+  }), [clearHistory, history, isLoading, query, reset, results])
 }
