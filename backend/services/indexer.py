@@ -151,6 +151,7 @@ def index_file(path: Path, force: bool) -> None:
 def run(
     force: bool,
     annotate: bool = False,
+    detect_nsfw: bool = False,
     db_path: str | None = None,
     media_dir: str | None = None,
     reset: bool = False,
@@ -220,6 +221,11 @@ def run(
         log.info("starting annotation pass")
         annotator.annotate_unannotated()
 
+    if detect_nsfw:
+        from services import nsfw
+        log.info("starting NSFW detection pass")
+        nsfw.detect_undetected()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Index media files into SQLite and ChromaDB")
@@ -228,6 +234,11 @@ if __name__ == "__main__":
         "--annotate",
         action="store_true",
         help="Annotate unannotated items with descriptions and search terms via Gemini",
+    )
+    parser.add_argument(
+        "--detect-nsfw",
+        action="store_true",
+        help="Detect NSFW content locally and store results in item metadata",
     )
     parser.add_argument(
         "--db-path",
@@ -245,4 +256,11 @@ if __name__ == "__main__":
         help="Wipe the database and all thumbnails before indexing",
     )
     args = parser.parse_args()
-    run(force=args.force, annotate=args.annotate, db_path=args.db_path, media_dir=args.media_dir, reset=args.reset)
+    run(
+        force=args.force,
+        annotate=args.annotate,
+        detect_nsfw=args.detect_nsfw,
+        db_path=args.db_path,
+        media_dir=args.media_dir,
+        reset=args.reset,
+    )

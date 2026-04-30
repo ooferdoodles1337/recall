@@ -60,6 +60,7 @@ uv run python -m services.indexer
 Options:
 - `--force` — re-index files that are already indexed
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and search terms for any unannotated items (requires `GEMINI_API_KEY`)
+- `--detect-nsfw` — after indexing, run local NSFW detection for items without `nsfw_detection` metadata
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`); also settable via `RECALL_DB_PATH`
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`); also settable via `RECALL_MEDIA_DIR`
 
@@ -75,6 +76,7 @@ The indexer:
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
 8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
 9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each SQLite catalog item
+10. If `--detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without `nsfw_detection` metadata and writes the model label, score, and probabilities back to SQLite. Images are analyzed directly; videos are analyzed through their generated thumbnail.
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
@@ -431,4 +433,3 @@ Returns a random sample of items from the collection to use as trial targets for
 ```
 
 **Usage in the demo**: call this once at the start of a session to get the ordered list of targets. Show the user the image for target[0], let them search, record the time, then advance to target[1], and so on.
-

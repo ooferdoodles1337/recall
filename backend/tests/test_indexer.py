@@ -148,6 +148,17 @@ def test_run_indexes_all_files_in_catalog(media_root, mock_services):
     assert get_id_by_hash(_sha256(photo)) is not None
 
 
+def test_run_detect_nsfw_starts_detection_pass(media_root, mock_services, monkeypatch):
+    from services.indexer import run
+
+    detect_mock = MagicMock()
+    monkeypatch.setattr("services.nsfw.detect_undetected", detect_mock)
+
+    run(force=False, detect_nsfw=True)
+
+    detect_mock.assert_called_once()
+
+
 def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services):
     from services.catalog import get_id_by_hash
     from services.indexer import index_file

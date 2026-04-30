@@ -1,0 +1,109 @@
+import logging
+from pathlib import Path
+from typing import Any
+
+from PIL import Image
+
+import config
+from services import catalog
+
+log = logging.getLogger(__name__)
+
+MODEL_NAME = "hf_hub:Marqo/nsfw-image-detection-384"
+METADATA_KEY = "nsfw_detection"
+
+_model: Any | None = None
+_transforms: Any | None = None
+_class_names: list[str] | None = None
+
+
+def _load_model() -> tuple[Any, Any, list[str]]:
+    global _model, _transforms, _class_names
+    if _model is None or _transforms is None or _class_names is None:
+        try:
+            import timm
+            import timm.data
+        except ImportError as exc:
+            raise RuntimeError(
+                "NSFW detection requires indexing dependencies. "
+                "Install them with `uv sync --group indexing`."
+            ) from exc
+
+        _model = timm.create_model(MODEL_NAME, pretrained=True).eval()
+        data_config = timm.data.resolve_model_data_config(_model)
+        _transforms = timm.data.create_transform(**data_config, is_training=False)
+        _class_names = list(_model.pretrained_cfg["label_names"])
+    return _model, _transforms, _class_names
+
+
+def _candidate_path(meta: dict) -> Path | None:
+    path = meta.get("path")
+    if meta.get("media_type") == "image" and path:
+        return config.DATA_DIR / path
+
+    thumbnail_path = meta.get("thumbnail_path")
+    if thumbnail_path:
+        return config.DATA_DIR / thumbnail_path
+
+    return None
+
+
+def detect_image(path: Path) -> dict:
+    try:
+        import torch
+    except ImportError as exc:
+        raise RuntimeError(
+            "NSFW detection requires indexing dependencies. "
+            "Install them with `uv sync --group indexing`."
+        ) from exc
+
+    model, transforms, class_names = _load_model()
+    with Image.open(path) as raw:
+        image = raw.convert("RGB")
+        tensor = transforms(image).unsqueeze(0)
+
+    with torch.no_grad():
+        probabilities = model(tensor).softmax(dim=-1).cpu()[0]
+
+    scores = {
+        class_name: float(probabilities[i])
+        for i, class_name in enumerate(class_names)
+    }
+    label = max(scores, key=scores.get)
+    return {
+        "model": MODEL_NAME,
+        "label": label,
+        "score": scores[label],
+        "probabilities": scores,
+    }
+
+
+def _get_undetected() -> list[dict]:
+    all_items = catalog.get_all_items_with_metadata()
+    return [item for item in all_items if not (item["metadata"] or {}).get(METADATA_KEY)]
+
+
+def detect_undetected() -> None:
+    undetected = _get_undetected()
+    if not undetected:
+        log.info("all items already have NSFW detection")
+        return
+
+    log.info("running NSFW detection for %d items", len(undetected))
+    detected = 0
+    for item in undetected:
+        meta = item["metadata"] or {}
+        path = _candidate_path(meta)
+        if path is None:
+            log.warning("item %s missing image path or thumbnail_path", item["id"])
+            continue
+        if not path.is_file():
+            log.warning("item %s NSFW candidate not found: %s", item["id"], path)
+            continue
+        try:
+            catalog.update_metadata(item["id"], {METADATA_KEY: detect_image(path)})
+            detected += 1
+        except Exception as exc:
+            log.error("failed NSFW detection for %s: %s", item["id"], exc)
+
+    log.info("NSFW detection complete: %d/%d items detected", detected, len(undetected))
