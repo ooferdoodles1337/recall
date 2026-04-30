@@ -55,11 +55,14 @@ def mock_services(media_root, monkeypatch):
 
 
 def test_index_file_upserts_content_collection(media_root, mock_services):
-    from services.chroma import get_id_by_hash
+    from services.catalog import get_id_by_hash
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
-    assert get_id_by_hash(_sha256(photo)) is not None
+    item_id = get_id_by_hash(_sha256(photo))
+    assert item_id is not None
+    result = mock_services["content"].get(ids=[item_id])
+    assert result["ids"] == [item_id]
 
 
 def test_index_file_upserts_catalog_item(media_root, mock_services):
@@ -120,18 +123,21 @@ def test_index_file_outside_data_dir_is_rejected(media_root, mock_services, tmp_
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     outside.write_bytes(buf.getvalue())
+    from services.catalog import get_id_by_hash
     from services.indexer import index_file
-    from services.chroma import get_id_by_hash
     index_file(outside, force=False)
     assert get_id_by_hash(_sha256(outside)) is None
 
 
 def test_run_indexes_all_files_in_media_dir(media_root, mock_services):
-    from services.chroma import get_id_by_hash
+    from services.catalog import get_id_by_hash
     from services.indexer import run
     run(force=False)
     photo = media_root / "data" / "media" / "photo.jpg"
-    assert get_id_by_hash(_sha256(photo)) is not None
+    item_id = get_id_by_hash(_sha256(photo))
+    assert item_id is not None
+    result = mock_services["content"].get(ids=[item_id])
+    assert result["ids"] == [item_id]
 
 
 def test_run_indexes_all_files_in_catalog(media_root, mock_services):
@@ -143,7 +149,7 @@ def test_run_indexes_all_files_in_catalog(media_root, mock_services):
 
 
 def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services):
-    from services.chroma import get_id_by_hash
+    from services.catalog import get_id_by_hash
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
@@ -189,7 +195,7 @@ def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeyp
 
 
 def test_index_file_stores_relative_path(media_root, mock_services):
-    from services.chroma import get_id_by_hash
+    from services.catalog import get_id_by_hash
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
