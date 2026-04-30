@@ -171,13 +171,14 @@
             Endpoint
             <select id="preset">
               <option value="health">GET /health</option>
-              <option value="collection_stats">GET /collection/stats</option>
+              <option value="catalog_items">GET /catalog/items</option>
+              <option value="catalog_item">GET /catalog/items/{id}</option>
+              <option value="catalog_facets">GET /catalog/facets</option>
+              <option value="catalog_stats">GET /catalog/stats</option>
               <option value="semantic">GET /search/semantic</option>
               <option value="text">GET /search/text</option>
               <option value="suggest">GET /search/suggest</option>
               <option value="trials">GET /trials</option>
-              <option value="media_library">GET /media/library</option>
-              <option value="media_info">GET /media/info</option>
               <option value="custom">Custom GET path</option>
             </select>
           </label>
@@ -257,8 +258,28 @@
           showLimit: false,
           showQuery: false,
         },
-        collection_stats: {
-          buildPath: () => "/collection/stats",
+        catalog_items: {
+          buildPath: () => "/catalog/items",
+          showCustom: false,
+          showLimit: false,
+          showQuery: false,
+        },
+        catalog_item: {
+          buildPath: ({ query }) => `/catalog/items/${encodeURIComponent(query)}`,
+          placeholder: "item UUID",
+          queryLabel: "Item ID",
+          showCustom: false,
+          showLimit: false,
+          showQuery: true,
+        },
+        catalog_facets: {
+          buildPath: () => "/catalog/facets",
+          showCustom: false,
+          showLimit: false,
+          showQuery: false,
+        },
+        catalog_stats: {
+          buildPath: () => "/catalog/stats",
           showCustom: false,
           showLimit: false,
           showQuery: false,
@@ -414,7 +435,7 @@
         const encodedId = encodeURIComponent(itemId);
         const thumbUrl = buildAbsoluteUrl(`/media/${encodedId}/thumbnail`);
         const mediaUrl = buildAbsoluteUrl(`/media/${encodedId}`);
-        const infoUrl = buildAbsoluteUrl(`/media/info?id=${encodedId}`);
+        const infoUrl = buildAbsoluteUrl(`/catalog/items/${encodedId}`);
         return { infoUrl, mediaUrl, thumbUrl };
       }
 

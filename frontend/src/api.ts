@@ -1,5 +1,5 @@
 import { API_BASE, METRICS_ENDPOINT, SEARCH_RESULTS_COUNT } from './constants'
-import type { LibraryResponse, MediaItem, SearchResult, SessionMetrics } from './types'
+import type { CatalogResponse, MediaItem, SearchResult, SessionMetrics } from './types'
 
 export async function fetchTrials(n: number): Promise<MediaItem[]> {
   const res = await fetch(`${API_BASE}/trials?n=${n}`)
@@ -16,10 +16,10 @@ export async function fetchSearch(query: string): Promise<SearchResult[]> {
   return data.results as SearchResult[]
 }
 
-export async function fetchLibrary(): Promise<MediaItem[]> {
-  const res = await fetch(`${API_BASE}/media/library?order=desc`)
-  if (!res.ok) throw new Error(`Failed to fetch library: ${res.status}`)
-  const data = await res.json() as LibraryResponse
+export async function fetchCatalog(): Promise<MediaItem[]> {
+  const res = await fetch(`${API_BASE}/catalog/items?order=desc`)
+  if (!res.ok) throw new Error(`Failed to fetch catalog: ${res.status}`)
+  const data = await res.json() as CatalogResponse
   return data.results
 }
 

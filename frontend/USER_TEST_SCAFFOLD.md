@@ -23,7 +23,7 @@ Use the local Vite proxy through `API_BASE = "/api"`.
 - `GET /search/semantic?q=...&n=24`: search results.
 - `GET /media/{id}/thumbnail`: grid thumbnails.
 - `GET /media/{id}`: full media for target display or preview.
-- `GET /media/library?order=desc`: full metadata catalog for chronological gallery work.
+- `GET /catalog/items?order=desc`: full metadata catalog for chronological gallery work.
 
 The API helpers live in `src/api.ts`.
 

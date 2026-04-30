@@ -31,7 +31,7 @@ export interface SearchResult {
   metadata: ItemMetadata
 }
 
-export interface LibraryResponse {
+export interface CatalogResponse {
   count: number
   results: MediaItem[]
 }
