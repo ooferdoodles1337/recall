@@ -11,9 +11,14 @@ FastAPI backend for the Recall user-testing demo. Provides semantic search over 
    GEMINI_API_KEY=your_key_here
    ```
 
-3. Install dependencies (run from `backend/`):
+3. Install runtime dependencies (run from `backend/`):
    ```bash
    uv sync
+   ```
+
+   Maintainers who run indexing should install the indexing dependency group:
+   ```bash
+   uv sync --group indexing
    ```
 
 > **Maintainers only:** indexing also requires ExifTool for metadata extraction.
@@ -65,6 +70,8 @@ Options:
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`); also settable via `RECALL_MEDIA_DIR`
 
 Set `RECALL_THUMBNAILS_DIR` to write thumbnails somewhere other than `backend/data/thumbnails`.
+
+`--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into the existing SQLite metadata JSON blob; no schema migration is required.
 
 The indexer:
 1. Recursively scans `backend/data/media/` for supported files
@@ -134,7 +141,7 @@ Semantic (vector) search over the indexed media collection using a natural-langu
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail). Annotated items additionally include `description` (a natural-language description of the content) and `search_terms` (a JSON-encoded list of keyword phrases). Any extracted EXIF fields and reverse-geocoded `geo_*` fields are also present when available.
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail). Annotated items additionally include `description` (a natural-language description of the content) and `search_terms` (a JSON-encoded list of keyword phrases). Items processed with `--detect-nsfw` additionally include `nsfw_detection` with the model name, predicted label, top score, and per-class probabilities. Any extracted EXIF fields and reverse-geocoded `geo_*` fields are also present when available.
 
 Newly indexed items also include canonical capture-date fields for chronological browsing:
 
