@@ -59,3 +59,25 @@ def test_upsert_content_merges_extra_metadata():
     assert meta["geo_city"] == "Tokyo"
     assert meta["geo_country"] == "Japan"
     assert meta["filename"] == "geo.jpg"
+
+
+def test_list_library_items_sorts_by_taken_date_and_filters_media_type():
+    import services.chroma as chroma
+    chroma.upsert_content(
+        "old-id", [0.1] * 3072, "old.jpg", "old.jpg", "image/jpeg", "image",
+        extra_metadata={"taken_sort": "2024-03-17T10:00:00", "taken_date": "2024-03-17"},
+    )
+    chroma.upsert_content(
+        "new-id", [0.1] * 3072, "new.jpg", "new.jpg", "image/jpeg", "image",
+        extra_metadata={"taken_sort": "2024-03-18T10:00:00", "taken_date": "2024-03-18"},
+    )
+    chroma.upsert_content(
+        "video-id", [0.1] * 3072, "video.mp4", "video.mp4", "video/mp4", "video",
+        extra_metadata={"taken_sort": "2024-03-19T10:00:00", "taken_date": "2024-03-19"},
+    )
+
+    items = chroma.list_library_items(media_type="image", order="desc")
+
+    item_ids = [item["id"] for item in items]
+    assert item_ids[:2] == ["new-id", "old-id"]
+    assert "video-id" not in item_ids

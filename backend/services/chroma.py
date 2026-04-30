@@ -91,6 +91,25 @@ def get_all_items_with_metadata() -> list[dict]:
     ]
 
 
+def list_library_items(
+    media_type: str | None = None,
+    order: str = "desc",
+) -> list[dict]:
+    items = []
+    for item in get_all_items_with_metadata():
+        meta = item["metadata"] or {}
+        if media_type is not None and meta.get("media_type") != media_type:
+            continue
+        items.append({"id": item["id"], "metadata": meta})
+
+    reverse = order == "desc"
+    return sorted(
+        items,
+        key=lambda item: ((item["metadata"] or {}).get("taken_sort", ""), item["id"]),
+        reverse=reverse,
+    )
+
+
 def update_metadata(file_id: str, patch: dict) -> None:
     item = get_item(file_id)
     if item is None:

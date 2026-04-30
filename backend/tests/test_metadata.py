@@ -328,3 +328,53 @@ def test_extract_skips_normalization_when_dimensions_absent(tmp_path):
     assert "width" not in result
     assert "height" not in result
     assert "duration_s" not in result
+
+
+def test_extract_normalizes_exif_taken_date(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {"EXIF:DateTimeOriginal": "2024:03:18 14:22:09"}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["taken_at"] == "2024-03-18T14:22:09"
+    assert result["taken_date"] == "2024-03-18"
+    assert result["taken_year_month"] == "2024-03"
+    assert result["taken_sort"] == "2024-03-18T14:22:09"
+    assert result["taken_source"] == "EXIF_DateTimeOriginal"
+
+
+def test_extract_normalizes_timezone_taken_date(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {"QuickTime:CreationDate": "2024:03:18 14:22:09+09:00"}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert result["taken_at"] == "2024-03-18T14:22:09+09:00"
+    assert result["taken_date"] == "2024-03-18"
+    assert result["taken_source"] == "QuickTime_CreationDate"
+
+
+def test_extract_falls_back_to_filesystem_mtime_for_taken_date(tmp_path):
+    p = tmp_path / "photo.jpg"
+    p.write_bytes(b"fake")
+    raw = {"EXIF:Make": "Canon"}
+    with patch("exiftool.ExifToolHelper") as mock_cls:
+        inst = MagicMock()
+        mock_cls.return_value.__enter__.return_value = inst
+        mock_cls.return_value.__exit__.return_value = False
+        inst.get_metadata.return_value = [raw]
+        from services.metadata import extract
+        result = extract(str(p))
+    assert "taken_at" in result
+    assert "taken_date" in result
+    assert result["taken_source"] == "filesystem_mtime"

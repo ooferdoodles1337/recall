@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import functools
 import logging
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import exiftool
@@ -79,6 +81,87 @@ def _parse_duration(value: Any) -> float | None:
         except ValueError:
             return None
     return None
+
+
+_DATE_KEYS = [
+    "EXIF_DateTimeOriginal",
+    "EXIF_CreateDate",
+    "EXIF_DateTimeDigitized",
+    "Composite_SubSecDateTimeOriginal",
+    "Composite_SubSecCreateDate",
+    "QuickTime_CreationDate",
+    "QuickTime_CreateDate",
+    "QuickTime_ModifyDate",
+    "File_FileModifyDate",
+]
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    normalized = value.replace("T", " ")
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    if len(normalized) >= 10 and normalized[4] == ":" and normalized[7] == ":":
+        normalized = f"{normalized[:4]}-{normalized[5:7]}-{normalized[8:]}"
+
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S%z",
+        "%Y-%m-%d %H:%M:%S.%f%z",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d",
+    ):
+        try:
+            return datetime.strptime(normalized, fmt)
+        except ValueError:
+            continue
+
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+
+def _format_datetime(dt: datetime) -> str:
+    return dt.isoformat(timespec="seconds")
+
+
+def _normalize_taken_date(
+    result: dict[str, str | int | float | bool],
+    path: str,
+) -> dict[str, str]:
+    taken = None
+    source = None
+    for key in _DATE_KEYS:
+        parsed = _parse_datetime(result.get(key))
+        if parsed is not None:
+            taken = parsed
+            source = key
+            break
+
+    if taken is None:
+        try:
+            taken = datetime.fromtimestamp(Path(path).stat().st_mtime)
+            source = "filesystem_mtime"
+        except OSError:
+            return {}
+
+    taken_at = _format_datetime(taken)
+    taken_date = taken.date().isoformat()
+    return {
+        "taken_at": taken_at,
+        "taken_date": taken_date,
+        "taken_year_month": taken_date[:7],
+        "taken_sort": taken_at,
+        "taken_source": source or "unknown",
+    }
 
 
 def _normalize_dimensions_and_duration(
@@ -210,5 +293,6 @@ def extract(path: str) -> dict[str, str | int | float | bool]:
         result.update(_reverse_geocode(float(lat), float(lon)))
 
     result.update(_normalize_dimensions_and_duration(result))
+    result.update(_normalize_taken_date(result, path))
 
     return result

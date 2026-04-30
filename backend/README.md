@@ -133,6 +133,14 @@ Semantic (vector) search over the indexed media collection using a natural-langu
 
 `distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail). Annotated items additionally include `description` (a natural-language description of the content) and `search_terms` (a JSON-encoded list of keyword phrases). Any extracted EXIF fields and reverse-geocoded `geo_*` fields are also present when available.
 
+Newly indexed items also include canonical capture-date fields for chronological browsing:
+
+- `taken_at` — ISO timestamp used for display.
+- `taken_date` — `YYYY-MM-DD` local calendar date.
+- `taken_year_month` — `YYYY-MM` grouping key.
+- `taken_sort` — ISO timestamp used for backend ordering.
+- `taken_source` — source field used to derive the date, such as `EXIF_DateTimeOriginal` or `filesystem_mtime`.
+
 ---
 
 ### `GET /search/suggest`
@@ -189,6 +197,41 @@ Keyword search against the `search_terms` index. Tries exact match → prefix un
 ```
 
 `distance` is `null` for text matches — there is no cosine score, unlike semantic search.
+
+---
+
+### `GET /media/library`
+
+Returns the complete metadata catalog for gallery views. This endpoint does not serve full image/video bytes; it returns IDs and metadata so the frontend can render a chronological gallery, group items by `taken_date`, and find items from the same date locally.
+
+**Query params**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `media_type` | `image` or `video` | optional | Restrict results by media type |
+| `order` | `asc` or `desc` | `desc` | Sort by `taken_sort` |
+
+**Response**
+
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+      "metadata": {
+        "filename": "IMG_4821.jpg",
+        "media_type": "image",
+        "taken_at": "2024-03-18T14:22:09",
+        "taken_date": "2024-03-18",
+        "thumbnail_path": "thumbnails/3f4a8b2c.webp"
+      }
+    }
+  ]
+}
+```
+
+For same-date browsing, use the selected item's `taken_date` and filter the loaded library results client-side.
 
 ---
 
