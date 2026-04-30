@@ -64,6 +64,8 @@ Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotat
 - `GET /search/semantic?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → `services/catalog.py` (hydrate metadata) → returns UUIDs + metadata
 - `GET /search/text?q=` → `services/text_index.py` (exact/prefix/fuzzy term match over SQLite metadata) → `services/catalog.py` (fetch items) → returns UUIDs + metadata
 - `GET /search/suggest?q=` → `services/text_index.py` (prefix + fuzzy autocomplete) → returns search term suggestions
+- `GET /search/similar/{id}` → `services/chroma.py` (fetch stored embedding by UUID, no Gemini call) → `services/chroma.py` (top-k+1 vector query, self excluded) → `services/catalog.py` (hydrate) → returns UUIDs + metadata
+- `POST /search/similar` (image upload) → `services/media.py` (process image) → `services/gemini.py` (embed) → `services/chroma.py` (top-k vector query) → `services/catalog.py` (hydrate) → returns UUIDs + metadata; file is ephemeral, never indexed
 
 **Catalog browsing (runtime):**
 `GET /catalog/items` → `services/catalog.py` (all metadata sorted by `taken_sort`) → returns IDs + metadata for chronological gallery loading

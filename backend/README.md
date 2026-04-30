@@ -201,6 +201,68 @@ Keyword search against the `search_terms` index. Tries exact match → prefix un
 
 ---
 
+### `GET /search/similar/{id}`
+
+Returns items visually similar to an already-indexed item, using its stored embedding — no Gemini API call needed. The query item itself is excluded from results.
+
+**Path params**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `id` | string | UUID of the indexed item to search from |
+
+**Query params**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `n` | int ≥ 1 | `5` | Number of results to return |
+
+**Response**
+
+```json
+{
+  "query_id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+  "results": [
+    { "id": "...", "distance": 0.18, "metadata": { ... } }
+  ]
+}
+```
+
+Returns 404 if the UUID is not in the vector store.
+
+---
+
+### `POST /search/similar`
+
+Accepts an uploaded image and returns visually similar items from the indexed collection. The uploaded file is embedded on-the-fly and never added to the catalog.
+
+**Request:** `multipart/form-data` with a single `file` field containing the image.
+
+**Accepted types:** `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+
+**Max size:** 20 MB
+
+**Query params**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `n` | int ≥ 1 | `5` | Number of results to return |
+
+**Response**
+
+```json
+{
+  "query_filename": "photo.jpg",
+  "results": [
+    { "id": "...", "distance": 0.22, "metadata": { ... } }
+  ]
+}
+```
+
+Returns 415 for unsupported file types, 413 if the file exceeds 20 MB.
+
+---
+
 ### `GET /catalog/items`
 
 Returns the complete metadata catalog for gallery views. Does not serve file bytes — returns IDs and metadata so the frontend can render a chronological gallery, group by `taken_date`, and lazy-load thumbnails by UUID.

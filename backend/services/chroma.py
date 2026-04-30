@@ -53,6 +53,13 @@ def upsert_content(
     )
 
 
+def get_embedding(file_id: str) -> list[float] | None:
+    result = _collection().get(ids=[file_id], include=["embeddings"])
+    if not result["ids"]:
+        return None
+    return list(result["embeddings"][0])
+
+
 def get_id_by_hash(content_hash: str) -> str | None:
     result = _collection().get(where={"content_hash": content_hash}, include=[])
     if not result["ids"]:
