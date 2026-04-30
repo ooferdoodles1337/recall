@@ -201,9 +201,9 @@ Keyword search against the `search_terms` index. Tries exact match → prefix un
 
 ---
 
-### `GET /media/library`
+### `GET /catalog/items`
 
-Returns the complete metadata catalog for gallery views. This endpoint does not serve full image/video bytes; it returns IDs and metadata so the frontend can render a chronological gallery, group items by `taken_date`, and find items from the same date locally.
+Returns the complete metadata catalog for gallery views. Does not serve file bytes — returns IDs and metadata so the frontend can render a chronological gallery, group by `taken_date`, and lazy-load thumbnails by UUID.
 
 **Query params**
 
@@ -232,7 +232,91 @@ Returns the complete metadata catalog for gallery views. This endpoint does not 
 }
 ```
 
-For same-date browsing, use the selected item's `taken_date` and filter the loaded library results client-side.
+For same-date browsing, use the selected item's `taken_date` and filter the loaded results client-side.
+
+---
+
+### `GET /catalog/items/{id}`
+
+Returns stored metadata for a single item without serving the file.
+
+**Response**
+
+```json
+{
+  "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+  "metadata": {
+    "filename": "IMG_4821.jpg",
+    "mime_type": "image/jpeg",
+    "media_type": "image",
+    "path": "/backend/data/media/IMG_4821.jpg",
+    "content_hash": "e3b0c44298fc1c149afb...",
+    "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
+    "description": "A wide-angle beach scene at golden hour...",
+    "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
+    "geo_city": "Kuta",
+    "geo_country": "Indonesia"
+  }
+}
+```
+
+Returns 404 if the UUID is not in the catalog.
+
+---
+
+### `POST /catalog/items/batch`
+
+Fetch metadata for multiple items in one request. Useful for hydrating search results or pre-loading a set of IDs.
+
+**Request body**
+
+```json
+{ "ids": ["uuid-a", "uuid-b", "uuid-c"] }
+```
+
+**Response**
+
+```json
+{
+  "results": [
+    { "id": "uuid-a", "metadata": { ... } },
+    { "id": "uuid-b", "metadata": { ... } }
+  ],
+  "missing": ["uuid-c"]
+}
+```
+
+IDs not found in the catalog appear in `missing` rather than causing an error.
+
+---
+
+### `GET /catalog/facets`
+
+Returns aggregate counts useful for building filter UI.
+
+**Response**
+
+```json
+{
+  "media_type": { "image": 280, "video": 32 },
+  "taken_year_month": { "2024-01": 14, "2024-02": 38, "2024-03": 61 }
+}
+```
+
+---
+
+### `GET /catalog/stats`
+
+Returns a high-level summary of the indexed collection.
+
+**Response**
+
+```json
+{
+  "total": 312,
+  "by_media_type": { "image": 280, "video": 32 }
+}
+```
 
 ---
 
@@ -257,38 +341,6 @@ GET /media/3f4a8b2c-1234-5678-abcd-ef0123456789/thumbnail
 ```
 
 Returns 404 if the item does not exist or has no thumbnail (items indexed before this feature was added will lack one).
-
----
-
-### `GET /media/info`
-
-Returns the stored metadata for a single item without serving the file.
-
-**Query params**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | string | Item UUID (same as the `id` field from any search endpoint) |
-
-**Response**
-
-```json
-{
-  "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
-  "metadata": {
-    "filename": "IMG_4821.jpg",
-    "mime_type": "image/jpeg",
-    "media_type": "image",
-    "path": "/backend/data/media/IMG_4821.jpg",
-    "content_hash": "e3b0c44298fc1c149afb...",
-    "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
-    "description": "A wide-angle beach scene at golden hour...",
-    "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
-    "geo_city": "Kuta",
-    "geo_country": "Indonesia"
-  }
-}
-```
 
 ---
 
@@ -318,20 +370,3 @@ Returns a random sample of items from the collection to use as trial targets for
 
 **Usage in the demo**: call this once at the start of a session to get the ordered list of targets. Show the user the image for target[0], let them search, record the time, then advance to target[1], and so on.
 
----
-
-### `GET /collection/stats`
-
-Returns a summary of the indexed collection.
-
-**Response**
-
-```json
-{
-  "total": 312,
-  "by_media_type": {
-    "image": 280,
-    "video": 32
-  }
-}
-```
