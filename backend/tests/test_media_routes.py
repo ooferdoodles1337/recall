@@ -17,7 +17,7 @@ def _webp_file(tmp_path) -> str:
 def test_thumbnail_404_unknown_id(monkeypatch):
     from routes.media import serve_thumbnail
 
-    monkeypatch.setattr("services.chroma.get_item", lambda item_id: None)
+    monkeypatch.setattr("services.catalog.get_item", lambda item_id: None)
 
     with pytest.raises(HTTPException) as exc:
         serve_thumbnail("does-not-exist")
@@ -28,7 +28,7 @@ def test_thumbnail_404_no_thumbnail_path(monkeypatch):
     from routes.media import serve_thumbnail
 
     monkeypatch.setattr(
-        "services.chroma.get_item",
+        "services.catalog.get_item",
         lambda item_id: {"id": item_id, "metadata": {}},
     )
 
@@ -41,7 +41,7 @@ def test_thumbnail_404_file_missing_from_disk(monkeypatch):
     from routes.media import serve_thumbnail
 
     monkeypatch.setattr(
-        "services.chroma.get_item",
+        "services.catalog.get_item",
         lambda item_id: {"id": item_id, "metadata": {"thumbnail_path": "/nonexistent/path.webp"}},
     )
 
@@ -55,7 +55,7 @@ def test_thumbnail_200_returns_webp(monkeypatch, tmp_path):
 
     thumb_path = _webp_file(tmp_path)
     monkeypatch.setattr(
-        "services.chroma.get_item",
+        "services.catalog.get_item",
         lambda item_id: {"id": item_id, "metadata": {"thumbnail_path": thumb_path}},
     )
 
@@ -69,7 +69,7 @@ def test_library_returns_all_image_metadata_sorted_chronologically(monkeypatch):
     from routes.media import get_library
 
     monkeypatch.setattr(
-        "services.chroma.list_library_items",
+        "services.catalog.list_library_items",
         lambda media_type=None, order="desc": [
             {
                 "id": "new-id",

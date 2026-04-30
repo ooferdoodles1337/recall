@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 
 import config
-from services import chroma, gemini, openrouter
+from services import catalog, gemini, openrouter
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -40,8 +40,24 @@ class PackedAnnotationResponse(BaseModel):
     annotations: list[SingleImageAnnotation]
 
 
+def _inline_schema(schema: dict) -> dict:
+    """Resolve $ref/$defs into an inline JSON schema for annotation providers."""
+    defs = schema.get("$defs", {})
+
+    def resolve(node):
+        if isinstance(node, dict):
+            if "$ref" in node:
+                return resolve(defs[node["$ref"].split("/")[-1]])
+            return {k: resolve(v) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [resolve(item) for item in node]
+        return node
+
+    return resolve(schema)
+
+
 def _get_unannotated() -> list[dict]:
-    all_items = chroma.get_all_items_with_metadata()
+    all_items = catalog.get_all_items_with_metadata()
     return [item for item in all_items if not (item["metadata"] or {}).get("description")]
 
 
@@ -79,7 +95,7 @@ def _write_annotations(annotations: dict[str, SingleImageAnnotation], expected_i
             log.warning("unexpected file_id in response: %s", file_id)
             continue
         try:
-            chroma.update_metadata(file_id, {
+            catalog.update_metadata(file_id, {
                 "description": annotation.description,
                 "search_terms": json.dumps(annotation.search_terms),
             })

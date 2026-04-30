@@ -1,6 +1,6 @@
 # Backend
 
-FastAPI backend for the Recall user-testing demo. Provides semantic search over a pre-indexed media dataset. End users never run the indexer — they download the pre-built ChromaDB and run the API server only.
+FastAPI backend for the Recall user-testing demo. Provides semantic search over a pre-indexed media dataset. End users never run the indexer — they download the pre-built SQLite media catalog and ChromaDB vector store, then run the API server only.
 
 ## Setup
 
@@ -43,14 +43,15 @@ backend/
     media/          # source media files (images and videos)
     thumbnails/     # WebP thumbnails, one per indexed item ({uuid}.webp)
     databases/
-      chroma_db/    # persistent ChromaDB vector store
+      chroma_db/       # persistent ChromaDB vector store
+      catalog.sqlite   # SQLite media catalog
 ```
 
 The entire `backend/data/` directory is distributed to demo participants as a zip. They extract it at `backend/data/` and run the server — no indexing needed.
 
 ## Indexing (maintainer only)
 
-Run this once to build the ChromaDB from the media files in `backend/data/media/`:
+Run this once to build the SQLite catalog and ChromaDB vector store from the media files in `backend/data/media/`:
 
 ```bash
 uv run python -m services.indexer
@@ -67,13 +68,13 @@ Set `RECALL_THUMBNAILS_DIR` to write thumbnails somewhere other than `backend/da
 The indexer:
 1. Recursively scans `backend/data/media/` for supported files
 2. Computes a SHA-256 hash of the raw file bytes
-3. Skips files whose hash is already in the DB (idempotent without `--force`)
+3. Skips files whose hash is already in the SQLite catalog (idempotent without `--force`)
 4. Processes images/videos into an embeddable format (transcodes if needed)
 5. Embeds content via `gemini-embedding-2`
 6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
-8. Upserts into ChromaDB using a UUID primary key; `content_hash` and `thumbnail_path` are stored in metadata
-9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each item's metadata
+8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
+9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each SQLite catalog item
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
@@ -145,7 +146,7 @@ Newly indexed items also include canonical capture-date fields for chronological
 
 ### `GET /search/suggest`
 
-Returns autocomplete suggestions for a partial query. Backed by an in-memory index of `search_terms` from all annotated items — no ChromaDB or Gemini calls. Use on every keystroke.
+Returns autocomplete suggestions for a partial query. Backed by an in-memory index of `search_terms` from the SQLite catalog — no ChromaDB or Gemini calls. Use on every keystroke.
 
 **Query params**
 

@@ -4,7 +4,7 @@ import logging
 
 from rapidfuzz import fuzz, process
 
-from services import chroma
+from services import catalog
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def build() -> None:
     _term_list = []
     _term_to_ids = {}
 
-    items = chroma.get_all_items_with_metadata()
+    items = catalog.get_all_items_with_metadata()
     for item in items:
         meta = item["metadata"] or {}
         raw = meta.get("search_terms")

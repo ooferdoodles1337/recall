@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import config
-from services import chroma, gemini, metadata as metadata_svc
+from services import catalog, chroma, gemini, metadata as metadata_svc
 from services.media import (
     IMAGE_EXTENSIONS,
     classify_extension,
@@ -56,7 +56,7 @@ def _preprocess_file(path: Path, force: bool) -> _PendingItem | None:
         return None
 
     content_hash = _file_hash(path)
-    existing_id = chroma.get_id_by_hash(content_hash)
+    existing_id = catalog.get_id_by_hash(content_hash)
 
     if not force and existing_id is not None:
         log.info("skipped (already indexed): %s", path)
@@ -105,7 +105,7 @@ def index_file(path: Path, force: bool) -> None:
         return
 
     content_hash = _file_hash(path)
-    existing_id = chroma.get_id_by_hash(content_hash)
+    existing_id = catalog.get_id_by_hash(content_hash)
 
     if not force and existing_id is not None:
         log.info("skipped (already indexed): %s", path)
@@ -135,6 +135,14 @@ def index_file(path: Path, force: bool) -> None:
             media_type=processed.media_type,
             extra_metadata=file_metadata,
         )
+        catalog.upsert_item(
+            file_id=file_id,
+            path=rel_path,
+            filename=path.name,
+            mime_type=processed.mime_type,
+            media_type=processed.media_type,
+            extra_metadata=file_metadata,
+        )
         log.info("indexed: %s", path)
     except Exception as exc:
         log.error("failed (%s): %s", type(exc).__name__, path)
@@ -149,9 +157,11 @@ def run(
 ) -> None:
     if db_path is not None:
         chroma.configure(db_path)
+    catalog.configure()
 
     if reset:
         chroma.reset_collection()
+        catalog.reset()
         if config.THUMBS_DIR.exists():
             for f in config.THUMBS_DIR.iterdir():
                 if f.is_file():
@@ -193,6 +203,14 @@ def run(
                     media_type=item.processed_media_type,
                     extra_metadata=item.file_metadata,
                 )
+                catalog.upsert_item(
+                    file_id=item.file_id,
+                    path=item.rel_path,
+                    filename=item.path.name,
+                    mime_type=item.processed_mime,
+                    media_type=item.processed_media_type,
+                    extra_metadata=item.file_metadata,
+                )
                 log.info("indexed: %s", item.path)
             except Exception as exc:
                 log.error("failed upserting (%s): %s", type(exc).__name__, item.path)
@@ -204,7 +222,7 @@ def run(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Index media files into ChromaDB")
+    parser = argparse.ArgumentParser(description="Index media files into SQLite and ChromaDB")
     parser.add_argument("--force", action="store_true", help="Re-index already-indexed files")
     parser.add_argument(
         "--annotate",

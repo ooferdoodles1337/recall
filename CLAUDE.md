@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Recall is a personal-media semantic-search app built as a user-testing demo. A pre-indexed ChromaDB is distributed to participants; they run only the API server.
+Recall is a personal-media semantic-search app built as a user-testing demo. A pre-indexed SQLite media catalog and ChromaDB vector store are distributed to participants; they run only the API server.
 
 ## Project layout
 
@@ -25,7 +25,7 @@ uv run pytest tests/test_metadata.py -v
 # Start dev server (http://localhost:8000, /docs for Swagger UI)
 uv run uvicorn main:app --reload
 
-# Index media files into ChromaDB (maintainer only)
+# Index media files into SQLite + ChromaDB (maintainer only)
 # Requires indexing dependencies: uv sync --group indexing
 uv run python -m services.indexer
 uv run python -m services.indexer --force         # re-index existing files
@@ -54,27 +54,27 @@ uv add <package>
 ### Data flow
 
 **Indexing (offline, maintainer only):**
-`services/indexer.py` preprocesses all files first (SHA-256 dedup, `services/media.py` transcode, `services/metadata.py` EXIF + geocode, thumbnail generation), then submits all embeddings to `services/gemini.py` in one Gemini Batch API call (`gemini-embedding-2`), then upserts results to `services/chroma.py` (UUID primary key).
+`services/indexer.py` preprocesses all files first (SHA-256 dedup using `services/catalog.py`, `services/media.py` transcode, `services/metadata.py` EXIF + geocode, thumbnail generation), then submits all embeddings to `services/gemini.py` in one Gemini Batch API call (`gemini-embedding-2`), then upserts metadata to SQLite via `services/catalog.py` and vectors to `services/chroma.py` with the same UUID primary key.
 
 Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotated items and calls one of two backends:
 - **Gemini** (default): `services/gemini.py` `annotate_packs_batch()` — submits all packs in one Gemini Batch API job, model `gemini-3.1-flash-lite-preview`
 - **OpenRouter** (set `OPENROUTER_API_KEY`): `services/openrouter.py` `annotate_packs()` — synchronous, one request per pack; images max 8 per pack, videos 1 per pack
 
 **Search (runtime):**
-- `GET /search/semantic?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → returns UUIDs + metadata
-- `GET /search/text?q=` → `services/text_index.py` (exact/prefix/fuzzy term match) → `services/chroma.py` (fetch items) → returns UUIDs + metadata
+- `GET /search/semantic?q=` → `services/gemini.py` (embed query text) → `services/chroma.py` (top-k vector query) → `services/catalog.py` (hydrate metadata) → returns UUIDs + metadata
+- `GET /search/text?q=` → `services/text_index.py` (exact/prefix/fuzzy term match over SQLite metadata) → `services/catalog.py` (fetch items) → returns UUIDs + metadata
 - `GET /search/suggest?q=` → `services/text_index.py` (prefix + fuzzy autocomplete) → returns search term suggestions
 
 **Media serving (runtime):**
-`GET /media/library` → `services/chroma.py` (all metadata sorted by `taken_sort`) → returns IDs + metadata for chronological gallery loading
-`GET /media/{uuid}` → `services/chroma.py` (lookup path from metadata) → `FileResponse`
-`GET /media/{uuid}/thumbnail` → `services/chroma.py` (lookup `thumbnail_path`) → `FileResponse`
+`GET /media/library` → `services/catalog.py` (all metadata sorted by `taken_sort`) → returns IDs + metadata for chronological gallery loading
+`GET /media/{uuid}` → `services/catalog.py` (lookup path from metadata) → `FileResponse`
+`GET /media/{uuid}/thumbnail` → `services/catalog.py` (lookup `thumbnail_path`) → `FileResponse`
 `GET /media/info?id={uuid}` → returns metadata without serving the file
 
 ### Key invariants
 
-- **ChromaDB primary key** is a UUID (not the file path). The file path is stored in metadata as `path`.
-- **Dedup** is by `content_hash` (SHA-256 of raw file bytes), stored in metadata. `--force` re-indexes by reusing the existing UUID for that hash, so no duplicates are created.
+- **Catalog primary key** is a UUID (not the file path). The file path is stored in metadata as `path`. ChromaDB uses the same UUID for the vector row.
+- **Dedup** is by `content_hash` (SHA-256 of raw file bytes), stored in SQLite metadata. `--force` re-indexes by reusing the existing UUID for that hash, so no duplicates are created.
 - **ChromaDB metadata values** must be `str | int | float | bool` only. `metadata.py._sanitize_value` enforces this. EXIF keys with colons/spaces/dashes are flattened to underscores (e.g. `EXIF:Make` → `EXIF_Make`).
 - **Chronological gallery fields** are normalized at index time: `taken_at`, `taken_date`, `taken_year_month`, `taken_sort`, and `taken_source`. Frontend loads all metadata with `/media/library`, groups by `taken_date`, and lazy-loads thumbnails by UUID.
 - **Embedding dimension** is 3072 (gemini-embedding-2). Test fixtures use `[0.1] * 3072`.
@@ -84,4 +84,4 @@ Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotat
 
 ### Test isolation
 
-Tests never hit the real ChromaDB or Gemini API. `conftest.py` sets a dummy `GEMINI_API_KEY`. Tests that touch ChromaDB monkeypatch `services.chroma.content_collection` with a `chromadb.EphemeralClient` collection.
+Tests never hit the real Gemini API. `conftest.py` sets a dummy `GEMINI_API_KEY`. Tests that touch ChromaDB monkeypatch `services.chroma.content_collection` with a `chromadb.EphemeralClient` collection. Tests that touch SQLite call `services.catalog.configure()` with a temporary `catalog.sqlite`.

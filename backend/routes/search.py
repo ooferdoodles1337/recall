@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from services import chroma, gemini, text_index
+from services import catalog, chroma, gemini, text_index
 
 router = APIRouter()
 
@@ -9,19 +9,18 @@ router = APIRouter()
 def search_semantic(q: str = Query(..., description="Search query text"), n: int = Query(5, ge=1)):
     embedding = gemini.embed_text(q)
     results = chroma.search(embedding, n_results=n)
+    ids = results["ids"][0]
+    distances = results["distances"][0]
     return {
         "query": q,
         "results": [
             {
                 "id": doc_id,
                 "distance": dist,
-                "metadata": meta,
+                "metadata": item["metadata"],
             }
-            for doc_id, dist, meta in zip(
-                results["ids"][0],
-                results["distances"][0],
-                results["metadatas"][0],
-            )
+            for doc_id, dist in zip(ids, distances)
+            if (item := catalog.get_item(doc_id)) is not None
         ],
     }
 
@@ -44,7 +43,7 @@ def search_text(
     if not matched_ids:
         return {"query": q, "results": []}
 
-    items = [chroma.get_item(item_id) for item_id in matched_ids]
+    items = [catalog.get_item(item_id) for item_id in matched_ids]
     items = [item for item in items if item is not None]
     items = items[:n]
 

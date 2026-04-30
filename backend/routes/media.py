@@ -4,14 +4,14 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 import config
-from services import chroma
+from services import catalog
 
 router = APIRouter()
 
 
 @router.get("/info")
 def get_item_info(id: str = Query(..., description="Item UUID from search results")):
-    item = chroma.get_item(id)
+    item = catalog.get_item(id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
@@ -22,13 +22,13 @@ def get_library(
     media_type: Literal["image", "video"] | None = Query(None),
     order: Literal["asc", "desc"] = Query("desc"),
 ):
-    results = chroma.list_library_items(media_type=media_type, order=order)
+    results = catalog.list_library_items(media_type=media_type, order=order)
     return {"count": len(results), "results": results}
 
 
 @router.get("/{id}/thumbnail")
 def serve_thumbnail(id: str):
-    item = chroma.get_item(id)
+    item = catalog.get_item(id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     thumbnail_path = (item["metadata"] or {}).get("thumbnail_path")
@@ -42,7 +42,7 @@ def serve_thumbnail(id: str):
 
 @router.get("/{id}")
 def serve_media(id: str):
-    item = chroma.get_item(id)
+    item = catalog.get_item(id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     path = (item["metadata"] or {}).get("path")

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from routes import collection, media, search, trials
-from services import chroma, text_index
+from services import catalog, chroma, text_index
 
 TESTER_PAGE = Path(__file__).resolve().parent / "devtools" / "endpoint_tester" / "index.html"
 
@@ -14,6 +14,7 @@ TESTER_PAGE = Path(__file__).resolve().parent / "devtools" / "endpoint_tester" /
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     chroma.configure()
+    catalog.configure()
     text_index.build()
     yield
 

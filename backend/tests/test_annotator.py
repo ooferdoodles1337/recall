@@ -8,31 +8,36 @@ TEST_UUID = "aaaaaaaa-0000-0000-0000-000000000002"
 
 
 @pytest.fixture(autouse=True)
-def in_memory_chroma(monkeypatch):
+def in_memory_catalog(tmp_path, monkeypatch):
     ephemeral = chromadb.EphemeralClient()
     content_col = ephemeral.get_or_create_collection("media_content")
     monkeypatch.setattr("services.chroma.content_collection", content_col)
+    import services.catalog as catalog
+    catalog.configure(str(tmp_path / "catalog.sqlite"))
+    catalog.reset()
 
 
 def _seed(extra=None):
-    import services.chroma as chroma
-    chroma.upsert_content(
+    import services.catalog as catalog
+    metadata = {"content_hash": "test-hash"}
+    if extra:
+        metadata.update(extra)
+    catalog.upsert_item(
         file_id=TEST_UUID,
-        embedding=[0.1] * 3072,
         path="backend/data/media/foo.jpg",
         filename="foo.jpg",
         mime_type="image/jpeg",
         media_type="image",
-        extra_metadata=extra or {},
+        extra_metadata=metadata,
     )
 
 
-# --- chroma helpers ---
+# --- catalog helpers ---
 
 def test_get_all_items_with_metadata_returns_seeded_item():
     _seed()
-    import services.chroma as chroma
-    items = chroma.get_all_items_with_metadata()
+    import services.catalog as catalog
+    items = catalog.get_all_items_with_metadata()
     assert len(items) == 1
     assert items[0]["id"] == TEST_UUID
     assert items[0]["metadata"]["filename"] == "foo.jpg"
@@ -41,17 +46,17 @@ def test_get_all_items_with_metadata_returns_seeded_item():
 
 def test_update_metadata_merges_patch():
     _seed()
-    import services.chroma as chroma
-    chroma.update_metadata(TEST_UUID, {"description": "a photo", "search_terms": '["cat"]'})
-    item = chroma.get_item(TEST_UUID)
+    import services.catalog as catalog
+    catalog.update_metadata(TEST_UUID, {"description": "a photo", "search_terms": '["cat"]'})
+    item = catalog.get_item(TEST_UUID)
     assert item["metadata"]["description"] == "a photo"
     assert item["metadata"]["filename"] == "foo.jpg"  # original key preserved
 
 
 def test_update_metadata_raises_for_missing_id():
-    import services.chroma as chroma
+    import services.catalog as catalog
     with pytest.raises(ValueError, match="not found"):
-        chroma.update_metadata("nonexistent-id", {"description": "x"})
+        catalog.update_metadata("nonexistent-id", {"description": "x"})
 
 
 # --- annotator helpers ---
@@ -72,8 +77,8 @@ def test_write_annotations_stores_description_and_terms():
         search_terms=["red", "square"],
     )
     _write_annotations({TEST_UUID: ann}, {TEST_UUID})
-    import services.chroma as chroma
-    item = chroma.get_item(TEST_UUID)
+    import services.catalog as catalog
+    item = catalog.get_item(TEST_UUID)
     assert item["metadata"]["description"] == "a red square"
     assert json.loads(item["metadata"]["search_terms"]) == ["red", "square"]
 

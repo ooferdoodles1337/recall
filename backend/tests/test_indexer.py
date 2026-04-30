@@ -37,17 +37,21 @@ def mock_services(media_root, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", media_root / "data")
     monkeypatch.setattr(config, "MEDIA_DIR", media_root / "data" / "media")
     monkeypatch.setattr(config, "THUMBS_DIR", media_root / "data" / "thumbnails")
+    monkeypatch.setattr(config, "CATALOG_DB_PATH", media_root / "data" / "databases" / "catalog.sqlite")
 
     ephemeral = chromadb.EphemeralClient()
     content_col = ephemeral.get_or_create_collection("media_content")
     monkeypatch.setattr("services.chroma.content_collection", content_col)
+    import services.catalog as catalog
+    catalog.configure(str(config.CATALOG_DB_PATH))
+    catalog.reset()
     monkeypatch.setattr("services.gemini.embed_content", lambda data, mime: [0.1] * 3072)
     monkeypatch.setattr(
         "services.gemini.embed_content_batch",
         lambda items: {key: [0.1] * 3072 for key, _, _ in items},
     )
     monkeypatch.setattr("services.metadata.extract", lambda path: {})
-    return {"content": content_col, "data_dir": media_root / "data"}
+    return {"content": content_col, "data_dir": media_root / "data", "catalog": catalog}
 
 
 def test_index_file_upserts_content_collection(media_root, mock_services):
@@ -58,13 +62,25 @@ def test_index_file_upserts_content_collection(media_root, mock_services):
     assert get_id_by_hash(_sha256(photo)) is not None
 
 
+def test_index_file_upserts_catalog_item(media_root, mock_services):
+    from services.catalog import get_id_by_hash, get_item
+    from services.indexer import index_file
+    photo = media_root / "data" / "media" / "photo.jpg"
+    index_file(photo, force=False)
+    item_id = get_id_by_hash(_sha256(photo))
+    item = get_item(item_id)
+    assert item["metadata"]["filename"] == "photo.jpg"
+    assert item["metadata"]["path"] == "media/photo.jpg"
+    assert item["metadata"]["content_hash"] == _sha256(photo)
+
+
 def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch):
-    from services.chroma import upsert_content
+    from services.catalog import upsert_item
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     content_hash = _sha256(photo)
-    upsert_content(
-        "existing-uuid", [0.1] * 3072, "media/photo.jpg", "photo.jpg",
+    upsert_item(
+        "existing-uuid", "media/photo.jpg", "photo.jpg",
         "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
     )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
@@ -74,12 +90,12 @@ def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch
 
 
 def test_index_file_force_reindexes_existing(media_root, mock_services, monkeypatch):
-    from services.chroma import upsert_content
+    from services.catalog import upsert_item
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     content_hash = _sha256(photo)
-    upsert_content(
-        "existing-uuid", [0.1] * 3072, "media/photo.jpg", "photo.jpg",
+    upsert_item(
+        "existing-uuid", "media/photo.jpg", "photo.jpg",
         "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
     )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
@@ -112,6 +128,14 @@ def test_index_file_outside_data_dir_is_rejected(media_root, mock_services, tmp_
 
 def test_run_indexes_all_files_in_media_dir(media_root, mock_services):
     from services.chroma import get_id_by_hash
+    from services.indexer import run
+    run(force=False)
+    photo = media_root / "data" / "media" / "photo.jpg"
+    assert get_id_by_hash(_sha256(photo)) is not None
+
+
+def test_run_indexes_all_files_in_catalog(media_root, mock_services):
+    from services.catalog import get_id_by_hash
     from services.indexer import run
     run(force=False)
     photo = media_root / "data" / "media" / "photo.jpg"
@@ -153,13 +177,12 @@ def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeyp
         "services.indexer.metadata_svc.extract",
         lambda path: {"EXIF_Make": "Nikon", "geo_city": "Paris", "geo_country": "France"},
     )
-    from services.chroma import get_id_by_hash
+    from services.catalog import get_id_by_hash, get_item
     from services.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=True)
     item_id = get_id_by_hash(_sha256(photo))
-    result = mock_services["content"].get(ids=[item_id], include=["metadatas"])
-    meta = result["metadatas"][0]
+    meta = get_item(item_id)["metadata"]
     assert meta["EXIF_Make"] == "Nikon"
     assert meta["geo_city"] == "Paris"
     assert meta["geo_country"] == "France"
