@@ -233,3 +233,19 @@ def get_stats() -> dict:
         "total": total,
         "by_media_type": {row["media_type"] or "unknown": row["count"] for row in rows},
     }
+
+
+def get_facets() -> dict:
+    with _connect() as conn:
+        by_type = conn.execute(
+            "SELECT media_type, COUNT(*) AS count FROM media_items GROUP BY media_type ORDER BY media_type"
+        ).fetchall()
+        by_month = conn.execute(
+            "SELECT taken_year_month, COUNT(*) AS count FROM media_items"
+            " WHERE taken_year_month IS NOT NULL"
+            " GROUP BY taken_year_month ORDER BY taken_year_month"
+        ).fetchall()
+    return {
+        "media_type": {row["media_type"] or "unknown": row["count"] for row in by_type},
+        "taken_year_month": {row["taken_year_month"]: row["count"] for row in by_month},
+    }

@@ -65,35 +65,3 @@ def test_thumbnail_200_returns_webp(monkeypatch, tmp_path):
     assert str(response.path) == thumb_path
 
 
-def test_library_returns_all_image_metadata_sorted_chronologically(monkeypatch):
-    from routes.media import get_library
-
-    monkeypatch.setattr(
-        "services.catalog.list_library_items",
-        lambda media_type=None, order="desc": [
-            {
-                "id": "new-id",
-                "metadata": {
-                    "media_type": "image",
-                    "taken_sort": "2024-03-18T10:00:00",
-                    "taken_at": "2024-03-18T10:00:00",
-                    "taken_date": "2024-03-18",
-                },
-            },
-            {
-                "id": "old-id",
-                "metadata": {
-                    "media_type": "image",
-                    "taken_sort": "2024-03-17T10:00:00",
-                    "taken_at": "2024-03-17T10:00:00",
-                    "taken_date": "2024-03-17",
-                },
-            },
-        ],
-    )
-
-    body = get_library(media_type="image", order="desc")
-
-    assert body["count"] == 2
-    assert [item["id"] for item in body["results"]] == ["new-id", "old-id"]
-    assert body["results"][0]["metadata"]["taken_date"] == "2024-03-18"

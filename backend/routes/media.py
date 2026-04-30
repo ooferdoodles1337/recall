@@ -1,29 +1,10 @@
-from typing import Literal
-
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 import config
 from services import catalog
 
 router = APIRouter()
-
-
-@router.get("/info")
-def get_item_info(id: str = Query(..., description="Item UUID from search results")):
-    item = catalog.get_item(id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return item
-
-
-@router.get("/library")
-def get_library(
-    media_type: Literal["image", "video"] | None = Query(None),
-    order: Literal["asc", "desc"] = Query("desc"),
-):
-    results = catalog.list_library_items(media_type=media_type, order=order)
-    return {"count": len(results), "results": results}
 
 
 @router.get("/{id}/thumbnail")
