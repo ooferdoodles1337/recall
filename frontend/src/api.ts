@@ -1,43 +1,24 @@
-import { API_BASE, METRICS_ENDPOINT, SEARCH_RESULTS_COUNT } from './constants'
-import type { CatalogResponse, MediaItem, SearchResult, SessionMetrics } from './types'
+import { API_BASE, DEFAULT_SEARCH_LIMIT } from './constants'
+import type { CatalogResponse, MediaItem, SearchResponse, SearchResult } from './types'
 
-export async function fetchTrials(n: number): Promise<MediaItem[]> {
-  const res = await fetch(`${API_BASE}/trials?n=${n}`)
-  if (!res.ok) throw new Error(`Failed to fetch trials: ${res.status}`)
-  const data = await res.json()
-  return data.targets as MediaItem[]
-}
-
-export async function fetchSearch(query: string): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q: query, n: String(SEARCH_RESULTS_COUNT) })
-  const res = await fetch(`${API_BASE}/search/semantic?${params}`)
-  if (!res.ok) throw new Error(`Search failed: ${res.status}`)
-  const data = await res.json()
-  return data.results as SearchResult[]
+async function readJson<T>(res: Response, message: string): Promise<T> {
+  if (!res.ok) throw new Error(`${message}: ${res.status}`)
+  return await res.json() as T
 }
 
 export async function fetchCatalog(): Promise<MediaItem[]> {
   const res = await fetch(`${API_BASE}/catalog/items?order=desc`)
-  if (!res.ok) throw new Error(`Failed to fetch catalog: ${res.status}`)
-  const data = await res.json() as CatalogResponse
+  const data = await readJson<CatalogResponse>(res, 'Failed to fetch catalog')
   return data.results
 }
 
-export async function submitSessionMetrics(metrics: SessionMetrics): Promise<void> {
-  if (!METRICS_ENDPOINT) return
-
-  const res = await fetch(METRICS_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(metrics),
-  })
-  if (!res.ok) throw new Error(`Metrics submission failed: ${res.status}`)
+export async function fetchSearch(query: string, limit = DEFAULT_SEARCH_LIMIT): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query, n: String(limit) })
+  const res = await fetch(`${API_BASE}/search/semantic?${params}`)
+  const data = await readJson<SearchResponse>(res, 'Search failed')
+  return data.results
 }
 
-export function mediaUrl(id: string): string {
-  return `${API_BASE}/media/${id}`
-}
-
-export function thumbnailUrl(id: string): string {
-  return `${API_BASE}/media/${id}/thumbnail`
+export function absoluteApiUrl(path: string): string {
+  return path.startsWith('/api/') ? path : `${API_BASE}${path}`
 }

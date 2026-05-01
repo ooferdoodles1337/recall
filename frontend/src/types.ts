@@ -1,34 +1,83 @@
-export type AppState = 'start' | 'free_use' | 'trial' | 'result_flash' | 'end'
+export type MediaType = 'image' | 'video'
+export type SafetyState = 'safe' | 'sensitive' | 'nsfw' | 'unknown'
 
-export interface ItemMetadata {
-  filename: string
-  mime_type: string
-  media_type: 'image' | 'video'
-  path: string
-  content_hash: string
-  taken_at?: string
-  taken_date?: string
-  taken_year_month?: string
-  taken_sort?: string
-  taken_source?: string
-  thumbnail_path?: string
-  width?: number
-  height?: number
-  geo_city?: string
-  geo_state?: string
-  geo_country?: string
-  [key: string]: string | number | boolean | undefined
+export interface MediaLinks {
+  media: string
+  thumbnail?: string
+}
+
+export interface MediaMetadata {
+  asset: {
+    filename: string
+    mime_type: string
+    media_type: MediaType
+    paths: {
+      original: string
+      thumbnail?: string
+    }
+    width?: number
+    height?: number
+    duration_seconds?: number
+  }
+  capture: {
+    taken_at?: string
+    date?: string
+    year_month?: string
+    sort_key?: string
+    source?: string
+    location?: {
+      city?: string
+      state?: string
+      country?: string
+      country_code?: string
+      latitude?: number
+      longitude?: number
+    }
+  }
+  search: {
+    description?: string | null
+    phrases: string[]
+    annotation?: {
+      provider: string
+      model: string
+      updated_at: string
+    }
+  }
+  safety: {
+    state: SafetyState
+    score?: number
+    labels?: Record<string, number>
+    provider?: string
+    model?: string
+    checked_at?: string
+  }
+  organization: {
+    favorite: boolean
+    folders: string[]
+  }
+  raw: {
+    exif: Record<string, string | number | boolean>
+  }
+  system: {
+    schema_version: number
+    content_hash?: string
+    indexed_at?: string
+    embedding?: {
+      provider: string
+      model: string
+      dimensions: number
+    }
+  }
 }
 
 export interface MediaItem {
   id: string
-  metadata: ItemMetadata
+  metadata: MediaMetadata
+  links: MediaLinks
 }
 
-export interface SearchResult {
-  id: string
+export interface SearchResult extends MediaItem {
   distance: number | null
-  metadata: ItemMetadata
 }
 
 export interface CatalogResponse {
@@ -36,34 +85,7 @@ export interface CatalogResponse {
   results: MediaItem[]
 }
 
-export interface TrialEvent {
-  type: 'trial_start' | 'search' | 'selection'
-  atMs: number
-  trialIndex: number
-  targetId: string
-  query?: string
-  resultCount?: number
-  selectedId?: string
-  isCorrect?: boolean
-}
-
-export interface TrialMetric {
-  trialIndex: number
-  targetId: string
-  startedAtMs: number
-  completedAtMs?: number
-  durationMs?: number
-  searchCount: number
-  selectionCount: number
-  wrongSelectionCount: number
-  finalQuery?: string
-}
-
-export interface SessionMetrics {
-  sessionId: string
-  startedAtIso: string
-  completedAtIso?: string
-  targetIds: string[]
-  events: TrialEvent[]
-  trials: TrialMetric[]
+export interface SearchResponse {
+  query: string
+  results: SearchResult[]
 }
