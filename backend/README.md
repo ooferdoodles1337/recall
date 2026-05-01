@@ -66,10 +66,8 @@ Options:
 - `--force` — re-index files that are already indexed
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and internal search phrases for any unannotated items (requires `GEMINI_API_KEY`)
 - `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
-- `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`); also settable via `RECALL_DB_PATH`
-- `--media-dir <path>` — scan a different media directory (default: `backend/data/media`); also settable via `RECALL_MEDIA_DIR`
-
-Set `RECALL_THUMBNAILS_DIR` to write thumbnails somewhere other than `backend/data/thumbnails`.
+- `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
+- `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
 
 `--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into `metadata.safety`.
 

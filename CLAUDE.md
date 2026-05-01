@@ -45,7 +45,6 @@ uv add <package>
 | Variable | Required | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | yes | Embedding and Gemini batch annotation |
-| `DATA_DIR` | no | Override default data directory (`./backend/data`) |
 | `OPENROUTER_API_KEY` | no | Use OpenRouter for annotation instead of Gemini |
 | `OPENROUTER_MODEL` | no | OpenRouter model (default: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`) |
 
