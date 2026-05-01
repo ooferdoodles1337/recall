@@ -5,12 +5,11 @@ from typing import Any
 from PIL import Image
 
 import config
-from services import catalog
+from services import catalog, metadata_schema
 
 log = logging.getLogger(__name__)
 
 MODEL_NAME = "hf_hub:Marqo/nsfw-image-detection-384"
-METADATA_KEY = "nsfw_detection"
 
 _model: Any | None = None
 _transforms: Any | None = None
@@ -37,11 +36,11 @@ def _load_model() -> tuple[Any, Any, list[str]]:
 
 
 def _candidate_path(meta: dict) -> Path | None:
-    path = meta.get("path")
-    if meta.get("media_type") == "image" and path:
+    path = metadata_schema.asset_path(meta)
+    if metadata_schema.media_type(meta) == "image" and path:
         return config.DATA_DIR / path
 
-    thumbnail_path = meta.get("thumbnail_path")
+    thumbnail_path = metadata_schema.thumbnail_path(meta)
     if thumbnail_path:
         return config.DATA_DIR / thumbnail_path
 
@@ -80,7 +79,7 @@ def detect_image(path: Path) -> dict:
 
 def _get_undetected() -> list[dict]:
     all_items = catalog.get_all_items_with_metadata()
-    return [item for item in all_items if not (item["metadata"] or {}).get(METADATA_KEY)]
+    return [item for item in all_items if not metadata_schema.has_safety_detection(item["metadata"] or {})]
 
 
 def detect_undetected() -> None:
@@ -101,7 +100,7 @@ def detect_undetected() -> None:
             log.warning("item %s NSFW candidate not found: %s", item["id"], path)
             continue
         try:
-            catalog.update_metadata(item["id"], {METADATA_KEY: detect_image(path)})
+            catalog.update_metadata(item["id"], metadata_schema.nsfw_patch(detect_image(path)))
             detected += 1
         except Exception as exc:
             log.error("failed NSFW detection for %s: %s", item["id"], exc)

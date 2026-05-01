@@ -42,7 +42,7 @@ def test_thumbnail_404_file_missing_from_disk(monkeypatch):
 
     monkeypatch.setattr(
         "services.catalog.get_item",
-        lambda item_id: {"id": item_id, "metadata": {"thumbnail_path": "/nonexistent/path.webp"}},
+        lambda item_id: {"id": item_id, "metadata": {"asset": {"paths": {"thumbnail": "/nonexistent/path.webp"}}}},
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -56,12 +56,11 @@ def test_thumbnail_200_returns_webp(monkeypatch, tmp_path):
     thumb_path = _webp_file(tmp_path)
     monkeypatch.setattr(
         "services.catalog.get_item",
-        lambda item_id: {"id": item_id, "metadata": {"thumbnail_path": thumb_path}},
+        lambda item_id: {"id": item_id, "metadata": {"asset": {"paths": {"thumbnail": thumb_path}}}},
     )
 
     response = serve_thumbnail("test-uuid")
 
     assert response.media_type == "image/webp"
     assert str(response.path) == thumb_path
-
 

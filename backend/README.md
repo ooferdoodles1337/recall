@@ -64,14 +64,14 @@ uv run python -m services.indexer
 
 Options:
 - `--force` — re-index files that are already indexed
-- `--annotate` — after indexing, run the annotation pass to generate descriptions and search terms for any unannotated items (requires `GEMINI_API_KEY`)
-- `--detect-nsfw` — after indexing, run local NSFW detection for items without `nsfw_detection` metadata
+- `--annotate` — after indexing, run the annotation pass to generate descriptions and internal search phrases for any unannotated items (requires `GEMINI_API_KEY`)
+- `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`); also settable via `RECALL_DB_PATH`
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`); also settable via `RECALL_MEDIA_DIR`
 
 Set `RECALL_THUMBNAILS_DIR` to write thumbnails somewhere other than `backend/data/thumbnails`.
 
-`--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into the existing SQLite metadata JSON blob; no schema migration is required.
+`--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into `metadata.safety`.
 
 The indexer:
 1. Recursively scans `backend/data/media/` for supported files
@@ -82,8 +82,8 @@ The indexer:
 6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
 8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
-9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `description` and `search_terms` back to each SQLite catalog item
-10. If `--detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without `nsfw_detection` metadata and writes the model label, score, and probabilities back to SQLite. Images are analyzed directly; videos are analyzed through their generated thumbnail.
+9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `metadata.search.description` and `metadata.search.phrases`
+10. If `--detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without checked `metadata.safety` and writes the UI state, score, labels, and model info. Images are analyzed directly; videos are analyzed through their generated thumbnail.
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
@@ -124,38 +124,60 @@ Semantic (vector) search over the indexed media collection using a natural-langu
     {
       "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
       "distance": 0.312,
+      "links": {
+        "media": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789",
+        "thumbnail": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789/thumbnail"
+      },
       "metadata": {
-        "filename": "IMG_4821.jpg",
-        "mime_type": "image/jpeg",
-        "media_type": "image",
-        "path": "/backend/data/media/IMG_4821.jpg",
-        "content_hash": "e3b0c44298fc1c149afb...",
-        "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
-        "description": "A wide-angle beach scene at golden hour...",
-        "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
-        "geo_city": "Kuta",
-        "geo_country": "Indonesia"
+        "asset": {
+          "filename": "IMG_4821.jpg",
+          "mime_type": "image/jpeg",
+          "media_type": "image",
+          "paths": {
+            "original": "media/IMG_4821.jpg",
+            "thumbnail": "thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp"
+          }
+        },
+        "capture": {
+          "date": "2024-03-18",
+          "year_month": "2024-03",
+          "sort_key": "2024-03-18T14:22:09",
+          "location": { "city": "Kuta", "country": "Indonesia" }
+        },
+        "search": {
+          "description": "A wide-angle beach scene at golden hour...",
+          "phrases": ["sunset beach", "golden hour", "ocean waves"]
+        },
+        "safety": { "state": "safe", "score": 0.99 },
+        "organization": { "favorite": false, "folders": [] },
+        "raw": { "exif": {} },
+        "system": {
+          "schema_version": 2,
+          "content_hash": "e3b0c44298fc1c149afb..."
+        }
       }
     }
   ]
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID and is what you pass to `/media/{id}` to fetch the file. `metadata` always includes `filename`, `mime_type`, `media_type`, `path`, `content_hash` (SHA-256 of the original file), and `thumbnail_path` (server-local path to the WebP thumbnail). Annotated items additionally include `description` (a natural-language description of the content) and `search_terms` (a JSON-encoded list of keyword phrases). Items processed with `--detect-nsfw` additionally include `nsfw_detection` with the model name, predicted label, top score, and per-class probabilities. Any extracted EXIF fields and reverse-geocoded `geo_*` fields are also present when available.
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID. `links.media` and `links.thumbnail` are the frontend-facing URLs. The stored path values under `metadata.asset.paths` are server-local relative paths.
 
-Newly indexed items also include canonical capture-date fields for chronological browsing:
+Metadata is grouped by purpose:
 
-- `taken_at` — ISO timestamp used for display.
-- `taken_date` — `YYYY-MM-DD` local calendar date.
-- `taken_year_month` — `YYYY-MM` grouping key.
-- `taken_sort` — ISO timestamp used for backend ordering.
-- `taken_source` — source field used to derive the date, such as `EXIF_DateTimeOriginal` or `filesystem_mtime`.
+- `asset` — filename, MIME/media type, relative storage paths, dimensions, and duration.
+- `capture` — normalized date/sort fields plus optional reverse-geocoded location.
+- `search` — optional generated description and internal search phrases. These are not user-facing tags.
+- `safety` — UI-ready state (`safe`, `sensitive`, `nsfw`, or `unknown`) plus optional model details.
+- `organization` — user-level state such as `favorite` and `folders`.
+- `raw.exif` — flattened EXIF/tool metadata retained for debugging and future migrations.
+- `system` — schema version, content hash, indexing provenance, and embedding model metadata.
 
 ---
 
 ### `GET /search/suggest`
 
-Returns autocomplete suggestions for a partial query. Backed by an in-memory index of `search_terms` from the SQLite catalog — no ChromaDB or Gemini calls. Use on every keystroke.
+Returns autocomplete suggestions for a partial query. Backed by an in-memory index of `metadata.search.phrases` from the SQLite catalog — no ChromaDB or Gemini calls. Use on every keystroke.
 
 **Query params**
 
@@ -182,7 +204,7 @@ Suggestions are prefix matches first; fuzzy matches fill any remaining slots.
 
 ### `GET /search/text`
 
-Keyword search against the `search_terms` index. Tries exact match → prefix union → fuzzy union and returns all matched items.
+Keyword search against the `metadata.search.phrases` index. Tries exact match → prefix union → fuzzy union and returns all matched items.
 
 **Query params**
 
@@ -200,7 +222,8 @@ Keyword search against the `search_terms` index. Tries exact match → prefix un
     {
       "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
       "distance": null,
-      "metadata": { ... }
+      "metadata": { ... },
+      "links": { ... }
     }
   ]
 }
@@ -232,7 +255,7 @@ Returns items visually similar to an already-indexed item, using its stored embe
 {
   "query_id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
   "results": [
-    { "id": "...", "distance": 0.18, "metadata": { ... } }
+    { "id": "...", "distance": 0.18, "metadata": { ... }, "links": { ... } }
   ]
 }
 ```
@@ -274,14 +297,14 @@ Returns 415 for unsupported file types, 413 if the file exceeds 20 MB.
 
 ### `GET /catalog/items`
 
-Returns the complete metadata catalog for gallery views. Does not serve file bytes — returns IDs and metadata so the frontend can render a chronological gallery, group by `taken_date`, and lazy-load thumbnails by UUID.
+Returns the complete metadata catalog for gallery views. Does not serve file bytes — returns IDs, metadata, and links so the frontend can render a chronological gallery, group by `metadata.capture.date`, and lazy-load thumbnails by URL.
 
 **Query params**
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `media_type` | `image` or `video` | optional | Restrict results by media type |
-| `order` | `asc` or `desc` | `desc` | Sort by `taken_sort` |
+| `order` | `asc` or `desc` | `desc` | Sort by `metadata.capture.sort_key` |
 
 **Response**
 
@@ -291,19 +314,33 @@ Returns the complete metadata catalog for gallery views. Does not serve file byt
   "results": [
     {
       "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+      "links": {
+        "media": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789",
+        "thumbnail": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789/thumbnail"
+      },
       "metadata": {
-        "filename": "IMG_4821.jpg",
-        "media_type": "image",
-        "taken_at": "2024-03-18T14:22:09",
-        "taken_date": "2024-03-18",
-        "thumbnail_path": "thumbnails/3f4a8b2c.webp"
+        "asset": {
+          "filename": "IMG_4821.jpg",
+          "media_type": "image",
+          "mime_type": "image/jpeg",
+          "paths": {
+            "original": "media/IMG_4821.jpg",
+            "thumbnail": "thumbnails/3f4a8b2c.webp"
+          }
+        },
+        "capture": {
+          "taken_at": "2024-03-18T14:22:09",
+          "date": "2024-03-18",
+          "year_month": "2024-03",
+          "sort_key": "2024-03-18T14:22:09"
+        }
       }
     }
   ]
 }
 ```
 
-For same-date browsing, use the selected item's `taken_date` and filter the loaded results client-side.
+For same-date browsing, use the selected item's `metadata.capture.date` and filter the loaded results client-side.
 
 ---
 
@@ -316,17 +353,28 @@ Returns stored metadata for a single item without serving the file.
 ```json
 {
   "id": "3f4a8b2c-1234-5678-abcd-ef0123456789",
+  "links": {
+    "media": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789",
+    "thumbnail": "/media/3f4a8b2c-1234-5678-abcd-ef0123456789/thumbnail"
+  },
   "metadata": {
-    "filename": "IMG_4821.jpg",
-    "mime_type": "image/jpeg",
-    "media_type": "image",
-    "path": "/backend/data/media/IMG_4821.jpg",
-    "content_hash": "e3b0c44298fc1c149afb...",
-    "thumbnail_path": "/backend/data/thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp",
-    "description": "A wide-angle beach scene at golden hour...",
-    "search_terms": "[\"sunset beach\", \"golden hour\", \"ocean waves\"]",
-    "geo_city": "Kuta",
-    "geo_country": "Indonesia"
+    "asset": {
+      "filename": "IMG_4821.jpg",
+      "mime_type": "image/jpeg",
+      "media_type": "image",
+      "paths": {
+        "original": "media/IMG_4821.jpg",
+        "thumbnail": "thumbnails/3f4a8b2c-1234-5678-abcd-ef0123456789.webp"
+      }
+    },
+    "search": {
+      "description": "A wide-angle beach scene at golden hour...",
+      "phrases": ["sunset beach", "golden hour", "ocean waves"]
+    },
+    "system": {
+      "schema_version": 2,
+      "content_hash": "e3b0c44298fc1c149afb..."
+    }
   }
 }
 ```
@@ -350,8 +398,8 @@ Fetch metadata for multiple items in one request. Useful for hydrating search re
 ```json
 {
   "results": [
-    { "id": "uuid-a", "metadata": { ... } },
-    { "id": "uuid-b", "metadata": { ... } }
+    { "id": "uuid-a", "metadata": { ... }, "links": { ... } },
+    { "id": "uuid-b", "metadata": { ... }, "links": { ... } }
   ],
   "missing": ["uuid-c"]
 }

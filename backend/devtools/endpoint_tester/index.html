@@ -439,11 +439,24 @@
         return { infoUrl, mediaUrl, thumbUrl };
       }
 
+      function metadataAsset(metadata) {
+        return metadata && typeof metadata.asset === "object" ? metadata.asset : {};
+      }
+
+      function metadataTitle(metadata, fallback) {
+        return metadataAsset(metadata).filename || metadata?.filename || fallback;
+      }
+
+      function metadataMediaType(metadata) {
+        const asset = metadataAsset(metadata);
+        return asset.media_type || asset.mime_type || metadata?.media_type || metadata?.mime_type || "media";
+      }
+
       function showItemPreview(item) {
         const itemId = item.id;
         const metadata = item.metadata || {};
-        const mediaType = metadata.media_type || metadata.mime_type || "media";
-        const title = metadata.filename || itemId;
+        const mediaType = metadataMediaType(metadata);
+        const title = metadataTitle(metadata, itemId);
         const { infoUrl, mediaUrl, thumbUrl } = buildPreviewLinks(itemId);
 
         elements.queryValue.value = itemId;
@@ -457,7 +470,7 @@
         clearBinaryPreview();
         elements.previewMedia.innerHTML = "";
 
-        if ((metadata.media_type || "").startsWith("video") || (metadata.mime_type || "").startsWith("video/")) {
+        if (mediaType.startsWith("video")) {
           const video = document.createElement("video");
           video.controls = true;
           video.src = mediaUrl;
@@ -483,7 +496,7 @@
         for (const item of items) {
           const card = document.createElement("div");
           const metadata = item.metadata || {};
-          const title = metadata.filename || item.id;
+          const title = metadataTitle(metadata, item.id);
           const thumbUrl = buildAbsoluteUrl(`/media/${encodeURIComponent(item.id)}/thumbnail`);
           const mediaUrl = buildAbsoluteUrl(`/media/${encodeURIComponent(item.id)}`);
           const image = document.createElement("img");
@@ -505,7 +518,7 @@
           meta.className = "meta";
           meta.innerHTML = [
             `<div><strong>ID:</strong> ${escapeHtml(item.id)}</div>`,
-            `<div><strong>Type:</strong> ${escapeHtml(metadata.media_type || metadata.mime_type || "unknown")}</div>`,
+            `<div><strong>Type:</strong> ${escapeHtml(metadataMediaType(metadata))}</div>`,
             item.distance == null ? "" : `<div><strong>Distance:</strong> ${escapeHtml(item.distance)}</div>`,
           ].join("");
 

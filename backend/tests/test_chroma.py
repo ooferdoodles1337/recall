@@ -40,7 +40,6 @@ def test_upsert_content_merges_extra_metadata():
     )
     result = chroma.content_collection.get(ids=[TEST_UUID], include=["metadatas"])
     meta = result["metadatas"][0]
-    assert meta["EXIF_Make"] == "Sony"
     assert meta["geo_city"] == "Tokyo"
     assert meta["geo_country"] == "Japan"
     assert meta["filename"] == "geo.jpg"

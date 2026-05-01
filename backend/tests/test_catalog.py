@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pytest
@@ -30,19 +29,17 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
 
     item = catalog_db.get_item("item-1")
 
-    assert item == {
-        "id": "item-1",
-        "metadata": {
-            "path": "media/photo.jpg",
-            "filename": "photo.jpg",
-            "mime_type": "image/jpeg",
-            "media_type": "image",
-            "content_hash": "hash-1",
-            "taken_sort": "2024-03-18T10:00:00",
-            "taken_date": "2024-03-18",
-            "geo_city": "Paris",
-        },
-    }
+    assert item["id"] == "item-1"
+    assert item["links"] == {"media": "/media/item-1"}
+    assert item["metadata"]["asset"]["filename"] == "photo.jpg"
+    assert item["metadata"]["asset"]["mime_type"] == "image/jpeg"
+    assert item["metadata"]["asset"]["media_type"] == "image"
+    assert item["metadata"]["asset"]["paths"]["original"] == "media/photo.jpg"
+    assert item["metadata"]["capture"]["sort_key"] == "2024-03-18T10:00:00"
+    assert item["metadata"]["capture"]["date"] == "2024-03-18"
+    assert item["metadata"]["capture"]["location"]["city"] == "Paris"
+    assert item["metadata"]["system"]["content_hash"] == "hash-1"
+    assert item["metadata"]["system"]["schema_version"] == 2
 
 
 def test_get_id_by_hash_uses_catalog_content_hash(catalog_db):
@@ -97,15 +94,15 @@ def test_update_metadata_merges_patch(catalog_db):
         "photo.jpg",
         "image/jpeg",
         "image",
-        extra_metadata={"content_hash": "hash-1", "search_terms": json.dumps(["old"])},
+        extra_metadata={"content_hash": "hash-1", "search_terms": ["old"]},
     )
 
-    catalog_db.update_metadata("item-1", {"description": "a photo", "search_terms": json.dumps(["new"])})
+    catalog_db.update_metadata("item-1", {"search": {"description": "a photo", "phrases": ["new"]}})
 
     item = catalog_db.get_item("item-1")
-    assert item["metadata"]["filename"] == "photo.jpg"
-    assert item["metadata"]["description"] == "a photo"
-    assert json.loads(item["metadata"]["search_terms"]) == ["new"]
+    assert item["metadata"]["asset"]["filename"] == "photo.jpg"
+    assert item["metadata"]["search"]["description"] == "a photo"
+    assert item["metadata"]["search"]["phrases"] == ["new"]
 
 
 def test_reset_deletes_catalog_data(catalog_db):

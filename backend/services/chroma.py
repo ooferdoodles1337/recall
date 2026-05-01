@@ -1,6 +1,7 @@
 import chromadb
 
 from config import DB_PATH
+from services import metadata_schema
 
 DEFAULT_DB_PATH = str(DB_PATH)
 
@@ -41,9 +42,14 @@ def upsert_content(
     media_type: str,
     extra_metadata: dict | None = None,
 ) -> None:
-    metadata: dict = {"path": path, "filename": filename, "mime_type": mime_type, "media_type": media_type}
-    if extra_metadata:
-        metadata.update(extra_metadata)
+    structured = metadata_schema.build_metadata(
+        path=path,
+        filename=filename,
+        mime_type=mime_type,
+        media_type=media_type,
+        extra_metadata=extra_metadata,
+    )
+    metadata = metadata_schema.chroma_metadata(structured)
     _collection().upsert(
         ids=[file_id],
         embeddings=[embedding],

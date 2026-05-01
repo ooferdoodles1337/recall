@@ -1,10 +1,9 @@
 import bisect
-import json
 import logging
 
 from rapidfuzz import fuzz, process
 
-from services import catalog
+from services import catalog, metadata_schema
 
 log = logging.getLogger(__name__)
 
@@ -22,13 +21,8 @@ def build() -> None:
     items = catalog.get_all_items_with_metadata()
     for item in items:
         meta = item["metadata"] or {}
-        raw = meta.get("search_terms")
-        if not raw:
-            continue
-        try:
-            terms = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            log.warning("invalid search_terms for item %s, skipping", item["id"])
+        terms = metadata_schema.search_phrases(meta)
+        if not terms:
             continue
         for term in terms:
             normalized = term.strip().lower()

@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from pathlib import Path
@@ -7,7 +6,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 
 import config
-from services import catalog, gemini, openrouter
+from services import catalog, gemini, metadata_schema, openrouter
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -58,13 +57,13 @@ def _inline_schema(schema: dict) -> dict:
 
 def _get_unannotated() -> list[dict]:
     all_items = catalog.get_all_items_with_metadata()
-    return [item for item in all_items if not (item["metadata"] or {}).get("description")]
+    return [item for item in all_items if not metadata_schema.search_description(item["metadata"] or {})]
 
 
 def _load_item_bytes(item: dict) -> tuple[str, bytes, str] | None:
     meta = item["metadata"] or {}
-    path = meta.get("path")
-    mime_type = meta.get("mime_type")
+    path = metadata_schema.asset_path(meta)
+    mime_type = metadata_schema.mime_type(meta)
     if not path or not mime_type:
         log.warning("item %s missing path or mime_type", item["id"])
         return None
@@ -89,16 +88,27 @@ def _parse_pack_results(raw_results: list[str | None]) -> dict[str, SingleImageA
     return annotations
 
 
-def _write_annotations(annotations: dict[str, SingleImageAnnotation], expected_ids: set[str]) -> None:
+def _write_annotations(
+    annotations: dict[str, SingleImageAnnotation],
+    expected_ids: set[str],
+    *,
+    provider: str = "gemini",
+    model: str = ANNOTATION_MODEL,
+) -> None:
     for file_id, annotation in annotations.items():
         if file_id not in expected_ids:
             log.warning("unexpected file_id in response: %s", file_id)
             continue
         try:
-            catalog.update_metadata(file_id, {
-                "description": annotation.description,
-                "search_terms": json.dumps(annotation.search_terms),
-            })
+            catalog.update_metadata(
+                file_id,
+                metadata_schema.annotation_patch(
+                    description=annotation.description,
+                    phrases=annotation.search_terms,
+                    provider=provider,
+                    model=model,
+                ),
+            )
         except Exception as exc:
             log.error("failed to write annotation for %s: %s", file_id, exc)
 
@@ -119,10 +129,13 @@ def annotate_unannotated() -> None:
 
     if os.getenv("OPENROUTER_API_KEY"):
         model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
+        provider = "openrouter"
         packs = _make_openrouter_packs(loaded)
         log.info("annotating %d packs via OpenRouter (%s)", len(packs), model)
         raw_results = openrouter.annotate_packs(packs, model, _ANNOTATION_PROMPT, PackedAnnotationResponse.model_json_schema())
     else:
+        provider = "gemini"
+        model = ANNOTATION_MODEL
         packs = [loaded[i:i + PACK_SIZE] for i in range(0, len(loaded), PACK_SIZE)]
         log.info("submitting %d packs to Gemini Batch API (%s)", len(packs), ANNOTATION_MODEL)
         raw_results = gemini.annotate_packs_batch(
@@ -130,5 +143,5 @@ def annotate_unannotated() -> None:
         )
 
     annotations = _parse_pack_results(raw_results)
-    _write_annotations(annotations, expected_ids)
+    _write_annotations(annotations, expected_ids, provider=provider, model=model)
     log.info("annotation complete: %d/%d items annotated", len(annotations), len(loaded))

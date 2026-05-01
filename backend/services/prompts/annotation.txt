@@ -1,4 +1,4 @@
-Annotate each labeled image above for semantic search.
+Describe each labeled image above for search.
 
 Return a JSON object with this exact structure:
 {
@@ -6,7 +6,7 @@ Return a JSON object with this exact structure:
     {
       "file_id": "echo back the Image ID label exactly as written",
       "description": "one concise paragraph describing the image content, setting, mood, and any notable details",
-      "search_terms": ["8 to 12 terms for this specific image. Prefer specific descriptive phrases over generic category labels. Bad: 'anime girl', 'sadness', 'kawaii'. Good: 'dark blue hair close-up', 'teary classroom scene', 'hands clasped to chest', 'soft pastel school background'. Terms should distinguish this image from others in the same genre, not just identify the genre itself. Cover: specific visual details, emotional moment or action, setting details, color and lighting, character features."]
+      "search_terms": ["8 to 12 search phrases for this specific image. Prefer specific descriptive phrases over generic labels. Bad: 'anime girl', 'sadness', 'kawaii'. Good: 'dark blue hair close-up', 'teary classroom scene', 'hands clasped to chest', 'soft pastel school background'. Phrases should distinguish this image from visually similar items."]
     }
   ]
 }

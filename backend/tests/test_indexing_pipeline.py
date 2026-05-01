@@ -49,8 +49,8 @@ def test_run_indexes_temp_images_into_catalog_and_chroma(tmp_path, monkeypatch):
     catalog.configure(str(catalog_path))
     library_items = catalog.list_library_items()
     assert len(library_items) == 2
-    assert {item["metadata"]["filename"] for item in library_items} == {"red.jpg", "blue.jpg"}
-    assert all((data_dir / item["metadata"]["thumbnail_path"]).is_file() for item in library_items)
+    assert {item["metadata"]["asset"]["filename"] for item in library_items} == {"red.jpg", "blue.jpg"}
+    assert all((data_dir / item["metadata"]["asset"]["paths"]["thumbnail"]).is_file() for item in library_items)
 
     chroma.configure(str(chroma_path))
     vector_results = chroma.search([0.1] * 3072, n_results=2)

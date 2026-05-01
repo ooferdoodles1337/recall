@@ -70,17 +70,17 @@ def test_detect_undetected_writes_nsfw_metadata(in_memory_catalog, monkeypatch):
 
     nsfw.detect_undetected()
 
-    detection = catalog.get_item(TEST_UUID)["metadata"]["nsfw_detection"]
-    assert detection["label"] == "nsfw"
-    assert detection["score"] == 0.9
-    assert detection["probabilities"]["safe"] == 0.1
+    safety = catalog.get_item(TEST_UUID)["metadata"]["safety"]
+    assert safety["state"] == "nsfw"
+    assert safety["score"] == 0.9
+    assert safety["labels"]["safe"] == 0.1
 
 
 def test_detect_undetected_skips_existing_detection(in_memory_catalog, monkeypatch):
     from services import nsfw
 
     _write_jpeg(in_memory_catalog / "media" / "foo.jpg")
-    _seed(extra={"nsfw_detection": {"label": "safe"}})
+    _seed(extra={"nsfw_detection": {"label": "safe", "probabilities": {"safe": 1.0}}})
 
     def fail_if_called(path):
         pytest.fail(f"detect_image should not be called for {path}")
@@ -108,4 +108,4 @@ def test_video_detection_uses_thumbnail(in_memory_catalog, monkeypatch):
     nsfw.detect_undetected()
 
     assert seen_paths == [thumb_path]
-    assert catalog.get_item(TEST_UUID)["metadata"]["nsfw_detection"]["label"] == "safe"
+    assert catalog.get_item(TEST_UUID)["metadata"]["safety"]["state"] == "safe"

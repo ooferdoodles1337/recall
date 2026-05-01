@@ -72,9 +72,9 @@ def test_index_file_upserts_catalog_item(media_root, mock_services):
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
     item = get_item(item_id)
-    assert item["metadata"]["filename"] == "photo.jpg"
-    assert item["metadata"]["path"] == "media/photo.jpg"
-    assert item["metadata"]["content_hash"] == _sha256(photo)
+    assert item["metadata"]["asset"]["filename"] == "photo.jpg"
+    assert item["metadata"]["asset"]["paths"]["original"] == "media/photo.jpg"
+    assert item["metadata"]["system"]["content_hash"] == _sha256(photo)
 
 
 def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch):
@@ -170,6 +170,9 @@ def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services)
     assert "thumbnail_path" in meta
     assert meta["thumbnail_path"].endswith(".webp")
     assert meta["thumbnail_path"].startswith("thumbnails/")
+    item = mock_services["catalog"].get_item(item_id)
+    assert item["metadata"]["asset"]["paths"]["thumbnail"].endswith(".webp")
+    assert item["links"]["thumbnail"] == f"/media/{item_id}/thumbnail"
 
 
 def test_index_file_writes_thumbnail_webp_to_disk(media_root, mock_services):
@@ -200,9 +203,9 @@ def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeyp
     index_file(photo, force=True)
     item_id = get_id_by_hash(_sha256(photo))
     meta = get_item(item_id)["metadata"]
-    assert meta["EXIF_Make"] == "Nikon"
-    assert meta["geo_city"] == "Paris"
-    assert meta["geo_country"] == "France"
+    assert meta["raw"]["exif"]["EXIF_Make"] == "Nikon"
+    assert meta["capture"]["location"]["city"] == "Paris"
+    assert meta["capture"]["location"]["country"] == "France"
 
 
 def test_index_file_stores_relative_path(media_root, mock_services):

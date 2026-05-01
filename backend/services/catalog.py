@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import config
+from services import metadata_schema
 
 _db_path: Path | None = None
 
@@ -67,18 +68,26 @@ def _metadata_for_storage(
     media_type: str,
     extra_metadata: dict | None,
 ) -> dict:
-    metadata = {
-        "path": path,
-        "filename": filename,
-        "mime_type": mime_type,
-        "media_type": media_type,
-    }
-    if extra_metadata:
-        metadata.update(extra_metadata)
-    return metadata
+    return metadata_schema.build_metadata(
+        path=path,
+        filename=filename,
+        mime_type=mime_type,
+        media_type=media_type,
+        extra_metadata=extra_metadata,
+    )
 
 
 def _row_to_item(row: sqlite3.Row) -> dict:
+    item_id = row["id"]
+    metadata = json.loads(row["metadata_json"])
+    return {
+        "id": item_id,
+        "metadata": metadata,
+        "links": metadata_schema.response_links(item_id, metadata),
+    }
+
+
+def _row_to_stored_item(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"],
         "metadata": json.loads(row["metadata_json"]),
@@ -94,7 +103,7 @@ def upsert_item(
     extra_metadata: dict | None = None,
 ) -> None:
     metadata = _metadata_for_storage(path, filename, mime_type, media_type, extra_metadata)
-    content_hash = metadata.get("content_hash")
+    content_hash = metadata_schema.content_hash(metadata)
     if not isinstance(content_hash, str) or not content_hash:
         raise ValueError("content_hash is required for catalog items")
 
@@ -125,9 +134,9 @@ def upsert_item(
                 mime_type,
                 media_type,
                 content_hash,
-                metadata.get("taken_sort"),
-                metadata.get("taken_date"),
-                metadata.get("taken_year_month"),
+                metadata_schema.taken_sort(metadata),
+                metadata_schema.taken_date(metadata),
+                metadata_schema.taken_year_month(metadata),
                 json.dumps(metadata, sort_keys=True),
             ),
         )
@@ -174,7 +183,7 @@ def list_library_items(
     reverse = order == "desc"
     return sorted(
         items,
-        key=lambda item: ((item["metadata"] or {}).get("taken_sort", ""), item["id"]),
+        key=lambda item: (metadata_schema.taken_sort(item["metadata"] or {}) or "", item["id"]),
         reverse=reverse,
     )
 
@@ -187,10 +196,24 @@ def get_random_ids(n: int) -> list[str]:
 
 
 def update_metadata(file_id: str, patch: dict) -> None:
-    item = get_item(file_id)
-    if item is None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT id, metadata_json FROM media_items WHERE id = ?",
+            (file_id,),
+        ).fetchone()
+    if row is None:
         raise ValueError(f"Item not found: {file_id}")
-    metadata = {**(item["metadata"] or {}), **patch}
+
+    item = _row_to_stored_item(row)
+    metadata = metadata_schema.merge_metadata(item["metadata"] or {}, patch)
+    path = metadata_schema.asset_path(metadata)
+    filename = metadata_schema.filename(metadata)
+    mime_type = metadata_schema.mime_type(metadata)
+    media_type = metadata_schema.media_type(metadata)
+    content_hash = metadata_schema.content_hash(metadata)
+    if not all(isinstance(value, str) and value for value in (path, filename, mime_type, media_type, content_hash)):
+        raise ValueError(f"Item metadata is missing required asset/system fields: {file_id}")
+
     with _connect() as conn:
         conn.execute(
             """
@@ -209,14 +232,14 @@ def update_metadata(file_id: str, patch: dict) -> None:
             WHERE id = ?
             """,
             (
-                metadata["path"],
-                metadata["filename"],
-                metadata["mime_type"],
-                metadata["media_type"],
-                metadata["content_hash"],
-                metadata.get("taken_sort"),
-                metadata.get("taken_date"),
-                metadata.get("taken_year_month"),
+                path,
+                filename,
+                mime_type,
+                media_type,
+                content_hash,
+                metadata_schema.taken_sort(metadata),
+                metadata_schema.taken_date(metadata),
+                metadata_schema.taken_year_month(metadata),
                 json.dumps(metadata, sort_keys=True),
                 file_id,
             ),

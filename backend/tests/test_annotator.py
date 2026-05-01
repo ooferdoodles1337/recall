@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 
 import chromadb
 import pytest
@@ -40,17 +39,17 @@ def test_get_all_items_with_metadata_returns_seeded_item():
     items = catalog.get_all_items_with_metadata()
     assert len(items) == 1
     assert items[0]["id"] == TEST_UUID
-    assert items[0]["metadata"]["filename"] == "foo.jpg"
+    assert items[0]["metadata"]["asset"]["filename"] == "foo.jpg"
 
 
 
 def test_update_metadata_merges_patch():
     _seed()
     import services.catalog as catalog
-    catalog.update_metadata(TEST_UUID, {"description": "a photo", "search_terms": '["cat"]'})
+    catalog.update_metadata(TEST_UUID, {"search": {"description": "a photo", "phrases": ["cat"]}})
     item = catalog.get_item(TEST_UUID)
-    assert item["metadata"]["description"] == "a photo"
-    assert item["metadata"]["filename"] == "foo.jpg"  # original key preserved
+    assert item["metadata"]["search"]["description"] == "a photo"
+    assert item["metadata"]["asset"]["filename"] == "foo.jpg"  # original key preserved
 
 
 def test_update_metadata_raises_for_missing_id():
@@ -79,8 +78,9 @@ def test_write_annotations_stores_description_and_terms():
     _write_annotations({TEST_UUID: ann}, {TEST_UUID})
     import services.catalog as catalog
     item = catalog.get_item(TEST_UUID)
-    assert item["metadata"]["description"] == "a red square"
-    assert json.loads(item["metadata"]["search_terms"]) == ["red", "square"]
+    assert item["metadata"]["search"]["description"] == "a red square"
+    assert item["metadata"]["search"]["phrases"] == ["red", "square"]
+    assert item["metadata"]["search"]["annotation"]["provider"] == "gemini"
 
 
 def test_write_annotations_skips_unexpected_ids(caplog):

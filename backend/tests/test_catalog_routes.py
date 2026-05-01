@@ -6,9 +6,11 @@ def _item(id, taken_sort=None, media_type="image"):
     return {
         "id": id,
         "metadata": {
-            "media_type": media_type,
-            "taken_sort": taken_sort,
-            "taken_date": taken_sort[:10] if taken_sort else None,
+            "asset": {"media_type": media_type},
+            "capture": {
+                "sort_key": taken_sort,
+                "date": taken_sort[:10] if taken_sort else None,
+            },
         },
     }
 
