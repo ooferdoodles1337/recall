@@ -11,46 +11,31 @@ def in_memory_chroma(monkeypatch):
     monkeypatch.setattr("services.chroma.content_collection", content_col)
 
 
-def test_upsert_content_stores_embedding_and_metadata():
+def test_upsert_content_stores_embedding_only():
     import services.chroma as chroma
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
-        path="backend/data/media/foo.jpg",
-        filename="foo.jpg",
-        mime_type="image/jpeg",
-        media_type="image",
-    )
-    result = chroma.content_collection.get(ids=[TEST_UUID])
-    assert result["ids"] == [TEST_UUID]
-    assert result["metadatas"][0]["filename"] == "foo.jpg"
-    assert result["metadatas"][0]["media_type"] == "image"
-
-
-def test_upsert_content_merges_extra_metadata():
-    import services.chroma as chroma
-    chroma.upsert_content(
-        file_id=TEST_UUID,
-        embedding=[0.1] * 3072,
-        path="backend/data/media/geo.jpg",
-        filename="geo.jpg",
-        mime_type="image/jpeg",
-        media_type="image",
-        extra_metadata={"EXIF_Make": "Sony", "geo_city": "Tokyo", "geo_country": "Japan"},
     )
     result = chroma.content_collection.get(ids=[TEST_UUID], include=["metadatas"])
-    meta = result["metadatas"][0]
-    assert meta["geo_city"] == "Tokyo"
-    assert meta["geo_country"] == "Japan"
-    assert meta["filename"] == "geo.jpg"
+    assert result["ids"] == [TEST_UUID]
+    assert result["metadatas"] == [None]
+
+
+def test_upsert_content_does_not_store_metadata():
+    import services.chroma as chroma
+    chroma.upsert_content(
+        file_id=TEST_UUID,
+        embedding=[0.1] * 3072,
+    )
+    result = chroma.content_collection.get(ids=[TEST_UUID], include=["metadatas"])
+    assert result["metadatas"] == [None]
 
 
 def test_get_embedding_returns_stored_vector():
     import services.chroma as chroma
     embedding = [0.1] * 3072
-    chroma.upsert_content(
-        TEST_UUID, embedding, "foo.jpg", "foo.jpg", "image/jpeg", "image",
-    )
+    chroma.upsert_content(TEST_UUID, embedding)
     result = chroma.get_embedding(TEST_UUID)
     assert len(result) == 3072
     assert abs(result[0] - 0.1) < 1e-6

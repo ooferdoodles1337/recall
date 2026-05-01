@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import logging
+import mimetypes
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,17 +36,26 @@ class _PendingItem:
     file_id: str
     rel_path: str
     path: Path
+    original_mime: str
+    original_media_type: str
     processed_data: bytes
     processed_mime: str
-    processed_media_type: str
     file_metadata: dict
+
+
+def _original_mime_type(path: Path, media_type: str) -> str:
+    guessed, _ = mimetypes.guess_type(path.name)
+    if guessed:
+        return guessed
+    return "image/jpeg" if media_type == "image" else "video/mp4"
 
 
 def _preprocess_file(path: Path, force: bool) -> _PendingItem | None:
     """Process a file for indexing without embedding. Returns None if the file should be skipped."""
     ext = path.suffix.lower()
+    original_media_type = classify_extension(ext)
 
-    if classify_extension(ext) is None:
+    if original_media_type is None:
         log.warning("skipped (unsupported): %s", path)
         return None
 
@@ -80,9 +90,10 @@ def _preprocess_file(path: Path, force: bool) -> _PendingItem | None:
             file_id=file_id,
             rel_path=rel_path,
             path=path,
+            original_mime=_original_mime_type(path, original_media_type),
+            original_media_type=original_media_type,
             processed_data=processed.data,
             processed_mime=processed.mime_type,
-            processed_media_type=processed.media_type,
             file_metadata=file_metadata,
         )
     except Exception as exc:
@@ -92,60 +103,24 @@ def _preprocess_file(path: Path, force: bool) -> _PendingItem | None:
 
 def index_file(path: Path, force: bool) -> None:
     """Index a single file. Embeds immediately (no batching)."""
-    ext = path.suffix.lower()
-
-    if classify_extension(ext) is None:
-        log.warning("skipped (unsupported): %s", path)
+    item = _preprocess_file(path, force=force)
+    if item is None:
         return
 
     try:
-        rel_path = str(path.relative_to(config.DATA_DIR))
-    except ValueError:
-        log.error("file is outside DATA_DIR and cannot be indexed portably: %s", path)
-        return
-
-    content_hash = _file_hash(path)
-    existing_id = catalog.get_id_by_hash(content_hash)
-
-    if not force and existing_id is not None:
-        log.info("skipped (already indexed): %s", path)
-        return
-
-    file_id = existing_id or str(uuid.uuid4())
-
-    try:
-        path_str = str(path)
-        processed = process_image(path_str) if ext in IMAGE_EXTENSIONS else process_video(path_str)
-        content_embedding = gemini.embed_content(processed.data, processed.mime_type)
-        file_metadata = metadata_svc.extract(path_str)
-        file_metadata["content_hash"] = content_hash
-
-        thumbnail_bytes = generate_thumbnail(path_str, processed.media_type)
-        config.THUMBS_DIR.mkdir(parents=True, exist_ok=True)
-        thumbnail_abs = config.THUMBS_DIR / f"{file_id}.webp"
-        thumbnail_abs.write_bytes(thumbnail_bytes)
-        file_metadata["thumbnail_path"] = str(thumbnail_abs.relative_to(config.DATA_DIR))
-
-        chroma.upsert_content(
-            file_id=file_id,
-            embedding=content_embedding,
-            path=rel_path,
-            filename=path.name,
-            mime_type=processed.mime_type,
-            media_type=processed.media_type,
-            extra_metadata=file_metadata,
-        )
+        content_embedding = gemini.embed_content(item.processed_data, item.processed_mime)
+        chroma.upsert_content(file_id=item.file_id, embedding=content_embedding)
         catalog.upsert_item(
-            file_id=file_id,
-            path=rel_path,
-            filename=path.name,
-            mime_type=processed.mime_type,
-            media_type=processed.media_type,
-            extra_metadata=file_metadata,
+            file_id=item.file_id,
+            path=item.rel_path,
+            filename=item.path.name,
+            mime_type=item.original_mime,
+            media_type=item.original_media_type,
+            extra_metadata=item.file_metadata,
         )
-        log.info("indexed: %s", path)
+        log.info("indexed: %s", item.path)
     except Exception as exc:
-        log.error("failed (%s): %s", type(exc).__name__, path)
+        log.error("failed (%s): %s", type(exc).__name__, item.path)
 
 
 def run(
@@ -198,18 +173,13 @@ def run(
                 chroma.upsert_content(
                     file_id=item.file_id,
                     embedding=embedding,
-                    path=item.rel_path,
-                    filename=item.path.name,
-                    mime_type=item.processed_mime,
-                    media_type=item.processed_media_type,
-                    extra_metadata=item.file_metadata,
                 )
                 catalog.upsert_item(
                     file_id=item.file_id,
                     path=item.rel_path,
                     filename=item.path.name,
-                    mime_type=item.processed_mime,
-                    media_type=item.processed_media_type,
+                    mime_type=item.original_mime,
+                    media_type=item.original_media_type,
                     extra_metadata=item.file_metadata,
                 )
                 log.info("indexed: %s", item.path)

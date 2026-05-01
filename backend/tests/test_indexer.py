@@ -165,11 +165,6 @@ def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services)
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
-    result = mock_services["content"].get(ids=[item_id], include=["metadatas"])
-    meta = result["metadatas"][0]
-    assert "thumbnail_path" in meta
-    assert meta["thumbnail_path"].endswith(".webp")
-    assert meta["thumbnail_path"].startswith("thumbnails/")
     item = mock_services["catalog"].get_item(item_id)
     assert item["metadata"]["asset"]["paths"]["thumbnail"].endswith(".webp")
     assert item["links"]["thumbnail"] == f"/media/{item_id}/thumbnail"
@@ -214,7 +209,22 @@ def test_index_file_stores_relative_path(media_root, mock_services):
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
-    result = mock_services["content"].get(ids=[item_id], include=["metadatas"])
-    meta = result["metadatas"][0]
-    assert meta["path"] == "media/photo.jpg"
-    assert not meta["path"].startswith("/")
+    item = mock_services["catalog"].get_item(item_id)
+    path = item["metadata"]["asset"]["paths"]["original"]
+    assert path == "media/photo.jpg"
+    assert not path.startswith("/")
+
+
+def test_index_file_stores_original_asset_mime_type(media_root, mock_services):
+    from services.catalog import get_id_by_hash, get_item
+    from services.indexer import index_file
+
+    webp = media_root / "data" / "media" / "photo.webp"
+    Image.new("RGB", (10, 10), color=(0, 255, 0)).save(webp, format="WEBP")
+
+    index_file(webp, force=False)
+
+    item_id = get_id_by_hash(_sha256(webp))
+    meta = get_item(item_id)["metadata"]
+    assert meta["asset"]["mime_type"] == "image/webp"
+    assert meta["asset"]["media_type"] == "image"

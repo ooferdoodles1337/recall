@@ -36,13 +36,9 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS media_items (
             id TEXT PRIMARY KEY,
-            path TEXT NOT NULL,
-            filename TEXT NOT NULL,
-            mime_type TEXT NOT NULL,
             media_type TEXT NOT NULL,
             content_hash TEXT NOT NULL UNIQUE,
             taken_sort TEXT,
-            taken_date TEXT,
             taken_year_month TEXT,
             metadata_json TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,7 +46,6 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_taken_sort ON media_items(taken_sort)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_taken_date ON media_items(taken_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_media_type ON media_items(media_type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_content_hash ON media_items(content_hash)")
 
@@ -111,31 +106,22 @@ def upsert_item(
         conn.execute(
             """
             INSERT INTO media_items (
-                id, path, filename, mime_type, media_type, content_hash,
-                taken_sort, taken_date, taken_year_month, metadata_json
+                id, media_type, content_hash, taken_sort, taken_year_month, metadata_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
-                path = excluded.path,
-                filename = excluded.filename,
-                mime_type = excluded.mime_type,
                 media_type = excluded.media_type,
                 content_hash = excluded.content_hash,
                 taken_sort = excluded.taken_sort,
-                taken_date = excluded.taken_date,
                 taken_year_month = excluded.taken_year_month,
                 metadata_json = excluded.metadata_json,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
                 file_id,
-                path,
-                filename,
-                mime_type,
                 media_type,
                 content_hash,
                 metadata_schema.taken_sort(metadata),
-                metadata_schema.taken_date(metadata),
                 metadata_schema.taken_year_month(metadata),
                 json.dumps(metadata, sort_keys=True),
             ),
@@ -175,17 +161,14 @@ def list_library_items(
     if media_type is not None:
         query += " WHERE media_type = ?"
         params.append(media_type)
+    direction = "DESC" if order == "desc" else "ASC"
+    id_direction = "DESC" if order == "desc" else "ASC"
+    query += f" ORDER BY taken_sort IS NULL, taken_sort {direction}, id {id_direction}"
 
     with _connect() as conn:
         rows = conn.execute(query, params).fetchall()
 
-    items = [_row_to_item(row) for row in rows]
-    reverse = order == "desc"
-    return sorted(
-        items,
-        key=lambda item: (metadata_schema.taken_sort(item["metadata"] or {}) or "", item["id"]),
-        reverse=reverse,
-    )
+    return [_row_to_item(row) for row in rows]
 
 
 def get_random_ids(n: int) -> list[str]:
@@ -219,26 +202,18 @@ def update_metadata(file_id: str, patch: dict) -> None:
             """
             UPDATE media_items
             SET
-                path = ?,
-                filename = ?,
-                mime_type = ?,
                 media_type = ?,
                 content_hash = ?,
                 taken_sort = ?,
-                taken_date = ?,
                 taken_year_month = ?,
                 metadata_json = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
             (
-                path,
-                filename,
-                mime_type,
                 media_type,
                 content_hash,
                 metadata_schema.taken_sort(metadata),
-                metadata_schema.taken_date(metadata),
                 metadata_schema.taken_year_month(metadata),
                 json.dumps(metadata, sort_keys=True),
                 file_id,
