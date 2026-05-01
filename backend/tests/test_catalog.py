@@ -23,7 +23,14 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
             "content_hash": "hash-1",
             "taken_sort": "2024-03-18T10:00:00",
             "taken_date": "2024-03-18",
+            "taken_year_month": "2024-03",
+            "duration_s": 1.5,
+            "width": 640,
+            "height": 480,
             "geo_city": "Paris",
+            "geo_country": "France",
+            "EXIF_Make": "Nikon",
+            "Composite_GPSLatitude": 48.8566,
         },
     )
 
@@ -40,6 +47,10 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
     assert item["metadata"]["capture"]["location"]["city"] == "Paris"
     assert item["metadata"]["system"]["content_hash"] == "hash-1"
     assert item["metadata"]["system"]["schema_version"] == 2
+    assert item["metadata"]["raw"]["exif"] == {
+        "EXIF_Make": "Nikon",
+        "Composite_GPSLatitude": 48.8566,
+    }
 
 
 def test_get_id_by_hash_uses_catalog_content_hash(catalog_db):

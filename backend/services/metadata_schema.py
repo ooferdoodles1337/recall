@@ -11,6 +11,25 @@ EMBEDDING_DIMENSIONS = 3072
 
 Scalar = str | int | float | bool
 
+_PROMOTED_METADATA_KEYS = {
+    "content_hash",
+    "thumbnail_path",
+    "description",
+    "search_terms",
+    "width",
+    "height",
+    "duration_s",
+    "taken_at",
+    "taken_date",
+    "taken_year_month",
+    "taken_sort",
+    "taken_source",
+    "geo_city",
+    "geo_state",
+    "geo_country",
+    "geo_country_code",
+}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -119,7 +138,7 @@ def build_metadata(
     extracted = _scalar_dict({
         key: value
         for key, value in extra.items()
-        if key not in {"content_hash", "thumbnail_path", "description", "search_terms"}
+        if key not in _PROMOTED_METADATA_KEYS
     })
 
     thumbnail_path = extra.get("thumbnail_path")
