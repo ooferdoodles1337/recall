@@ -33,4 +33,5 @@ def serve_media(id: str):
     p = config.DATA_DIR / path
     if not p.is_file():
         raise HTTPException(status_code=404, detail="File not found on disk")
-    return FileResponse(p)
+    mime = metadata_schema.mime_type(item["metadata"] or {})
+    return FileResponse(p, media_type=mime or None)

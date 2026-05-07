@@ -28,6 +28,7 @@ _PROMOTED_METADATA_KEYS = {
     "geo_state",
     "geo_country",
     "geo_country_code",
+    "embedding_mime_type",
 }
 
 
@@ -110,12 +111,15 @@ def build_metadata(
     filename: str,
     mime_type: str,
     media_type: str,
+    embedding_mime_type: str | None = None,
     extra_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the structured catalog metadata document from extracted flat metadata."""
     extra = copy.deepcopy(extra_metadata or {})
     if isinstance(extra.get("system"), dict) and extra.get("system", {}).get("schema_version") == SCHEMA_VERSION:
         return extra
+    if embedding_mime_type is None and isinstance(extra.get("embedding_mime_type"), str):
+        embedding_mime_type = extra["embedding_mime_type"]
 
     extracted = _scalar_dict({
         key: value
@@ -136,6 +140,8 @@ def build_metadata(
         "media_type": media_type,
         "paths": asset_paths,
     }
+    if embedding_mime_type and embedding_mime_type != mime_type:
+        asset["embedding_mime_type"] = embedding_mime_type
     width = _as_int(extra.get("width"))
     height = _as_int(extra.get("height"))
     duration = _as_float(extra.get("duration_s"))
@@ -227,6 +233,9 @@ def _flat_extra_from_existing(metadata: dict[str, Any], *, include_raw: bool = T
         width = _as_int(asset.get("width"))
         height = _as_int(asset.get("height"))
         duration = _as_float(asset.get("duration_seconds"))
+        value = embedding_mime_type(metadata)
+        if value:
+            extra["embedding_mime_type"] = value
         if width is not None:
             extra["width"] = width
         if height is not None:
@@ -399,6 +408,14 @@ def mime_type(metadata: dict[str, Any]) -> str | None:
     if isinstance(asset, dict) and isinstance(asset.get("mime_type"), str):
         return asset["mime_type"]
     value = metadata.get("mime_type")
+    return value if isinstance(value, str) else None
+
+
+def embedding_mime_type(metadata: dict[str, Any]) -> str | None:
+    asset = metadata.get("asset")
+    if isinstance(asset, dict) and isinstance(asset.get("embedding_mime_type"), str):
+        return asset["embedding_mime_type"]
+    value = metadata.get("embedding_mime_type")
     return value if isinstance(value, str) else None
 
 

@@ -202,6 +202,7 @@ def _index_pending_batch(pending: list[_PendingItem]) -> int:
                 mime_type=item.original_mime,
                 media_type=item.original_media_type,
                 extra_metadata=item.file_metadata,
+                embedding_mime_type=item.processed_mime,
             )
             indexed += 1
             log.info("indexed: %s", item.path)
@@ -227,6 +228,7 @@ def index_file(path: Path, force: bool) -> None:
             mime_type=item.original_mime,
             media_type=item.original_media_type,
             extra_metadata=item.file_metadata,
+            embedding_mime_type=item.processed_mime,
         )
         log.info("indexed: %s", item.path)
     except Exception as exc:

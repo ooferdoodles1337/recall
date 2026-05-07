@@ -1,4 +1,5 @@
 import json
+import mimetypes
 import random
 import sqlite3
 from collections.abc import Iterator
@@ -126,6 +127,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_mime_type ON media_items(mime_type)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_has_annotation ON media_items(has_annotation)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_safety_state ON media_items(safety_state)")
+    _migrate_embedding_mime_types(conn)
     if added_promoted_columns or _needs_promoted_backfill(conn):
         _backfill_promoted_columns(conn)
 
@@ -158,6 +160,15 @@ def _needs_promoted_backfill(conn: sqlite3.Connection) -> bool:
 
 def _metadata_json(metadata: dict) -> str:
     return json.dumps(metadata, sort_keys=True)
+
+
+def _disk_mime(path: str) -> str:
+    guessed, _ = mimetypes.guess_type(path)
+    return guessed or "application/octet-stream"
+
+
+def _mime_to_media_type(mime: str) -> str:
+    return "video" if mime.startswith("video/") else "image"
 
 
 def _as_int(value: Any) -> int | None:
@@ -282,6 +293,35 @@ def _backfill_promoted_columns(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_embedding_mime_types(conn: sqlite3.Connection) -> None:
+    rows = conn.execute("SELECT id, metadata_json FROM media_items").fetchall()
+    for row in rows:
+        metadata = json.loads(row["metadata_json"])
+        stored_mime = metadata_schema.mime_type(metadata)
+        stored_path = metadata_schema.asset_path(metadata)
+        if not stored_mime or not stored_path:
+            continue
+
+        disk_mime = _disk_mime(stored_path)
+        if disk_mime == stored_mime or disk_mime == "application/octet-stream":
+            continue
+        if metadata_schema.embedding_mime_type(metadata) is not None:
+            continue
+
+        disk_media_type = _mime_to_media_type(disk_mime)
+        asset = metadata.get("asset")
+        if isinstance(asset, dict):
+            asset["embedding_mime_type"] = stored_mime
+            asset["mime_type"] = disk_mime
+            asset["media_type"] = disk_media_type
+        else:
+            metadata["embedding_mime_type"] = stored_mime
+            metadata["mime_type"] = disk_mime
+            metadata["media_type"] = disk_media_type
+
+        _update_metadata_row(conn, row["id"], metadata)
+
+
 def reset() -> None:
     with _connect() as conn:
         conn.execute("DROP TABLE IF EXISTS media_items")
@@ -294,12 +334,14 @@ def _metadata_for_storage(
     mime_type: str,
     media_type: str,
     extra_metadata: dict | None,
+    embedding_mime_type: str | None = None,
 ) -> dict:
     return metadata_schema.build_metadata(
         path=path,
         filename=filename,
         mime_type=mime_type,
         media_type=media_type,
+        embedding_mime_type=embedding_mime_type,
         extra_metadata=extra_metadata,
     )
 
@@ -424,8 +466,9 @@ def upsert_item(
     mime_type: str,
     media_type: str,
     extra_metadata: dict | None = None,
+    embedding_mime_type: str | None = None,
 ) -> None:
-    metadata = _metadata_for_storage(path, filename, mime_type, media_type, extra_metadata)
+    metadata = _metadata_for_storage(path, filename, mime_type, media_type, extra_metadata, embedding_mime_type)
     content_hash = metadata_schema.content_hash(metadata)
     if not isinstance(content_hash, str) or not content_hash:
         raise ValueError("content_hash is required for catalog items")
