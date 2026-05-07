@@ -1,0 +1,70 @@
+:root {
+  color-scheme: light;
+  font-family:
+    "Aptos",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  background: #f7f4ed;
+  color: #1e2528;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.placeholder-panel {
+  border: 1px solid #d8d2c5;
+  border-radius: 8px;
+  background: #fffdfa;
+  padding: 24px;
+}
+
+.placeholder-kicker {
+  margin: 0 0 8px;
+  color: #5d696d;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.placeholder-title {
+  margin: 0 0 12px;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.placeholder-copy {
+  max-width: 68ch;
+  margin: 0;
+  color: #3f4a4e;
+  line-height: 1.6;
+}
+
