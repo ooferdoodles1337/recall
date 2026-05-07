@@ -38,6 +38,21 @@ uv run uvicorn main:app --reload
 
 The server starts at `http://localhost:8000`. Interactive API docs are at `/docs`.
 
+The React frontend runs separately from `frontend/` on `http://localhost:5173`.
+`main.py` allows CORS from both `http://localhost:5173` and
+`http://127.0.0.1:5173`, which are the expected Vite development origins.
+
+## Testing
+
+```bash
+uv run pytest -v
+```
+
+Tests use a dummy `GEMINI_API_KEY` from `tests/conftest.py`. SQLite tests point
+`services.catalog` at a temporary catalog, and ChromaDB tests monkeypatch the
+content collection with an ephemeral in-memory collection. The test suite should
+not call the real Gemini API.
+
 ## Data layout
 
 ```
@@ -66,6 +81,7 @@ Options:
 - `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
+- `--reset` — wipe the ChromaDB store, SQLite catalog, and thumbnails before indexing
 
 `--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into `metadata.safety`.
 
@@ -461,7 +477,7 @@ Returns 404 if the item does not exist or has no thumbnail (items indexed before
 
 ### `GET /trials`
 
-Returns a random sample of items from the collection to use as trial targets for a user-testing session. Each call returns a freshly randomised set.
+Returns a random sample of items from the collection to use as trial targets for a user-testing session. Each call returns a freshly randomized set.
 
 **Query params**
 

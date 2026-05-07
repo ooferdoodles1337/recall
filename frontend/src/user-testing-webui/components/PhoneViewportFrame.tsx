@@ -9,7 +9,7 @@ export function PhoneViewportFrame() {
         <div className="phone-rect-content">
           <p className="placeholder-kicker">Recall Viewport</p>
           <p className="placeholder-copy" style={{ fontSize: "0.8rem" }}>
-            Awaiting embedded phone interface.
+            TODO: recall UI needs to be implemented here.
           </p>
         </div>
       </div>

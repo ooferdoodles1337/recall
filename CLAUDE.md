@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md / CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with this repository. `AGENTS.md` is a root-level symlink to this file; do not create nested `AGENTS.md` files in `backend/` or `frontend/`.
 
 ## Project overview
 
@@ -9,10 +9,11 @@ Recall is a personal-media semantic-search app built as a user-testing demo. A p
 ## Project layout
 
 - `backend/` — FastAPI server, indexing tools, and all runtime services.
+- `frontend/` — React/Vite browser app for the fullscreen desktop user-testing harness and standalone phone tester route.
 
 ## Commands
 
-All commands run from `backend/`. Python 3.14, managed by `uv`.
+Backend commands run from `backend/`. Python 3.14, managed by `uv`.
 
 ```bash
 # Run all tests
@@ -39,6 +40,22 @@ uv run python scripts/query.py "your query here"
 uv add <package>
 ```
 
+Frontend commands run from `frontend/`. React 19 and Vite are managed by npm.
+
+```bash
+# Install dependencies
+npm install
+
+# Start dev server (http://localhost:5173)
+npm run dev
+
+# Production build / typecheck
+npm run build
+
+# Preview built app
+npm run preview
+```
+
 `.env` lives at the **repo root** (not inside `backend/`). Required keys:
 
 | Variable | Required | Description |
@@ -46,6 +63,23 @@ uv add <package>
 | `GEMINI_API_KEY` | yes | Embedding and Gemini batch annotation |
 | `OPENROUTER_API_KEY` | no | Use OpenRouter for annotation instead of Gemini |
 | `OPENROUTER_MODEL` | no | OpenRouter model (default: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`) |
+
+Frontend API configuration:
+
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_RECALL_API_BASE_URL` | no | API base URL for the frontend (default: `http://localhost:8000`) |
+
+## Frontend product constraints
+
+- The guided user-testing program is a desktop fullscreen application, not a mobile-responsive website.
+- The app intentionally gates small windows: below 1280 x 720 px, it should show the fullscreen-size warning instead of trying to squeeze the task UI.
+- The primary route is `/` (or any non-`/phone` path), which renders `UserTestingWebUI`.
+- `/phone` renders the standalone phone tester shell. The phone UI is still a placeholder and should stay visually framed as the participant viewport until implemented.
+- The current visual direction is a quiet photo-archive / usability-lab console. Keep typography and styling consistent with `frontend/src/styles/global.css`.
+- Fonts are self-hosted with Fontsource packages, imported in `frontend/src/main.tsx`. Do not reintroduce external Google Fonts CSS imports.
+- Radix primitives may be used for accessible unstyled UI behavior. Keep custom visual styling in CSS rather than adopting a large styled UI kit.
+- Playwright artifacts belong in `.playwright-mcp/`. Do not leave screenshots or generated inspection files in the repo root.
 
 ## Architecture
 
