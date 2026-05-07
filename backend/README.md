@@ -38,8 +38,6 @@ uv run uvicorn main:app --reload
 
 The server starts at `http://localhost:8000`. Interactive API docs are at `/docs`.
 
-For a barebones browser-based tester that stays separate from the main frontend, open `http://localhost:8000/tester`. It can hit the existing GET endpoints, show the raw response, and preview thumbnails or original media for returned items.
-
 ## Data layout
 
 ```
@@ -159,7 +157,7 @@ Semantic (vector) search over the indexed media collection using a natural-langu
 }
 ```
 
-`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID. `links.media` and `links.thumbnail` are the frontend-facing URLs. The stored path values under `metadata.asset.paths` are server-local relative paths.
+`distance` is the cosine distance from the query embedding — lower is more similar. `id` is a UUID. `links.media` and `links.thumbnail` are API URLs for retrieving media bytes. The stored path values under `metadata.asset.paths` are server-local relative paths.
 
 Metadata is grouped by purpose:
 
@@ -295,7 +293,7 @@ Returns 415 for unsupported file types, 413 if the file exceeds 20 MB.
 
 ### `GET /catalog/items`
 
-Returns the complete metadata catalog for gallery views. Does not serve file bytes — returns IDs, metadata, and links so the frontend can render a chronological gallery, group by `metadata.capture.date`, and lazy-load thumbnails by URL.
+Returns the complete metadata catalog. Does not serve file bytes — returns IDs, metadata, and links so API consumers can group by `metadata.capture.date` and fetch thumbnails by URL when needed.
 
 **Query params**
 
