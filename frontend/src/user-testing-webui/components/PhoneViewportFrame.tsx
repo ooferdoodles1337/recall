@@ -1,11 +1,17 @@
 export function PhoneViewportFrame() {
   return (
-    <div className="phone-rect" aria-label="Phone interface viewport">
-      <div className="phone-rect-content">
-        <p className="placeholder-kicker">Phone Viewport</p>
-        <p className="placeholder-copy" style={{ fontSize: "0.8rem" }}>
-          The Recall phone UI will be embedded here.
-        </p>
+    <div className="phone-stage">
+      <div className="phone-stage-header" aria-hidden="true">
+        <span>Participant viewport</span>
+        <span className="phone-stage-size">390 x 844</span>
+      </div>
+      <div className="phone-rect" aria-label="Phone interface viewport">
+        <div className="phone-rect-content">
+          <p className="placeholder-kicker">Recall Viewport</p>
+          <p className="placeholder-copy" style={{ fontSize: "0.8rem" }}>
+            Awaiting embedded phone interface.
+          </p>
+        </div>
       </div>
     </div>
   );

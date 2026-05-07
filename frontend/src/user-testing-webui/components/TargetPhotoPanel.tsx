@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as Progress from "@radix-ui/react-progress";
 import type { RecallMediaItem } from "../../shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "../api/trialsApi";
 
@@ -67,6 +68,7 @@ function TargetMedia({ item }: { item: RecallMediaItem }) {
 
 export function TargetPhotoPanel({ item, taskNumber, totalTasks, onNext }: TargetPhotoPanelProps) {
   const isLastTask = taskNumber === totalTasks;
+  const progressPercent = Math.round((taskNumber / totalTasks) * 100);
 
   return (
     <div className="target-panel">
@@ -79,6 +81,18 @@ export function TargetPhotoPanel({ item, taskNumber, totalTasks, onNext }: Targe
           Study the image, then use the phone on the right to search for it.
         </p>
       </div>
+
+      <Progress.Root
+        className="target-progress"
+        value={taskNumber}
+        max={totalTasks}
+        getValueLabel={(value, max) => `Task ${value} of ${max}`}
+      >
+        <Progress.Indicator
+          className="target-progress-bar"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </Progress.Root>
 
       <div className="target-photo-frame" aria-label="Target media">
         <TargetMedia key={item.id} item={item} />

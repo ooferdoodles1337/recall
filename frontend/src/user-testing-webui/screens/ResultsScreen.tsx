@@ -19,16 +19,16 @@ export function ResultsScreen({ onRestart }: ResultsScreenProps) {
 
         <div className="results-metrics">
           <div className="metric-card">
-            <span className="metric-value">—</span>
-            <span className="metric-label">Tasks Completed</span>
+            <span className="metric-value">Done</span>
+            <span className="metric-label">Session Status</span>
           </div>
           <div className="metric-card">
-            <span className="metric-value">—</span>
-            <span className="metric-label">Avg. Time</span>
+            <span className="metric-value">Guided</span>
+            <span className="metric-label">Trial Mode</span>
           </div>
           <div className="metric-card">
-            <span className="metric-value">—</span>
-            <span className="metric-label">Accuracy</span>
+            <span className="metric-value">Debrief</span>
+            <span className="metric-label">Next Step</span>
           </div>
         </div>
 
