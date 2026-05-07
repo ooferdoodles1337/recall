@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 
+import config
 from services.catalog import db as catalog
 from services.providers import gemini
 from services.search import chroma, text_index
@@ -10,14 +11,9 @@ from services.pipeline import media
 
 router = APIRouter()
 
-_ACCEPTED_IMAGE_MIMES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-_MIME_TO_EXT = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-}
-_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+_ACCEPTED_IMAGE_MIMES = config.ACCEPTED_UPLOAD_MIMES
+_MIME_TO_EXT = config.MIME_TO_EXT
+_MAX_UPLOAD_BYTES = config.MAX_UPLOAD_BYTES
 
 
 @router.get("/semantic")
@@ -117,7 +113,7 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
 
-    embedding = gemini.embed_content(processed.data, processed.mime_type)
+    embedding = gemini.embed_content(processed.data, processed.embedding_mime)
     results = chroma.search(embedding, n_results=n)
     ids = results["ids"][0]
     distances = results["distances"][0]

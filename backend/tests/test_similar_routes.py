@@ -100,7 +100,7 @@ def test_similar_by_id_respects_n_limit(monkeypatch):
 def test_similar_upload_returns_results(client, monkeypatch):
     monkeypatch.setattr(
         "services.pipeline.media.process_image",
-        lambda path: ProcessedFile(data=b"img", mime_type="image/jpeg", media_type="image"),
+        lambda path: ProcessedFile(data=b"img", embedding_mime="image/jpeg", media_type="image"),
     )
     monkeypatch.setattr("services.providers.gemini.embed_content", lambda data, mime: [0.1] * 3072)
     monkeypatch.setattr(
@@ -148,7 +148,7 @@ def test_similar_upload_passes_through_processing_pipeline(client, monkeypatch):
     embedded_data = []
 
     def fake_process(path):
-        return ProcessedFile(data=b"processed-bytes", mime_type="image/png", media_type="image")
+        return ProcessedFile(data=b"processed-bytes", embedding_mime="image/png", media_type="image")
 
     def fake_embed(data, mime):
         processed_mime.append(mime)

@@ -147,7 +147,7 @@ def test_process_jpeg_returns_original_bytes(tmp_path):
     p.write_bytes(data)
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "image/jpeg"
+    assert result.embedding_mime == "image/jpeg"
     assert result.media_type == "image"
     assert result.data == data
 
@@ -158,7 +158,7 @@ def test_process_png_returns_original_bytes(tmp_path):
     p.write_bytes(data)
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "image/png"
+    assert result.embedding_mime == "image/png"
     assert result.media_type == "image"
     assert result.data == data
 
@@ -168,7 +168,7 @@ def test_process_webp_converts_to_jpeg(tmp_path):
     p.write_bytes(make_webp_bytes())
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "image/jpeg"
+    assert result.embedding_mime == "image/jpeg"
     img = Image.open(io.BytesIO(result.data))
     assert img.format == "JPEG"
 
@@ -178,7 +178,7 @@ def test_process_static_gif_converts_to_jpeg(tmp_path):
     p.write_bytes(make_static_gif_bytes())
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "image/jpeg"
+    assert result.embedding_mime == "image/jpeg"
     assert result.media_type == "image"
 
 
@@ -187,7 +187,7 @@ def test_process_static_apng_returns_png(tmp_path):
     p.write_bytes(make_static_apng_bytes())
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "image/png"
+    assert result.embedding_mime == "image/png"
     assert result.media_type == "image"
 
 
@@ -198,7 +198,7 @@ def test_process_animated_gif_returns_mp4(tmp_path):
     p.write_bytes(make_animated_gif_bytes())
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "video/mp4"
+    assert result.embedding_mime == "video/mp4"
     assert result.media_type == "video"
     assert len(result.data) > 0
 
@@ -208,7 +208,7 @@ def test_process_animated_apng_returns_mp4(tmp_path):
     p.write_bytes(make_animated_apng_bytes())
     from services.pipeline.media import process_image
     result = process_image(str(p))
-    assert result.mime_type == "video/mp4"
+    assert result.embedding_mime == "video/mp4"
     assert result.media_type == "video"
 
 
@@ -220,7 +220,7 @@ def test_process_short_mp4_returns_original_bytes(tmp_path):
     p.write_bytes(data)
     from services.pipeline.media import process_video
     result = process_video(str(p))
-    assert result.mime_type == "video/mp4"
+    assert result.embedding_mime == "video/mp4"
     assert result.media_type == "video"
     assert result.data == data
 
@@ -247,7 +247,7 @@ def test_process_avi_converts_to_mp4(tmp_path):
     iio.imwrite(avi_path, frames, fps=5, codec="rawvideo")
     from services.pipeline.media import process_video
     result = process_video(avi_path)
-    assert result.mime_type == "video/mp4"
+    assert result.embedding_mime == "video/mp4"
     assert result.media_type == "video"
 
 

@@ -137,7 +137,7 @@ def _preprocess_file(
             path,
             file_id,
             format_bytes(len(processed.data)),
-            processed.mime_type,
+            processed.embedding_mime,
             file_metadata["thumbnail_path"],
             elapsed,
         )
@@ -149,7 +149,7 @@ def _preprocess_file(
             original_mime=_original_mime_type(path, original_media_type),
             original_media_type=original_media_type,
             processed_data=processed.data,
-            processed_mime=processed.mime_type,
+            processed_mime=processed.embedding_mime,
             file_metadata=file_metadata,
         )
     except Exception as exc:

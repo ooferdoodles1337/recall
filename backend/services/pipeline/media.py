@@ -12,7 +12,9 @@ import imageio_ffmpeg
 import imageio.v3 as iio
 from PIL import Image
 
-MAX_VIDEO_SECONDS = 128.0
+import config
+
+MAX_VIDEO_SECONDS = config.MAX_VIDEO_SECONDS
 MAX_EMBED_VIDEO_BYTES = 48 * 1024 * 1024
 
 IMAGE_EXTENSIONS = {
@@ -31,7 +33,7 @@ NATIVE_VIDEO_EXTS = {".mp4", ".m4v", ".mov"}
 @dataclass
 class ProcessedFile:
     data: bytes
-    mime_type: str
+    embedding_mime: str  # MIME type of `data` as prepared for embedding (may differ from disk MIME)
     media_type: str  # "image" or "video"
 
 
@@ -52,17 +54,17 @@ def is_animated(path: str) -> bool:
 def process_image(path: str) -> ProcessedFile:
     ext = Path(path).suffix.lower()
     if ext in {".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp"}:
-        return ProcessedFile(data=Path(path).read_bytes(), mime_type="image/jpeg", media_type="image")
+        return ProcessedFile(data=Path(path).read_bytes(), embedding_mime="image/jpeg", media_type="image")
     if ext in {".png", ".apng"}:
         if is_animated(path):
-            return ProcessedFile(data=_animated_to_mp4(path), mime_type="video/mp4", media_type="video")
-        return ProcessedFile(data=Path(path).read_bytes(), mime_type="image/png", media_type="image")
+            return ProcessedFile(data=_animated_to_mp4(path), embedding_mime="video/mp4", media_type="video")
+        return ProcessedFile(data=Path(path).read_bytes(), embedding_mime="image/png", media_type="image")
     if ext == ".gif" and is_animated(path):
-        return ProcessedFile(data=_animated_to_mp4(path), mime_type="video/mp4", media_type="video")
+        return ProcessedFile(data=_animated_to_mp4(path), embedding_mime="video/mp4", media_type="video")
     with Image.open(path) as img:
         buf = io.BytesIO()
         img.convert("RGB").save(buf, format="JPEG")
-        return ProcessedFile(data=buf.getvalue(), mime_type="image/jpeg", media_type="image")
+        return ProcessedFile(data=buf.getvalue(), embedding_mime="image/jpeg", media_type="image")
 
 
 def _run_ffmpeg_to_mp4(
@@ -161,6 +163,10 @@ def process_video(path: str) -> ProcessedFile:
         and duration <= MAX_VIDEO_SECONDS
         and Path(path).stat().st_size <= MAX_EMBED_VIDEO_BYTES
     ):
-        return ProcessedFile(data=Path(path).read_bytes(), mime_type="video/mp4", media_type="video")
+        return ProcessedFile(data=Path(path).read_bytes(), embedding_mime="video/mp4", media_type="video")
 
-    return ProcessedFile(data=_run_ffmpeg_to_mp4(path, max_seconds=MAX_VIDEO_SECONDS), mime_type="video/mp4", media_type="video")
+    return ProcessedFile(
+        data=_run_ffmpeg_to_mp4(path, max_seconds=MAX_VIDEO_SECONDS),
+        embedding_mime="video/mp4",
+        media_type="video",
+    )

@@ -144,7 +144,7 @@ def test_load_item_file_converts_unsupported_gif_to_temp_media(tmp_path, monkeyp
     monkeypatch.setattr(
         annotator,
         "process_image",
-        lambda path: ProcessedFile(data=b"mp4-bytes", mime_type="video/mp4", media_type="video"),
+        lambda path: ProcessedFile(data=b"mp4-bytes", embedding_mime="video/mp4", media_type="video"),
     )
 
     loaded = annotator._load_item_file({

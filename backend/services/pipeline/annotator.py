@@ -87,11 +87,11 @@ def _get_unannotated() -> list[dict]:
 
 
 def _write_temp_processed_media(file_id: str, processed: ProcessedFile) -> AnnotationMedia:
-    suffix = _TEMP_SUFFIX_BY_MIME_TYPE.get(processed.mime_type, ".bin")
+    suffix = _TEMP_SUFFIX_BY_MIME_TYPE.get(processed.embedding_mime, ".bin")
     with tempfile.NamedTemporaryFile(prefix=f"recall-annotation-{file_id}-", suffix=suffix, delete=False) as f:
         f.write(processed.data)
         path = Path(f.name)
-    return AnnotationMedia(file_id=file_id, path=path, mime_type=processed.mime_type, temporary=True)
+    return AnnotationMedia(file_id=file_id, path=path, mime_type=processed.embedding_mime, temporary=True)
 
 
 def _load_item_file(item: dict) -> AnnotationMedia | None:
