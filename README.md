@@ -7,7 +7,7 @@ Personal-media semantic-search app. A pre-indexed media catalog is distributed t
 | Dependency | Ubuntu / WSL | macOS |
 |------------|-------------|-------|
 | **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | Same |
-| **Python 3.14** | `uv python install 3.14` | `uv python install 3.14` |
+| **Python 3.14** | `uv python install 3.14` | Same |
 | **Node.js + npm** | `sudo apt install nodejs npm` | `brew install node` |
 | **ExifTool** (maintainers only) | `sudo apt install libimage-exiftool-perl` | `brew install exiftool` |
 | **ffmpeg** (maintainers only) | `sudo apt install ffmpeg` | `brew install ffmpeg` |
