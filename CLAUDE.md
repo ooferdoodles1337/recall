@@ -89,7 +89,7 @@ Frontend API configuration:
 `services/indexer.py` preprocesses all files first (SHA-256 dedup using `services/catalog.py`, `services/media.py` transcode, `services/metadata.py` EXIF + geocode, thumbnail generation), then submits all embeddings to `services/gemini.py` in one Gemini Batch API call (`gemini-embedding-2`), then upserts metadata to SQLite via `services/catalog.py` and vectors to `services/chroma.py` with the same UUID primary key.
 
 Optional annotation pass (`--annotate`): `services/annotator.py` finds unannotated items and calls one of two backends:
-- **Gemini** (default): `services/gemini.py` `annotate_packs_batch()` — submits all packs in one Gemini Batch API job, model `gemini-3.1-flash-lite-preview`
+- **Gemini** (default): `services/gemini.py` `annotate_packs_batch()` — submits all packs in one Gemini Batch API job, model `gemini-3.1-flash-lite`
 - **OpenRouter** (set `OPENROUTER_API_KEY`): `services/openrouter.py` `annotate_packs()` — synchronous, one request per pack; images max 8 per pack, videos 1 per pack
 
 **Search (runtime):**

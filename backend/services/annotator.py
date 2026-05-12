@@ -11,7 +11,7 @@ from services import catalog, gemini, metadata_schema, openrouter
 load_dotenv()
 log = logging.getLogger(__name__)
 
-ANNOTATION_MODEL = "gemini-3.1-flash-lite-preview"
+ANNOTATION_MODEL = "gemini-3.1-flash-lite"
 PACK_SIZE = 10
 OPENROUTER_IMAGE_PACK_SIZE = 8  # Nvidia provider limit
 
