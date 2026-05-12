@@ -1,12 +1,18 @@
 export function PhoneViewportFrame() {
   return (
-    <section className="placeholder-panel" aria-label="Phone tester UI viewport">
-      <p className="placeholder-kicker">Phone Viewport</p>
-      <h2 className="placeholder-title">Embedded UI shell</h2>
-      <p className="placeholder-copy">
-        Placeholder for the future iframe or custom mobile Recall search UI used during guided tasks.
-      </p>
-    </section>
+    <div className="phone-stage">
+      <div className="phone-stage-header" aria-hidden="true">
+        <span>Participant viewport</span>
+        <span className="phone-stage-size">390 x 844</span>
+      </div>
+      <div className="phone-rect" aria-label="Phone interface viewport">
+        <div className="phone-rect-content">
+          <p className="placeholder-kicker">Recall Viewport</p>
+          <p className="placeholder-copy" style={{ fontSize: "0.8rem" }}>
+            TODO: recall UI needs to be implemented here.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
-
