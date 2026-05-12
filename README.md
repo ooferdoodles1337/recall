@@ -8,7 +8,7 @@ Personal-media semantic-search app. A pre-indexed media catalog is distributed t
 |------------|-------------|-------|
 | **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | Same |
 | **Python 3.14** | `uv python install 3.14` | Same |
-| **Node.js + npm** | `sudo apt install nodejs npm` | `brew install node` |
+| **Node.js + npm** | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` |
 | **ExifTool** (maintainers only) | `sudo apt install libimage-exiftool-perl` | `brew install exiftool` |
 | **ffmpeg** (maintainers only) | `sudo apt install ffmpeg` | `brew install ffmpeg` |
 
