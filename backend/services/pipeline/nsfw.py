@@ -1,11 +1,13 @@
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
 from PIL import Image
 
 import config
-from services import catalog, metadata_schema
+from services.catalog import db as catalog
+from services.catalog import schema as metadata_schema
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +85,7 @@ def _get_undetected() -> list[dict]:
 
 
 def detect_undetected() -> None:
+    started_at = time.monotonic()
     undetected = _get_undetected()
     if not undetected:
         log.info("all items already have NSFW detection")
@@ -90,7 +93,15 @@ def detect_undetected() -> None:
 
     log.info("running NSFW detection for %d items", len(undetected))
     detected = 0
-    for item in undetected:
+    for index, item in enumerate(undetected, start=1):
+        if index == 1 or index % 50 == 0 or index == len(undetected):
+            log.info(
+                "NSFW progress %d/%d: detected=%d elapsed=%.1fs",
+                index,
+                len(undetected),
+                detected,
+                time.monotonic() - started_at,
+            )
         meta = item["metadata"] or {}
         path = _candidate_path(meta)
         if path is None:
@@ -100,9 +111,17 @@ def detect_undetected() -> None:
             log.warning("item %s NSFW candidate not found: %s", item["id"], path)
             continue
         try:
-            catalog.update_metadata(item["id"], metadata_schema.nsfw_patch(detect_image(path)))
+            detection = detect_image(path)
+            catalog.update_metadata(item["id"], metadata_schema.nsfw_patch(detection))
             detected += 1
+            log.debug(
+                "NSFW detected: id=%s path=%s label=%s score=%.4f",
+                item["id"],
+                path,
+                detection["label"],
+                detection["score"],
+            )
         except Exception as exc:
             log.error("failed NSFW detection for %s: %s", item["id"], exc)
 
-    log.info("NSFW detection complete: %d/%d items detected", detected, len(undetected))
+    log.info("NSFW detection complete: %d/%d items detected, elapsed=%.1fs", detected, len(undetected), time.monotonic() - started_at)

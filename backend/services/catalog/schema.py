@@ -225,6 +225,123 @@ def build_metadata(
     return metadata
 
 
+def _flat_extra_from_existing(metadata: dict[str, Any], *, include_raw: bool = True) -> dict[str, Any]:
+    extra: dict[str, Any] = {}
+
+    raw = metadata.get("raw")
+    if include_raw and isinstance(raw, dict) and isinstance(raw.get("exif"), dict):
+        extra.update(_scalar_dict(raw["exif"]))
+
+    value = content_hash(metadata)
+    if value:
+        extra["content_hash"] = value
+
+    value = thumbnail_path(metadata)
+    if value:
+        extra["thumbnail_path"] = value
+
+    asset = metadata.get("asset")
+    if isinstance(asset, dict):
+        width = _as_int(asset.get("width"))
+        height = _as_int(asset.get("height"))
+        duration = _as_float(asset.get("duration_seconds"))
+        if width is not None:
+            extra["width"] = width
+        if height is not None:
+            extra["height"] = height
+        if duration is not None:
+            extra["duration_s"] = duration
+
+    capture = metadata.get("capture")
+    if isinstance(capture, dict):
+        for source_key, target_key in (
+            ("taken_at", "taken_at"),
+            ("date", "taken_date"),
+            ("year_month", "taken_year_month"),
+            ("sort_key", "taken_sort"),
+            ("source", "taken_source"),
+        ):
+            value = capture.get(source_key)
+            if isinstance(value, str) and value:
+                extra[target_key] = value
+
+        location = capture.get("location")
+        if isinstance(location, dict):
+            for source_key, target_key in (
+                ("city", "geo_city"),
+                ("state", "geo_state"),
+                ("country", "geo_country"),
+                ("country_code", "geo_country_code"),
+                ("latitude", "Composite_GPSLatitude"),
+                ("longitude", "Composite_GPSLongitude"),
+            ):
+                value = location.get(source_key)
+                if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                    extra[target_key] = value
+
+    description = search_description(metadata)
+    if description is not None:
+        extra["description"] = description
+    phrases = search_phrases(metadata)
+    if phrases:
+        extra["search_terms"] = phrases
+
+    return extra
+
+
+def rebuild_metadata(
+    *,
+    path: str,
+    filename: str,
+    mime_type: str,
+    media_type: str,
+    existing_metadata: dict[str, Any] | None = None,
+    extracted_metadata: dict[str, Any] | None = None,
+    content_hash: str | None = None,
+    thumbnail_path: str | None = None,
+) -> dict[str, Any]:
+    """Rebuild structured metadata without requiring a new embedding or annotation."""
+    existing = copy.deepcopy(existing_metadata or {})
+    has_fresh_extraction = extracted_metadata is not None
+    extra = _flat_extra_from_existing(existing, include_raw=not has_fresh_extraction)
+    if has_fresh_extraction:
+        extra.update(_scalar_dict(extracted_metadata or {}))
+
+    if content_hash:
+        extra["content_hash"] = content_hash
+    if thumbnail_path:
+        extra["thumbnail_path"] = thumbnail_path
+
+    rebuilt = build_metadata(
+        path=path,
+        filename=filename,
+        mime_type=mime_type,
+        media_type=media_type,
+        extra_metadata=extra,
+    )
+
+    search = existing.get("search")
+    if isinstance(search, dict) and isinstance(search.get("annotation"), dict):
+        rebuilt.setdefault("search", {})["annotation"] = copy.deepcopy(search["annotation"])
+
+    safety = existing.get("safety")
+    if isinstance(safety, dict) and has_safety_detection(existing):
+        rebuilt["safety"] = copy.deepcopy(safety)
+
+    organization = existing.get("organization")
+    if isinstance(organization, dict):
+        rebuilt["organization"] = copy.deepcopy(organization)
+
+    system = existing.get("system")
+    if isinstance(system, dict):
+        if isinstance(system.get("indexed_at"), str):
+            rebuilt["system"]["indexed_at"] = system["indexed_at"]
+        if isinstance(system.get("embedding"), dict):
+            rebuilt["system"]["embedding"] = copy.deepcopy(system["embedding"])
+
+    return rebuilt
+
+
 def response_links(file_id: str, metadata: dict[str, Any]) -> dict[str, str]:
     links = {"media": f"/media/{file_id}"}
     if thumbnail_path(metadata):

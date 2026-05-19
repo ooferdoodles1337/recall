@@ -10,7 +10,7 @@ TEST_UUID = "aaaaaaaa-0000-0000-0000-000000000003"
 @pytest.fixture(autouse=True)
 def in_memory_catalog(tmp_path, monkeypatch):
     import config
-    import services.catalog as catalog
+    import services.catalog.db as catalog
 
     data_dir = tmp_path / "data"
     media_dir = data_dir / "media"
@@ -21,7 +21,7 @@ def in_memory_catalog(tmp_path, monkeypatch):
 
     ephemeral = chromadb.EphemeralClient()
     content_col = ephemeral.get_or_create_collection("media_content")
-    monkeypatch.setattr("services.chroma.content_collection", content_col)
+    monkeypatch.setattr("services.search.chroma.content_collection", content_col)
 
     catalog.configure(str(tmp_path / "catalog.sqlite"))
     catalog.reset()
@@ -36,7 +36,7 @@ def _write_jpeg(path):
 
 
 def _seed(extra=None, media_type="image"):
-    import services.catalog as catalog
+    import services.catalog.db as catalog
 
     metadata = {"content_hash": f"test-hash-{TEST_UUID}"}
     if extra:
@@ -52,8 +52,8 @@ def _seed(extra=None, media_type="image"):
 
 
 def test_detect_undetected_writes_nsfw_metadata(in_memory_catalog, monkeypatch):
-    import services.catalog as catalog
-    from services import nsfw
+    import services.catalog.db as catalog
+    from services.pipeline import nsfw
 
     _write_jpeg(in_memory_catalog / "media" / "foo.jpg")
     _seed()
@@ -77,7 +77,7 @@ def test_detect_undetected_writes_nsfw_metadata(in_memory_catalog, monkeypatch):
 
 
 def test_detect_undetected_skips_existing_detection(in_memory_catalog, monkeypatch):
-    from services import nsfw
+    from services.pipeline import nsfw
 
     _write_jpeg(in_memory_catalog / "media" / "foo.jpg")
     _seed(extra={"nsfw_detection": {"label": "safe", "probabilities": {"safe": 1.0}}})
@@ -91,8 +91,8 @@ def test_detect_undetected_skips_existing_detection(in_memory_catalog, monkeypat
 
 
 def test_video_detection_uses_thumbnail(in_memory_catalog, monkeypatch):
-    import services.catalog as catalog
-    from services import nsfw
+    import services.catalog.db as catalog
+    from services.pipeline import nsfw
 
     thumb_path = in_memory_catalog / "thumbnails" / "foo.webp"
     _write_jpeg(thumb_path)

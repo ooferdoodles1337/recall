@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 import config
-from services import catalog, metadata_schema
+from services.catalog import db as catalog
+from services.catalog import schema as metadata_schema
 
 router = APIRouter()
 

@@ -4,7 +4,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from services import chroma, gemini
+from services.search import chroma
+from services.providers import gemini
 
 load_dotenv()
 

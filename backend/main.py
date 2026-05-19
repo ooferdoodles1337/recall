@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import catalog as catalog_router, media, search, trials
-from services import catalog, chroma, text_index
+from services.catalog import db as catalog
+from services.search import chroma, text_index
 
 
 @asynccontextmanager

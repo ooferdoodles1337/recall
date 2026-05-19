@@ -41,22 +41,22 @@ def mock_services(media_root, monkeypatch):
 
     ephemeral = chromadb.EphemeralClient()
     content_col = ephemeral.get_or_create_collection("media_content")
-    monkeypatch.setattr("services.chroma.content_collection", content_col)
-    import services.catalog as catalog
+    monkeypatch.setattr("services.search.chroma.content_collection", content_col)
+    import services.catalog.db as catalog
     catalog.configure(str(config.CATALOG_DB_PATH))
     catalog.reset()
-    monkeypatch.setattr("services.gemini.embed_content", lambda data, mime: [0.1] * 3072)
+    monkeypatch.setattr("services.providers.gemini.embed_content", lambda data, mime: [0.1] * 3072)
     monkeypatch.setattr(
-        "services.gemini.embed_content_batch",
+        "services.providers.gemini.embed_content_batch",
         lambda items: {key: [0.1] * 3072 for key, _, _ in items},
     )
-    monkeypatch.setattr("services.metadata.extract", lambda path: {})
+    monkeypatch.setattr("services.catalog.extractor.extract", lambda path, **kwargs: {})
     return {"content": content_col, "data_dir": media_root / "data", "catalog": catalog}
 
 
 def test_index_file_upserts_content_collection(media_root, mock_services):
-    from services.catalog import get_id_by_hash
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
@@ -66,8 +66,8 @@ def test_index_file_upserts_content_collection(media_root, mock_services):
 
 
 def test_index_file_upserts_catalog_item(media_root, mock_services):
-    from services.catalog import get_id_by_hash, get_item
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash, get_item
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
@@ -78,8 +78,8 @@ def test_index_file_upserts_catalog_item(media_root, mock_services):
 
 
 def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch):
-    from services.catalog import upsert_item
-    from services.indexer import index_file
+    from services.catalog.db import upsert_item
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     content_hash = _sha256(photo)
     upsert_item(
@@ -87,14 +87,14 @@ def test_index_file_skips_already_indexed(media_root, mock_services, monkeypatch
         "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
     )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
-    monkeypatch.setattr("services.gemini.embed_content", embed_mock)
+    monkeypatch.setattr("services.providers.gemini.embed_content", embed_mock)
     index_file(photo, force=False)
     embed_mock.assert_not_called()
 
 
 def test_index_file_force_reindexes_existing(media_root, mock_services, monkeypatch):
-    from services.catalog import upsert_item
-    from services.indexer import index_file
+    from services.catalog.db import upsert_item
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     content_hash = _sha256(photo)
     upsert_item(
@@ -102,7 +102,7 @@ def test_index_file_force_reindexes_existing(media_root, mock_services, monkeypa
         "image/jpeg", "image", extra_metadata={"content_hash": content_hash},
     )
     embed_mock = MagicMock(return_value=[0.1] * 3072)
-    monkeypatch.setattr("services.gemini.embed_content", embed_mock)
+    monkeypatch.setattr("services.providers.gemini.embed_content", embed_mock)
     index_file(photo, force=True)
     embed_mock.assert_called_once()
 
@@ -110,8 +110,8 @@ def test_index_file_force_reindexes_existing(media_root, mock_services, monkeypa
 def test_index_file_skips_unsupported_extension(media_root, mock_services, monkeypatch):
     (media_root / "data" / "media" / "icon.svg").write_text("<svg/>")
     embed_mock = MagicMock(return_value=[0.1] * 3072)
-    monkeypatch.setattr("services.gemini.embed_content", embed_mock)
-    from services.indexer import index_file
+    monkeypatch.setattr("services.providers.gemini.embed_content", embed_mock)
+    from services.pipeline.indexer import index_file
     index_file(media_root / "data" / "media" / "icon.svg", force=False)
     embed_mock.assert_not_called()
 
@@ -123,15 +123,15 @@ def test_index_file_outside_data_dir_is_rejected(media_root, mock_services, tmp_
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     outside.write_bytes(buf.getvalue())
-    from services.catalog import get_id_by_hash
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import index_file
     index_file(outside, force=False)
     assert get_id_by_hash(_sha256(outside)) is None
 
 
 def test_run_indexes_all_files_in_media_dir(media_root, mock_services):
-    from services.catalog import get_id_by_hash
-    from services.indexer import run
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import run
     run(force=False)
     photo = media_root / "data" / "media" / "photo.jpg"
     item_id = get_id_by_hash(_sha256(photo))
@@ -141,18 +141,60 @@ def test_run_indexes_all_files_in_media_dir(media_root, mock_services):
 
 
 def test_run_indexes_all_files_in_catalog(media_root, mock_services):
-    from services.catalog import get_id_by_hash
-    from services.indexer import run
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import run
     run(force=False)
     photo = media_root / "data" / "media" / "photo.jpg"
     assert get_id_by_hash(_sha256(photo)) is not None
 
 
+def test_run_splits_embedding_batches_by_jsonl_size(media_root, mock_services, monkeypatch):
+    second = media_root / "data" / "media" / "second.jpg"
+    Image.new("RGB", (10, 10), color=(0, 0, 255)).save(second, format="JPEG")
+
+    calls = []
+
+    def fake_embed_content_batch(items):
+        calls.append([key for key, _, _ in items])
+        return {key: [0.1] * 3072 for key, _, _ in items}
+
+    monkeypatch.setattr("services.pipeline.indexer.gemini.embed_content_batch", fake_embed_content_batch)
+
+    from services.pipeline.indexer import run
+
+    run(force=False, embedding_batch_max_jsonl_bytes=1)
+
+    assert len(calls) == 2
+    assert all(len(call) == 1 for call in calls)
+
+
+def test_run_skips_duplicate_hashes_within_same_batch(media_root, mock_services, monkeypatch):
+    original = media_root / "data" / "media" / "photo.jpg"
+    duplicate = media_root / "data" / "media" / "duplicate.jpg"
+    duplicate.write_bytes(original.read_bytes())
+
+    embed_mock = MagicMock(return_value={})
+
+    def fake_embed_content_batch(items):
+        embed_mock(items)
+        return {key: [0.1] * 3072 for key, _, _ in items}
+
+    monkeypatch.setattr("services.pipeline.indexer.gemini.embed_content_batch", fake_embed_content_batch)
+
+    from services.catalog.db import get_all_items_with_metadata
+    from services.pipeline.indexer import run
+
+    run(force=False)
+
+    assert len(embed_mock.call_args[0][0]) == 1
+    assert len(get_all_items_with_metadata()) == 1
+
+
 def test_run_detect_nsfw_starts_detection_pass(media_root, mock_services, monkeypatch):
-    from services.indexer import run
+    from services.pipeline.indexer import run
 
     detect_mock = MagicMock()
-    monkeypatch.setattr("services.nsfw.detect_undetected", detect_mock)
+    monkeypatch.setattr("services.pipeline.nsfw.detect_undetected", detect_mock)
 
     run(force=False, detect_nsfw=True)
 
@@ -160,8 +202,8 @@ def test_run_detect_nsfw_starts_detection_pass(media_root, mock_services, monkey
 
 
 def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services):
-    from services.catalog import get_id_by_hash
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
@@ -171,7 +213,7 @@ def test_index_file_stores_thumbnail_path_in_metadata(media_root, mock_services)
 
 
 def test_index_file_writes_thumbnail_webp_to_disk(media_root, mock_services):
-    from services.indexer import index_file
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=True)
     thumbs = list((media_root / "data" / "thumbnails").glob("*.webp"))
@@ -179,7 +221,7 @@ def test_index_file_writes_thumbnail_webp_to_disk(media_root, mock_services):
 
 
 def test_index_file_force_overwrites_thumbnail(media_root, mock_services):
-    from services.indexer import index_file
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=True)
     index_file(photo, force=True)
@@ -189,11 +231,11 @@ def test_index_file_force_overwrites_thumbnail(media_root, mock_services):
 
 def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeypatch):
     monkeypatch.setattr(
-        "services.indexer.metadata_svc.extract",
-        lambda path: {"EXIF_Make": "Nikon", "geo_city": "Paris", "geo_country": "France"},
+        "services.pipeline.indexer.metadata_svc.extract",
+        lambda path, **kwargs: {"EXIF_Make": "Nikon", "geo_city": "Paris", "geo_country": "France"},
     )
-    from services.catalog import get_id_by_hash, get_item
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash, get_item
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=True)
     item_id = get_id_by_hash(_sha256(photo))
@@ -204,8 +246,8 @@ def test_index_file_stores_extracted_metadata(media_root, mock_services, monkeyp
 
 
 def test_index_file_stores_relative_path(media_root, mock_services):
-    from services.catalog import get_id_by_hash
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash
+    from services.pipeline.indexer import index_file
     photo = media_root / "data" / "media" / "photo.jpg"
     index_file(photo, force=False)
     item_id = get_id_by_hash(_sha256(photo))
@@ -216,8 +258,8 @@ def test_index_file_stores_relative_path(media_root, mock_services):
 
 
 def test_index_file_stores_original_asset_mime_type(media_root, mock_services):
-    from services.catalog import get_id_by_hash, get_item
-    from services.indexer import index_file
+    from services.catalog.db import get_id_by_hash, get_item
+    from services.pipeline.indexer import index_file
 
     webp = media_root / "data" / "media" / "photo.webp"
     Image.new("RGB", (10, 10), color=(0, 255, 0)).save(webp, format="WEBP")

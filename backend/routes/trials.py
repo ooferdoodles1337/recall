@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from services import catalog
+from services.catalog import db as catalog
 
 router = APIRouter()
 

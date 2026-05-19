@@ -19,7 +19,7 @@ def test_list_items_returns_count_and_results(monkeypatch):
     from routes.catalog import list_items
 
     items = [_item("a", "2024-03-18T10:00:00"), _item("b", "2024-03-17T10:00:00")]
-    monkeypatch.setattr("services.catalog.list_library_items", lambda media_type=None, order="desc": items)
+    monkeypatch.setattr("services.catalog.db.list_library_items", lambda media_type=None, order="desc": items)
 
     body = list_items()
 
@@ -36,7 +36,7 @@ def test_list_items_passes_filters(monkeypatch):
         calls.append((media_type, order))
         return []
 
-    monkeypatch.setattr("services.catalog.list_library_items", fake_list)
+    monkeypatch.setattr("services.catalog.db.list_library_items", fake_list)
 
     list_items(media_type="video", order="asc")
 
@@ -47,7 +47,7 @@ def test_get_item_returns_item(monkeypatch):
     from routes.catalog import get_item
 
     item = _item("abc")
-    monkeypatch.setattr("services.catalog.get_item", lambda id: item)
+    monkeypatch.setattr("services.catalog.db.get_item", lambda id: item)
 
     result = get_item("abc")
 
@@ -57,7 +57,7 @@ def test_get_item_returns_item(monkeypatch):
 def test_get_item_404_when_missing(monkeypatch):
     from routes.catalog import get_item
 
-    monkeypatch.setattr("services.catalog.get_item", lambda id: None)
+    monkeypatch.setattr("services.catalog.db.get_item", lambda id: None)
 
     with pytest.raises(HTTPException) as exc:
         get_item("missing")
@@ -68,7 +68,7 @@ def test_get_items_batch_returns_found_and_missing(monkeypatch):
     from routes.catalog import BatchRequest, get_items_batch
 
     store = {"a": _item("a"), "b": _item("b")}
-    monkeypatch.setattr("services.catalog.get_item", lambda id: store.get(id))
+    monkeypatch.setattr("services.catalog.db.get_item", lambda id: store.get(id))
 
     body = get_items_batch(BatchRequest(ids=["a", "b", "c"]))
 
@@ -79,7 +79,7 @@ def test_get_items_batch_returns_found_and_missing(monkeypatch):
 def test_get_stats_delegates_to_catalog(monkeypatch):
     from routes.catalog import get_stats
 
-    monkeypatch.setattr("services.catalog.get_stats", lambda: {"total": 42, "by_media_type": {}})
+    monkeypatch.setattr("services.catalog.db.get_stats", lambda: {"total": 42, "by_media_type": {}})
 
     result = get_stats()
 
@@ -90,7 +90,7 @@ def test_get_facets_delegates_to_catalog(monkeypatch):
     from routes.catalog import get_facets
 
     facets = {"media_type": {"image": 10}, "taken_year_month": {"2024-03": 5}}
-    monkeypatch.setattr("services.catalog.get_facets", lambda: facets)
+    monkeypatch.setattr("services.catalog.db.get_facets", lambda: facets)
 
     result = get_facets()
 

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from services.media import ProcessedFile
+from services.pipeline.media import ProcessedFile
 
 
 @pytest.fixture
@@ -33,10 +33,10 @@ def _jpeg_bytes():
 def test_similar_by_id_returns_results(monkeypatch):
     from routes.search import search_similar_by_id
 
-    monkeypatch.setattr("services.chroma.get_embedding", lambda id: [0.1] * 3072)
-    monkeypatch.setattr("services.chroma.search", lambda emb, n_results: _fake_search(["a", "b"]))
+    monkeypatch.setattr("services.search.chroma.get_embedding", lambda id: [0.1] * 3072)
+    monkeypatch.setattr("services.search.chroma.search", lambda emb, n_results: _fake_search(["a", "b"]))
     monkeypatch.setattr(
-        "services.catalog.get_item",
+        "services.catalog.db.get_item",
         lambda id: {"id": id, "metadata": {"filename": f"{id}.jpg"}},
     )
 
@@ -50,13 +50,13 @@ def test_similar_by_id_returns_results(monkeypatch):
 def test_similar_by_id_excludes_self(monkeypatch):
     from routes.search import search_similar_by_id
 
-    monkeypatch.setattr("services.chroma.get_embedding", lambda id: [0.1] * 3072)
+    monkeypatch.setattr("services.search.chroma.get_embedding", lambda id: [0.1] * 3072)
     monkeypatch.setattr(
-        "services.chroma.search",
+        "services.search.chroma.search",
         lambda emb, n_results: _fake_search(["query-id", "other"]),
     )
     monkeypatch.setattr(
-        "services.catalog.get_item",
+        "services.catalog.db.get_item",
         lambda id: {"id": id, "metadata": {}},
     )
 
@@ -70,7 +70,7 @@ def test_similar_by_id_404_when_not_in_chroma(monkeypatch):
     from fastapi import HTTPException
     from routes.search import search_similar_by_id
 
-    monkeypatch.setattr("services.chroma.get_embedding", lambda id: None)
+    monkeypatch.setattr("services.search.chroma.get_embedding", lambda id: None)
 
     with pytest.raises(HTTPException) as exc:
         search_similar_by_id("missing-id")
@@ -80,13 +80,13 @@ def test_similar_by_id_404_when_not_in_chroma(monkeypatch):
 def test_similar_by_id_respects_n_limit(monkeypatch):
     from routes.search import search_similar_by_id
 
-    monkeypatch.setattr("services.chroma.get_embedding", lambda id: [0.1] * 3072)
+    monkeypatch.setattr("services.search.chroma.get_embedding", lambda id: [0.1] * 3072)
     monkeypatch.setattr(
-        "services.chroma.search",
+        "services.search.chroma.search",
         lambda emb, n_results: _fake_search(["a", "b", "c", "d"]),
     )
     monkeypatch.setattr(
-        "services.catalog.get_item",
+        "services.catalog.db.get_item",
         lambda id: {"id": id, "metadata": {}},
     )
 
@@ -99,16 +99,16 @@ def test_similar_by_id_respects_n_limit(monkeypatch):
 
 def test_similar_upload_returns_results(client, monkeypatch):
     monkeypatch.setattr(
-        "services.media.process_image",
+        "services.pipeline.media.process_image",
         lambda path: ProcessedFile(data=b"img", mime_type="image/jpeg", media_type="image"),
     )
-    monkeypatch.setattr("services.gemini.embed_content", lambda data, mime: [0.1] * 3072)
+    monkeypatch.setattr("services.providers.gemini.embed_content", lambda data, mime: [0.1] * 3072)
     monkeypatch.setattr(
-        "services.chroma.search",
+        "services.search.chroma.search",
         lambda emb, n_results: _fake_search(["result-1"]),
     )
     monkeypatch.setattr(
-        "services.catalog.get_item",
+        "services.catalog.db.get_item",
         lambda id: {"id": id, "metadata": {"filename": "result.jpg"}},
     )
 
@@ -155,10 +155,10 @@ def test_similar_upload_passes_through_processing_pipeline(client, monkeypatch):
         embedded_data.append(data)
         return [0.2] * 3072
 
-    monkeypatch.setattr("services.media.process_image", fake_process)
-    monkeypatch.setattr("services.gemini.embed_content", fake_embed)
-    monkeypatch.setattr("services.chroma.search", lambda emb, n_results: _fake_search([]))
-    monkeypatch.setattr("services.catalog.get_item", lambda id: None)
+    monkeypatch.setattr("services.pipeline.media.process_image", fake_process)
+    monkeypatch.setattr("services.providers.gemini.embed_content", fake_embed)
+    monkeypatch.setattr("services.search.chroma.search", lambda emb, n_results: _fake_search([]))
+    monkeypatch.setattr("services.catalog.db.get_item", lambda id: None)
 
     client.post("/similar", files={"file": ("img.png", b"rawbytes", "image/png")})
 

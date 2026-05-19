@@ -6,8 +6,8 @@ import pytest
 @pytest.fixture
 def catalog_db(tmp_path, monkeypatch):
     db_path = tmp_path / "catalog.sqlite"
-    monkeypatch.setattr("services.catalog._db_path", db_path)
-    import services.catalog as catalog
+    monkeypatch.setattr("services.catalog.db._db_path", db_path)
+    import services.catalog.db as catalog
     catalog.configure(str(db_path))
     return catalog
 
@@ -116,6 +116,35 @@ def test_update_metadata_merges_patch(catalog_db):
     assert item["metadata"]["search"]["phrases"] == ["new"]
 
 
+def test_replace_metadata_rewrites_full_document(catalog_db):
+    catalog_db.upsert_item(
+        "item-1",
+        "media/photo.jpg",
+        "photo.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-1", "EXIF_Make": "Old"},
+    )
+    original = catalog_db.get_item("item-1")["metadata"]
+
+    from services.catalog import schema as metadata_schema
+
+    replacement = metadata_schema.rebuild_metadata(
+        path="media/photo.jpg",
+        filename="photo.jpg",
+        mime_type="image/jpeg",
+        media_type="image",
+        existing_metadata=original,
+        extracted_metadata={"EXIF_Model": "New"},
+    )
+
+    catalog_db.replace_metadata("item-1", replacement)
+
+    item = catalog_db.get_item("item-1")
+    assert "EXIF_Make" not in item["metadata"]["raw"]["exif"]
+    assert item["metadata"]["raw"]["exif"]["EXIF_Model"] == "New"
+
+
 def test_reset_deletes_catalog_data(catalog_db):
     catalog_db.upsert_item(
         "item-1",
@@ -132,7 +161,7 @@ def test_reset_deletes_catalog_data(catalog_db):
 
 
 def test_configure_creates_parent_directory(tmp_path):
-    import services.catalog as catalog
+    import services.catalog.db as catalog
 
     db_path = tmp_path / "nested" / "catalog.sqlite"
     catalog.configure(str(db_path))

@@ -3,7 +3,8 @@ import logging
 
 from rapidfuzz import fuzz, process
 
-from services import catalog, metadata_schema
+from services.catalog import db as catalog
+from services.catalog import schema as metadata_schema
 
 log = logging.getLogger(__name__)
 

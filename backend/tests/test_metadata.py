@@ -10,7 +10,7 @@ def test_extract_sanitizes_keys(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert "EXIF_Make" in result
     assert "File_FileSize" in result
@@ -31,7 +31,7 @@ def test_extract_returns_chromadb_safe_types(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["EXIF_Make"] == "Canon"
     assert result["EXIF_FNumber"] == 2.8
@@ -52,7 +52,7 @@ def test_extract_filters_out_list_and_dict_values(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert "EXIF_Make" in result
     assert "EXIF_GPSVersionID" not in result
@@ -63,7 +63,7 @@ def test_extract_returns_empty_dict_on_exiftool_error(tmp_path):
     p = tmp_path / "photo.jpg"
     p.write_bytes(b"fake")
     with patch("exiftool.ExifToolHelper", side_effect=RuntimeError("not found")):
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result == {}
 
@@ -86,13 +86,13 @@ def test_extract_adds_geo_fields_when_gps_present(tmp_path):
         }
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         mock_geocoder.reverse.return_value = mock_location
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["geo_city"] == "New York City"
     assert result["geo_state"] == "New York"
@@ -105,12 +105,12 @@ def test_extract_skips_geocoding_when_no_gps(tmp_path):
     p.write_bytes(b"fake")
     raw = {"EXIF:Make": "Canon"}
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     mock_geocoder.reverse.assert_not_called()
     assert "geo_city" not in result
@@ -134,13 +134,13 @@ def test_extract_uses_town_fallback_when_no_city(tmp_path):
         }
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         mock_geocoder.reverse.return_value = mock_location
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["geo_city"] == "Lambeth"
     assert result["geo_country_code"] == "GB"
@@ -155,14 +155,14 @@ def test_extract_returns_partial_result_when_geocoding_fails(tmp_path):
         "Composite:GPSLongitude": -74.0060,
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.metadata._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._geocoder") as mock_geocoder:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         from geopy.exc import GeocoderTimedOut
         mock_geocoder.reverse.side_effect = GeocoderTimedOut("timeout")
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["EXIF_Make"] == "Canon"
     assert "geo_city" not in result
@@ -177,7 +177,7 @@ def test_extract_normalizes_width_height_from_exif(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["width"] == 1920
     assert result["height"] == 1080
@@ -197,7 +197,7 @@ def test_extract_prefers_composite_over_exif_dimensions(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["width"] == 3840
     assert result["height"] == 2160
@@ -212,7 +212,7 @@ def test_extract_normalizes_width_height_from_file_fallback(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["width"] == 1280
     assert result["height"] == 720
@@ -227,7 +227,7 @@ def test_extract_normalizes_width_height_from_generic_image_tags(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["width"] == 800
     assert result["height"] == 600
@@ -242,7 +242,7 @@ def test_extract_normalizes_duration_from_quicktime(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["duration_s"] == 62.5
 
@@ -256,7 +256,7 @@ def test_extract_parses_duration_time_string(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["duration_s"] == 83.5
 
@@ -274,7 +274,7 @@ def test_extract_prefers_composite_duration(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["duration_s"] == 120.0
 
@@ -292,7 +292,7 @@ def test_extract_prefers_longest_duration_when_no_composite(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["duration_s"] == 120.0
 
@@ -309,7 +309,7 @@ def test_extract_parses_xmp_duration(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["duration_s"] == 90.5
 
@@ -323,7 +323,7 @@ def test_extract_skips_normalization_when_dimensions_absent(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert "width" not in result
     assert "height" not in result
@@ -339,7 +339,7 @@ def test_extract_normalizes_exif_taken_date(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["taken_at"] == "2024-03-18T14:22:09"
     assert result["taken_date"] == "2024-03-18"
@@ -357,7 +357,7 @@ def test_extract_normalizes_timezone_taken_date(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["taken_at"] == "2024-03-18T14:22:09+09:00"
     assert result["taken_date"] == "2024-03-18"
@@ -373,7 +373,7 @@ def test_extract_falls_back_to_filesystem_mtime_for_taken_date(tmp_path):
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from services.metadata import extract
+        from services.catalog.extractor import extract
         result = extract(str(p))
     assert "taken_at" in result
     assert "taken_date" in result

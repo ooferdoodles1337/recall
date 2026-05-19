@@ -1,11 +1,13 @@
 import json
 import random
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import config
-from services import metadata_schema
+from services.catalog import schema as metadata_schema
 
 _db_path: Path | None = None
 
@@ -23,13 +25,21 @@ def configure(path: str | None = None) -> None:
         _init_schema(conn)
 
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect() -> Iterator[sqlite3.Connection]:
     if _db_path is None:
         configure()
     assert _db_path is not None
     conn = sqlite3.connect(_db_path)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _init_schema(conn: sqlite3.Connection) -> None:
@@ -219,6 +229,41 @@ def update_metadata(file_id: str, patch: dict) -> None:
                 file_id,
             ),
         )
+
+
+def replace_metadata(file_id: str, metadata: dict) -> None:
+    path = metadata_schema.asset_path(metadata)
+    filename = metadata_schema.filename(metadata)
+    mime_type = metadata_schema.mime_type(metadata)
+    media_type = metadata_schema.media_type(metadata)
+    content_hash = metadata_schema.content_hash(metadata)
+    if not all(isinstance(value, str) and value for value in (path, filename, mime_type, media_type, content_hash)):
+        raise ValueError(f"Item metadata is missing required asset/system fields: {file_id}")
+
+    with _connect() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE media_items
+            SET
+                media_type = ?,
+                content_hash = ?,
+                taken_sort = ?,
+                taken_year_month = ?,
+                metadata_json = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                media_type,
+                content_hash,
+                metadata_schema.taken_sort(metadata),
+                metadata_schema.taken_year_month(metadata),
+                json.dumps(metadata, sort_keys=True),
+                file_id,
+            ),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"Item not found: {file_id}")
 
 
 def get_stats() -> dict:

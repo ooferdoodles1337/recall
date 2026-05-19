@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from services import catalog
+from services.catalog import db as catalog
 
 router = APIRouter()
 

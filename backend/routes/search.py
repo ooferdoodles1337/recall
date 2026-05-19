@@ -3,7 +3,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 
-from services import catalog, chroma, gemini, media, text_index
+from services.catalog import db as catalog
+from services.providers import gemini
+from services.search import chroma, text_index
+from services.pipeline import media
 
 router = APIRouter()
 

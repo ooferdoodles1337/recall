@@ -1,31 +1,36 @@
 import logging
-import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
 import config
-from services import catalog, gemini, metadata_schema, openrouter
+from services.catalog import db as catalog
+from services.catalog import schema as metadata_schema
+from services.providers import gemini_annotation
+from services.utils import format_bytes
 
 load_dotenv()
 log = logging.getLogger(__name__)
 
 ANNOTATION_MODEL = "gemini-3.1-flash-lite"
-PACK_SIZE = 10
-OPENROUTER_IMAGE_PACK_SIZE = 8  # Nvidia provider limit
+IMAGE_PACK_SIZE = 50
+VIDEO_PACK_SIZE = 5
+GEMINI_SUBMISSION_PACK_LIMIT = 50
+GEMINI_SUBMISSION_MEDIA_BYTE_TARGET = 512 * 1024 * 1024
 
 
-def _make_openrouter_packs(
+def _make_gemini_packs(
     loaded: list[tuple[str, bytes, str]],
 ) -> list[list[tuple[str, bytes, str]]]:
     images = [item for item in loaded if not item[2].startswith("video/")]
     videos = [item for item in loaded if item[2].startswith("video/")]
-    packs = [images[i:i + OPENROUTER_IMAGE_PACK_SIZE] for i in range(0, len(images), OPENROUTER_IMAGE_PACK_SIZE)]
-    packs += [[v] for v in videos]  # videos must be sent one per request
+    packs = [images[i:i + IMAGE_PACK_SIZE] for i in range(0, len(images), IMAGE_PACK_SIZE)]
+    packs += [videos[i:i + VIDEO_PACK_SIZE] for i in range(0, len(videos), VIDEO_PACK_SIZE)]
     return [p for p in packs if p]
 
-_PROMPT_PATH = Path(__file__).parent / "prompts" / "annotation.txt"
+_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "annotation.txt"
 _ANNOTATION_PROMPT = _PROMPT_PATH.read_text(encoding="utf-8")
 
 
@@ -37,22 +42,6 @@ class SingleImageAnnotation(BaseModel):
 
 class PackedAnnotationResponse(BaseModel):
     annotations: list[SingleImageAnnotation]
-
-
-def _inline_schema(schema: dict) -> dict:
-    """Resolve $ref/$defs into an inline JSON schema for annotation providers."""
-    defs = schema.get("$defs", {})
-
-    def resolve(node):
-        if isinstance(node, dict):
-            if "$ref" in node:
-                return resolve(defs[node["$ref"].split("/")[-1]])
-            return {k: resolve(v) for k, v in node.items() if k != "$defs"}
-        if isinstance(node, list):
-            return [resolve(item) for item in node]
-        return node
-
-    return resolve(schema)
 
 
 def _get_unannotated() -> list[dict]:
@@ -117,6 +106,7 @@ def _write_annotations(
 
 
 def annotate_unannotated() -> None:
+    started_at = time.monotonic()
     unannotated = _get_unannotated()
     if not unannotated:
         log.info("all items already annotated")
@@ -125,23 +115,65 @@ def annotate_unannotated() -> None:
     log.info("annotating %d items", len(unannotated))
     expected_ids = {item["id"] for item in unannotated}
 
+    provider = "gemini"
+    model = ANNOTATION_MODEL
+
     loaded = [x for x in (_load_item_bytes(item) for item in unannotated) if x is not None]
+    loaded_count = len(loaded)
+    log.info("loaded %d/%d items", loaded_count, len(unannotated))
 
-    if os.getenv("OPENROUTER_API_KEY"):
-        model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
-        provider = "openrouter"
-        packs = _make_openrouter_packs(loaded)
-        log.info("annotating %d packs via OpenRouter (%s)", len(packs), model)
-        raw_results = openrouter.annotate_packs(packs, model, _ANNOTATION_PROMPT, PackedAnnotationResponse.model_json_schema())
-    else:
-        provider = "gemini"
-        model = ANNOTATION_MODEL
-        packs = [loaded[i:i + PACK_SIZE] for i in range(0, len(loaded), PACK_SIZE)]
-        log.info("submitting %d packs to Gemini Batch API (%s)", len(packs), ANNOTATION_MODEL)
-        raw_results = gemini.annotate_packs_batch(
-            packs, ANNOTATION_MODEL, _ANNOTATION_PROMPT, PackedAnnotationResponse.model_json_schema()
+    packs = _make_gemini_packs(loaded)
+    log.info("built %d packs", len(packs))
+
+    submission_count = 0
+    annotated_count = 0
+    pending_packs: list[list[tuple[str, bytes, str]]] = []
+    pending_bytes = 0
+
+    def submit_pending() -> None:
+        nonlocal annotated_count, pending_packs, pending_bytes, submission_count
+        if not pending_packs:
+            return
+        submission_count += 1
+        submission_ids = {file_id for pack in pending_packs for file_id, _, _ in pack}
+        log.info(
+            "submitting annotation batch %d: packs=%d items=%d media=%s model=%s",
+            submission_count,
+            len(pending_packs),
+            len(submission_ids),
+            format_bytes(pending_bytes),
+            ANNOTATION_MODEL,
         )
+        raw_results = gemini_annotation.annotate_packs_batch(
+            pending_packs, ANNOTATION_MODEL, _ANNOTATION_PROMPT, PackedAnnotationResponse.model_json_schema()
+        )
+        annotations = _parse_pack_results(raw_results)
+        _write_annotations(annotations, submission_ids, provider=provider, model=model)
+        annotated_count += len(annotations)
+        log.info(
+            "annotation batch %d complete: %d/%d items annotated",
+            submission_count,
+            len(annotations),
+            len(submission_ids),
+        )
+        pending_packs = []
+        pending_bytes = 0
 
-    annotations = _parse_pack_results(raw_results)
-    _write_annotations(annotations, expected_ids, provider=provider, model=model)
-    log.info("annotation complete: %d/%d items annotated", len(annotations), len(loaded))
+    for pack in packs:
+        pack_bytes = sum(len(item[1]) for item in pack)
+        if pending_packs and (
+            len(pending_packs) >= GEMINI_SUBMISSION_PACK_LIMIT
+            or pending_bytes + pack_bytes > GEMINI_SUBMISSION_MEDIA_BYTE_TARGET
+        ):
+            submit_pending()
+        pending_packs.append(pack)
+        pending_bytes += pack_bytes
+
+    submit_pending()
+    log.info(
+        "annotation complete: %d/%d items annotated in %d submissions, elapsed=%.1fs",
+        annotated_count,
+        loaded_count,
+        submission_count,
+        time.monotonic() - started_at,
+    )

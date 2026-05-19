@@ -49,7 +49,7 @@ uv run pytest -v
 ```
 
 Tests use a dummy `GEMINI_API_KEY` from `tests/conftest.py`. SQLite tests point
-`services.catalog` at a temporary catalog, and ChromaDB tests monkeypatch the
+`services.catalog.db` at a temporary catalog, and ChromaDB tests monkeypatch the
 content collection with an ephemeral in-memory collection. The test suite should
 not call the real Gemini API.
 
@@ -72,8 +72,19 @@ The entire `backend/data/` directory is distributed to demo participants as a zi
 Run this once to build the SQLite catalog and ChromaDB vector store from the media files in `backend/data/media/`:
 
 ```bash
-uv run python -m services.indexer
+uv run python -m services.pipeline.indexer
 ```
+
+To rebuild only the SQLite metadata shape after changing `services/catalog/schema.py`, without calling Gemini or touching ChromaDB:
+
+```bash
+uv run python -m services.catalog.refresh
+uv run python -m services.catalog.refresh --dry-run
+uv run python -m services.catalog.refresh --extract                  # also re-run local ExifTool extraction
+uv run python -m services.catalog.refresh --regenerate-thumbnails    # also regenerate local WebP thumbnails
+```
+
+`services.catalog.refresh` preserves item UUIDs, Chroma vector IDs, existing annotation text/search phrases, safety metadata, favorites/folders, and embedding metadata. It is intended for local schema/catalog migrations, not for changed media bytes; if the actual media file content changed, re-run the indexer so the embedding matches the file.
 
 Options:
 - `--force` — re-index files that are already indexed
@@ -82,19 +93,30 @@ Options:
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
 - `--reset` — wipe the ChromaDB store, SQLite catalog, and thumbnails before indexing
+- `--reverse-geocode` — call Nominatim for GPS reverse geocoding during metadata extraction. This is off by default for bulk runs to avoid public-service rate limits; GPS coordinates are still retained from EXIF.
+- `--embedding-batch-max-jsonl-mb <number>` — target maximum size for each Gemini embedding request JSONL file (default: `512` MiB). The indexer automatically creates multiple batch request files when needed.
 
 `--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into `metadata.safety`.
+
+After a full maintainer build, verify that `backend/data/` is portable before zipping or creating a tarball:
+
+```bash
+uv run python scripts/verify_data_bundle.py --require-annotations --require-safety
+tar -czf recall-data.tar.gz data
+```
+
+The verifier checks that the SQLite catalog and ChromaDB collection contain the same UUIDs, that media and thumbnail paths are relative to `backend/data/`, and that all referenced files exist.
 
 The indexer:
 1. Recursively scans `backend/data/media/` for supported files
 2. Computes a SHA-256 hash of the raw file bytes
 3. Skips files whose hash is already in the SQLite catalog (idempotent without `--force`)
 4. Processes images/videos into an embeddable format (transcodes if needed)
-5. Embeds content via `gemini-embedding-2`
-6. Extracts EXIF/XMP metadata and reverse-geocodes GPS coordinates
+5. Embeds content via `gemini-embedding-2`, automatically splitting large runs into multiple JSONL input files for Gemini Batch API
+6. Extracts EXIF/XMP metadata and, if `--reverse-geocode` is passed, reverse-geocodes GPS coordinates
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
 8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
-9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, polls until complete, and writes `metadata.search.description` and `metadata.search.phrases`
+9. If `--annotate` is passed, submits unannotated items to the Gemini Batch API in packs of 10, automatically splitting large annotation runs into multiple JSONL input files, polls until complete, and writes `metadata.search.description` and `metadata.search.phrases`
 10. If `--detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without checked `metadata.safety` and writes the UI state, score, labels, and model info. Images are analyzed directly; videos are analyzed through their generated thumbnail.
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
@@ -106,7 +128,7 @@ On `--force`, the existing UUID for that hash is reused so the record is updated
 | Image | `.jpg` `.jpeg` `.png` `.apng` `.webp` `.gif` `.jfif` |
 | Video | `.mp4` `.m4v` `.mov` `.avi` `.mkv` `.wmv` `.flv` `.webm` `.3gp` |
 
-Animated PNGs/GIFs and videos longer than 128 seconds are transcoded to MP4 before embedding.
+Animated PNGs/GIFs and videos longer than 128 seconds are transcoded to MP4 before embedding. Transcoding uses the FFmpeg executable bundled by the existing `imageio[ffmpeg]` indexing dependency.
 
 ## API reference
 

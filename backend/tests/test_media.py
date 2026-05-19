@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from PIL import Image
+from unittest.mock import MagicMock
 
 
 # --- Test fixtures ---
@@ -78,31 +79,31 @@ def make_mp4_bytes(duration_seconds: float = 1.0, fps: int = 10) -> bytes:
 # --- Extension classification ---
 
 def test_classify_jpeg_extensions():
-    from services.media import classify_extension
+    from services.pipeline.media import classify_extension
     for ext in [".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp"]:
         assert classify_extension(ext) == "image", f"Expected image for {ext}"
 
 
 def test_classify_png():
-    from services.media import classify_extension
+    from services.pipeline.media import classify_extension
     assert classify_extension(".png") == "image"
     assert classify_extension(".apng") == "image"
 
 
 def test_classify_webp_and_gif():
-    from services.media import classify_extension
+    from services.pipeline.media import classify_extension
     assert classify_extension(".webp") == "image"
     assert classify_extension(".gif") == "image"
 
 
 def test_classify_video_extensions():
-    from services.media import classify_extension
+    from services.pipeline.media import classify_extension
     for ext in [".mp4", ".m4v", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm", ".3gp"]:
         assert classify_extension(ext) == "video", f"Expected video for {ext}"
 
 
 def test_classify_unknown_returns_none():
-    from services.media import classify_extension
+    from services.pipeline.media import classify_extension
     assert classify_extension(".svg") is None
     assert classify_extension(".txt") is None
     assert classify_extension(".pdf") is None
@@ -113,28 +114,28 @@ def test_classify_unknown_returns_none():
 def test_is_animated_false_for_static_gif(tmp_path):
     p = tmp_path / "test.gif"
     p.write_bytes(make_static_gif_bytes())
-    from services.media import is_animated
+    from services.pipeline.media import is_animated
     assert is_animated(str(p)) is False
 
 
 def test_is_animated_true_for_animated_gif(tmp_path):
     p = tmp_path / "test.gif"
     p.write_bytes(make_animated_gif_bytes())
-    from services.media import is_animated
+    from services.pipeline.media import is_animated
     assert is_animated(str(p)) is True
 
 
 def test_is_animated_false_for_static_apng(tmp_path):
     p = tmp_path / "test.apng"
     p.write_bytes(make_static_apng_bytes())
-    from services.media import is_animated
+    from services.pipeline.media import is_animated
     assert is_animated(str(p)) is False
 
 
 def test_is_animated_true_for_animated_apng(tmp_path):
     p = tmp_path / "test.apng"
     p.write_bytes(make_animated_apng_bytes())
-    from services.media import is_animated
+    from services.pipeline.media import is_animated
     assert is_animated(str(p)) is True
 
 
@@ -144,7 +145,7 @@ def test_process_jpeg_returns_original_bytes(tmp_path):
     data = make_jpeg_bytes()
     p = tmp_path / "test.jpg"
     p.write_bytes(data)
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "image/jpeg"
     assert result.media_type == "image"
@@ -155,7 +156,7 @@ def test_process_png_returns_original_bytes(tmp_path):
     data = make_png_bytes()
     p = tmp_path / "test.png"
     p.write_bytes(data)
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "image/png"
     assert result.media_type == "image"
@@ -165,7 +166,7 @@ def test_process_png_returns_original_bytes(tmp_path):
 def test_process_webp_converts_to_jpeg(tmp_path):
     p = tmp_path / "test.webp"
     p.write_bytes(make_webp_bytes())
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "image/jpeg"
     img = Image.open(io.BytesIO(result.data))
@@ -175,7 +176,7 @@ def test_process_webp_converts_to_jpeg(tmp_path):
 def test_process_static_gif_converts_to_jpeg(tmp_path):
     p = tmp_path / "test.gif"
     p.write_bytes(make_static_gif_bytes())
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "image/jpeg"
     assert result.media_type == "image"
@@ -184,7 +185,7 @@ def test_process_static_gif_converts_to_jpeg(tmp_path):
 def test_process_static_apng_returns_png(tmp_path):
     p = tmp_path / "test.apng"
     p.write_bytes(make_static_apng_bytes())
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "image/png"
     assert result.media_type == "image"
@@ -195,7 +196,7 @@ def test_process_static_apng_returns_png(tmp_path):
 def test_process_animated_gif_returns_mp4(tmp_path):
     p = tmp_path / "test.gif"
     p.write_bytes(make_animated_gif_bytes())
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "video/mp4"
     assert result.media_type == "video"
@@ -205,7 +206,7 @@ def test_process_animated_gif_returns_mp4(tmp_path):
 def test_process_animated_apng_returns_mp4(tmp_path):
     p = tmp_path / "test.apng"
     p.write_bytes(make_animated_apng_bytes())
-    from services.media import process_image
+    from services.pipeline.media import process_image
     result = process_image(str(p))
     assert result.mime_type == "video/mp4"
     assert result.media_type == "video"
@@ -217,7 +218,7 @@ def test_process_short_mp4_returns_original_bytes(tmp_path):
     data = make_mp4_bytes(duration_seconds=1.0)
     p = tmp_path / "short.mp4"
     p.write_bytes(data)
-    from services.media import process_video
+    from services.pipeline.media import process_video
     result = process_video(str(p))
     assert result.mime_type == "video/mp4"
     assert result.media_type == "video"
@@ -229,7 +230,7 @@ def test_process_long_mp4_truncates_to_128s(tmp_path):
     data = make_mp4_bytes(duration_seconds=200.0, fps=2)
     p = tmp_path / "long.mp4"
     p.write_bytes(data)
-    from services.media import process_video, MAX_VIDEO_SECONDS
+    from services.pipeline.media import process_video, MAX_VIDEO_SECONDS
     result = process_video(str(p))
     out = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     out.write(result.data)
@@ -244,10 +245,39 @@ def test_process_avi_converts_to_mp4(tmp_path):
     frames = [np.zeros((10, 10, 3), dtype=np.uint8) for _ in range(5)]
     avi_path = str(tmp_path / "test.avi")
     iio.imwrite(avi_path, frames, fps=5, codec="rawvideo")
-    from services.media import process_video
+    from services.pipeline.media import process_video
     result = process_video(avi_path)
     assert result.mime_type == "video/mp4"
     assert result.media_type == "video"
+
+
+def test_process_non_native_video_uses_ffmpeg_transcoder(monkeypatch):
+    from services.pipeline import media
+
+    transcode_mock = MagicMock(return_value=b"mp4-bytes")
+    monkeypatch.setattr(media.iio, "immeta", lambda path, plugin: {"duration": 1.0})
+    monkeypatch.setattr(media, "_run_ffmpeg_to_mp4", transcode_mock)
+
+    result = media.process_video("test.avi")
+
+    assert result.data == b"mp4-bytes"
+    transcode_mock.assert_called_once_with("test.avi", max_seconds=media.MAX_VIDEO_SECONDS)
+
+
+def test_process_large_native_video_uses_ffmpeg_transcoder(tmp_path, monkeypatch):
+    from services.pipeline import media
+
+    p = tmp_path / "large.mp4"
+    p.write_bytes(b"larger-than-test-limit")
+    transcode_mock = MagicMock(return_value=b"compressed-mp4")
+    monkeypatch.setattr(media, "MAX_EMBED_VIDEO_BYTES", 10)
+    monkeypatch.setattr(media.iio, "immeta", lambda path, plugin: {"duration": 1.0})
+    monkeypatch.setattr(media, "_run_ffmpeg_to_mp4", transcode_mock)
+
+    result = media.process_video(str(p))
+
+    assert result.data == b"compressed-mp4"
+    transcode_mock.assert_called_once_with(str(p), max_seconds=media.MAX_VIDEO_SECONDS)
 
 
 # --- Thumbnail generation ---
@@ -255,7 +285,7 @@ def test_process_avi_converts_to_mp4(tmp_path):
 def test_generate_thumbnail_image_returns_webp(tmp_path):
     p = tmp_path / "test.jpg"
     p.write_bytes(make_jpeg_bytes(width=640, height=480))
-    from services.media import generate_thumbnail
+    from services.pipeline.media import generate_thumbnail
     result = generate_thumbnail(str(p), "image")
     thumb = Image.open(io.BytesIO(result))
     assert thumb.format == "WEBP"
@@ -265,7 +295,7 @@ def test_generate_thumbnail_image_returns_webp(tmp_path):
 def test_generate_thumbnail_image_preserves_aspect_ratio(tmp_path):
     p = tmp_path / "test.jpg"
     p.write_bytes(make_jpeg_bytes(width=640, height=320))
-    from services.media import generate_thumbnail
+    from services.pipeline.media import generate_thumbnail
     result = generate_thumbnail(str(p), "image")
     thumb = Image.open(io.BytesIO(result))
     assert thumb.size == (320, 160)
@@ -274,7 +304,7 @@ def test_generate_thumbnail_image_preserves_aspect_ratio(tmp_path):
 def test_generate_thumbnail_small_image_not_upscaled(tmp_path):
     p = tmp_path / "test.jpg"
     p.write_bytes(make_jpeg_bytes(width=100, height=80))
-    from services.media import generate_thumbnail
+    from services.pipeline.media import generate_thumbnail
     result = generate_thumbnail(str(p), "image")
     thumb = Image.open(io.BytesIO(result))
     assert thumb.size == (100, 80)
@@ -284,8 +314,8 @@ def test_generate_thumbnail_video_returns_webp():
     import numpy as np
     from unittest.mock import patch
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
-    with patch("services.media.iio.imread", return_value=frame):
-        from services.media import generate_thumbnail
+    with patch("services.pipeline.media.iio.imread", return_value=frame):
+        from services.pipeline.media import generate_thumbnail
         result = generate_thumbnail("fake.mp4", "video")
     thumb = Image.open(io.BytesIO(result))
     assert thumb.format == "WEBP"

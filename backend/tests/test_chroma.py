@@ -8,11 +8,11 @@ TEST_UUID = "aaaaaaaa-0000-0000-0000-000000000001"
 def in_memory_chroma(monkeypatch):
     ephemeral = chromadb.EphemeralClient()
     content_col = ephemeral.get_or_create_collection("media_content")
-    monkeypatch.setattr("services.chroma.content_collection", content_col)
+    monkeypatch.setattr("services.search.chroma.content_collection", content_col)
 
 
 def test_upsert_content_stores_embedding_only():
-    import services.chroma as chroma
+    import services.search.chroma as chroma
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
@@ -23,7 +23,7 @@ def test_upsert_content_stores_embedding_only():
 
 
 def test_upsert_content_does_not_store_metadata():
-    import services.chroma as chroma
+    import services.search.chroma as chroma
     chroma.upsert_content(
         file_id=TEST_UUID,
         embedding=[0.1] * 3072,
@@ -33,7 +33,7 @@ def test_upsert_content_does_not_store_metadata():
 
 
 def test_get_embedding_returns_stored_vector():
-    import services.chroma as chroma
+    import services.search.chroma as chroma
     embedding = [0.1] * 3072
     chroma.upsert_content(TEST_UUID, embedding)
     result = chroma.get_embedding(TEST_UUID)
@@ -42,5 +42,5 @@ def test_get_embedding_returns_stored_vector():
 
 
 def test_get_embedding_returns_none_for_missing():
-    from services.chroma import get_embedding
+    from services.search.chroma import get_embedding
     assert get_embedding("nonexistent-id") is None

@@ -12,8 +12,9 @@ def _write_jpeg(path, color):
 
 def test_run_indexes_temp_images_into_catalog_and_chroma(tmp_path, monkeypatch):
     import config
-    from services import catalog, chroma
-    from services.indexer import run
+    from services.catalog import db as catalog
+    from services.search import chroma
+    from services.pipeline.indexer import run
 
     data_dir = tmp_path / "data"
     media_dir = data_dir / "media"
@@ -30,11 +31,11 @@ def test_run_indexes_temp_images_into_catalog_and_chroma(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "THUMBS_DIR", thumbs_dir)
     monkeypatch.setattr(config, "CATALOG_DB_PATH", catalog_path)
     monkeypatch.setattr(
-        "services.indexer.metadata_svc.extract",
-        lambda path: {"taken_sort": "2024-03-18T10:00:00", "taken_date": "2024-03-18"},
+        "services.pipeline.indexer.metadata_svc.extract",
+        lambda path, **kwargs: {"taken_sort": "2024-03-18T10:00:00", "taken_date": "2024-03-18"},
     )
     monkeypatch.setattr(
-        "services.indexer.gemini.embed_content_batch",
+        "services.pipeline.indexer.gemini.embed_content_batch",
         lambda items: {file_id: [0.1] * 3072 for file_id, _, _ in items},
     )
 

@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import io
 import os
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import imageio_ffmpeg
 import imageio.v3 as iio
-import numpy as np
 from PIL import Image
 
 MAX_VIDEO_SECONDS = 128.0
+MAX_EMBED_VIDEO_BYTES = 48 * 1024 * 1024
 
 IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp",
@@ -63,23 +65,70 @@ def process_image(path: str) -> ProcessedFile:
         return ProcessedFile(data=buf.getvalue(), mime_type="image/jpeg", media_type="image")
 
 
-def _animated_to_mp4(path: str) -> bytes:
-    frames = []
-    with Image.open(path) as img:
-        for i in range(getattr(img, "n_frames", 1)):
-            img.seek(i)
-            frame = img.convert("RGB")
-            w, h = frame.size
-            if w % 2 != 0 or h % 2 != 0:
-                frame = frame.resize((w + (w % 2), h + (h % 2)), Image.Resampling.LANCZOS)
-            frames.append(np.array(frame))
+def _run_ffmpeg_to_mp4(
+    path: str,
+    *,
+    max_seconds: float | None = None,
+    max_bytes: int | None = MAX_EMBED_VIDEO_BYTES,
+) -> bytes:
+    attempts = [
+        {"height": 720, "crf": 28},
+        {"height": 540, "crf": 32},
+        {"height": 360, "crf": 35},
+    ]
+    last_data: bytes | None = None
     tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     tmp.close()
     try:
-        iio.imwrite(tmp.name, frames, fps=10, codec="libx264", pixelformat="yuv420p")
-        return Path(tmp.name).read_bytes()
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        for attempt in attempts:
+            cmd = [
+                ffmpeg,
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                path,
+                "-map",
+                "0:v:0",
+                "-an",
+            ]
+            if max_seconds is not None:
+                cmd.extend(["-t", str(max_seconds)])
+            cmd.extend([
+                "-vf",
+                f"scale=-2:min({attempt['height']}\\,ih),pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                str(attempt["crf"]),
+                "-movflags",
+                "+faststart",
+                tmp.name,
+            ])
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                stderr = result.stderr.strip() or "unknown ffmpeg error"
+                raise RuntimeError(f"ffmpeg transcode failed for {path}: {stderr}")
+
+            last_data = Path(tmp.name).read_bytes()
+            if max_bytes is None or len(last_data) <= max_bytes:
+                return last_data
+
+        if last_data is None:
+            raise RuntimeError(f"ffmpeg transcode did not produce output for {path}")
+        raise RuntimeError(
+            f"ffmpeg transcode for {path} is still too large: {len(last_data):,} bytes "
+            f"(limit {max_bytes:,} bytes)"
+        )
     finally:
         os.unlink(tmp.name)
+
+
+def _animated_to_mp4(path: str) -> bytes:
+    return _run_ffmpeg_to_mp4(path, max_seconds=MAX_VIDEO_SECONDS)
 
 
 ANIMATED_IMAGE_EXTS = {".gif", ".apng"}
@@ -106,22 +155,12 @@ def process_video(path: str) -> ProcessedFile:
     ext = Path(path).suffix.lower()
     meta = iio.immeta(path, plugin="FFMPEG")
     duration = meta.get("duration", 0.0)
-    fps = meta.get("fps", 24.0)
 
-    if ext in NATIVE_VIDEO_EXTS and duration <= MAX_VIDEO_SECONDS:
+    if (
+        ext in NATIVE_VIDEO_EXTS
+        and duration <= MAX_VIDEO_SECONDS
+        and Path(path).stat().st_size <= MAX_EMBED_VIDEO_BYTES
+    ):
         return ProcessedFile(data=Path(path).read_bytes(), mime_type="video/mp4", media_type="video")
 
-    max_frames = int(MAX_VIDEO_SECONDS * fps)
-    frames = []
-    for i, frame in enumerate(iio.imiter(path, plugin="FFMPEG")):
-        if i >= max_frames:
-            break
-        frames.append(frame)
-
-    tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-    tmp.close()
-    try:
-        iio.imwrite(tmp.name, frames, fps=fps, codec="libx264", pixelformat="yuv420p")
-        return ProcessedFile(data=Path(tmp.name).read_bytes(), mime_type="video/mp4", media_type="video")
-    finally:
-        os.unlink(tmp.name)
+    return ProcessedFile(data=_run_ffmpeg_to_mp4(path, max_seconds=MAX_VIDEO_SECONDS), mime_type="video/mp4", media_type="video")

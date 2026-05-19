@@ -271,7 +271,7 @@ def _reverse_geocode(lat: float, lon: float) -> dict[str, str]:
         return {}
 
 
-def extract(path: str) -> dict[str, str | int | float | bool]:
+def extract(path: str, *, reverse_geocode: bool = True) -> dict[str, str | int | float | bool]:
     try:
         with exiftool.ExifToolHelper() as et:
             raw_list = et.get_metadata(path)
@@ -289,7 +289,7 @@ def extract(path: str) -> dict[str, str | int | float | bool]:
 
     lat = raw.get("Composite:GPSLatitude")
     lon = raw.get("Composite:GPSLongitude")
-    if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+    if reverse_geocode and isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
         result.update(_reverse_geocode(float(lat), float(lon)))
 
     result.update(_normalize_dimensions_and_duration(result))
