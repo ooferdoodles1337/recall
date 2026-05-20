@@ -76,22 +76,19 @@ def test_extract_adds_geo_fields_when_gps_present(tmp_path):
         "Composite:GPSLatitude": 40.7128,
         "Composite:GPSLongitude": -74.0060,
     }
-    mock_location = MagicMock()
-    mock_location.raw = {
-        "address": {
-            "city": "New York City",
-            "state": "New York",
-            "country": "United States",
-            "country_code": "us",
-        }
+    mock_hit = {
+        "city": "New York City",
+        "state": "New York",
+        "country": "United States",
+        "country_code": "us",
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.catalog.extractor._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._rg.get") as mock_reverse_get:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        mock_geocoder.reverse.return_value = mock_location
+        mock_reverse_get.return_value = mock_hit
         from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["geo_city"] == "New York City"
@@ -105,41 +102,38 @@ def test_extract_skips_geocoding_when_no_gps(tmp_path):
     p.write_bytes(b"fake")
     raw = {"EXIF:Make": "Canon"}
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.catalog.extractor._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._rg.get") as mock_reverse_get:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
         from services.catalog.extractor import extract
         result = extract(str(p))
-    mock_geocoder.reverse.assert_not_called()
+    mock_reverse_get.assert_not_called()
     assert "geo_city" not in result
     assert "geo_country" not in result
 
 
-def test_extract_uses_town_fallback_when_no_city(tmp_path):
+def test_extract_uses_reverse_geocode_city(tmp_path):
     p = tmp_path / "photo.jpg"
     p.write_bytes(b"fake")
     raw = {
         "Composite:GPSLatitude": 51.5074,
         "Composite:GPSLongitude": -0.1278,
     }
-    mock_location = MagicMock()
-    mock_location.raw = {
-        "address": {
-            "town": "Lambeth",
-            "state": "England",
-            "country": "United Kingdom",
-            "country_code": "gb",
-        }
+    mock_hit = {
+        "city": "Lambeth",
+        "state": "England",
+        "country": "United Kingdom",
+        "country_code": "gb",
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.catalog.extractor._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._rg.get") as mock_reverse_get:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        mock_geocoder.reverse.return_value = mock_location
+        mock_reverse_get.return_value = mock_hit
         from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["geo_city"] == "Lambeth"
@@ -155,13 +149,12 @@ def test_extract_returns_partial_result_when_geocoding_fails(tmp_path):
         "Composite:GPSLongitude": -74.0060,
     }
     with patch("exiftool.ExifToolHelper") as mock_cls, \
-         patch("services.catalog.extractor._geocoder") as mock_geocoder:
+         patch("services.catalog.extractor._rg.get") as mock_reverse_get:
         inst = MagicMock()
         mock_cls.return_value.__enter__.return_value = inst
         mock_cls.return_value.__exit__.return_value = False
         inst.get_metadata.return_value = [raw]
-        from geopy.exc import GeocoderTimedOut
-        mock_geocoder.reverse.side_effect = GeocoderTimedOut("timeout")
+        mock_reverse_get.side_effect = RuntimeError("timeout")
         from services.catalog.extractor import extract
         result = extract(str(p))
     assert result["EXIF_Make"] == "Canon"

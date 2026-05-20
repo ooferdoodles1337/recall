@@ -7,8 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import exiftool
-from geopy.exc import GeocoderServiceError, GeocoderTimedOut
-from geopy.geocoders import Nominatim
+import reverse_geocode as _rg
 
 log = logging.getLogger(__name__)
 
@@ -241,34 +240,25 @@ def _normalize_dimensions_and_duration(
     return normalized
 
 
-# Shared geocoder instance — created once at import time (no network call).
-_geocoder = Nominatim(user_agent="recall-indexer")
-
-
 @functools.lru_cache(maxsize=1024)
 def _reverse_geocode(lat: float, lon: float) -> dict[str, str]:
     try:
-        location = _geocoder.reverse((lat, lon), language="en", timeout=5)
-        if location is None:
-            return {}
-        addr = location.raw.get("address", {})
-        result: dict[str, str] = {}
-        for field in ("city", "town", "village", "suburb"):
-            if field in addr:
-                result["geo_city"] = addr[field]
-                break
-        for field in ("state", "region"):
-            if field in addr:
-                result["geo_state"] = addr[field]
-                break
-        if "country" in addr:
-            result["geo_country"] = addr["country"]
-        if "country_code" in addr:
-            result["geo_country_code"] = addr["country_code"].upper()
-        return result
-    except (GeocoderTimedOut, GeocoderServiceError) as exc:
+        hit = _rg.get((lat, lon))
+    except Exception as exc:
         log.warning("reverse geocoding failed: %s", exc)
         return {}
+    if not hit:
+        return {}
+    result: dict[str, str] = {}
+    if hit.get("city"):
+        result["geo_city"] = hit["city"]
+    if hit.get("state"):
+        result["geo_state"] = hit["state"]
+    if hit.get("country"):
+        result["geo_country"] = hit["country"]
+    if hit.get("country_code"):
+        result["geo_country_code"] = hit["country_code"].upper()
+    return result
 
 
 def extract(path: str, *, reverse_geocode: bool = True) -> dict[str, str | int | float | bool]:

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import catalog as catalog_router, media, search, trials
+from routes import catalog as catalog_router, media, search
 from services.catalog import db as catalog
 from services.search import chroma, text_index
 
@@ -26,7 +26,6 @@ app.add_middleware(
 app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(catalog_router.router, prefix="/catalog", tags=["catalog"])
 app.include_router(media.router, prefix="/media", tags=["media"])
-app.include_router(trials.router, prefix="/trials", tags=["trials"])
 
 
 @app.get("/health")

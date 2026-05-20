@@ -65,7 +65,7 @@ def test_refresh_catalog_rebuilds_metadata_without_gemini(refresh_catalog_db, mo
 
     monkeypatch.setattr("services.providers.gemini.embed_content", fail_gemini)
     monkeypatch.setattr("services.providers.gemini.embed_content_batch", fail_gemini)
-    monkeypatch.setattr("services.providers.gemini_annotation.annotate_packs_batch", fail_gemini)
+    monkeypatch.setattr("services.providers.gemini_annotation.annotate_pack", fail_gemini)
     monkeypatch.setattr("services.catalog.refresh.metadata_svc.extract", lambda path, **kwargs: {"EXIF_Make": "New"})
 
     from services.catalog.refresh import refresh_catalog

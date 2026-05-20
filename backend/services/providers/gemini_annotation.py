@@ -1,197 +1,199 @@
-import base64
-import json
+import asyncio
 import logging
 import os
-import tempfile
-import time
-from collections.abc import Iterable
+import random
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 
-from services.providers.gemini import MAX_BATCH_INPUT_FILE_BYTES
-from services.utils import format_bytes, inline_schema
+from services.utils import inline_schema
 
 load_dotenv()
 
 log = logging.getLogger(__name__)
 
 _annotation_client: genai.Client | None = None
-_ANNOTATION_TERMINAL_STATES = {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
-_ANNOTATION_POLL_INTERVAL = 30
-DEFAULT_ANNOTATION_BATCH_MAX_JSONL_BYTES = 512 * 1024 * 1024
+_FILE_POLL_INTERVAL = 5
+_MAX_UPLOAD_CONCURRENCY = 8
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0
+
+
+@dataclass(frozen=True)
+class _UploadedAnnotationMedia:
+    file_id: str
+    uri: str
+    mime_type: str
 
 
 def _get_annotation_client() -> genai.Client:
-    global _annotation_client
-    if _annotation_client is None:
-        _annotation_client = genai.Client(
-            api_key=os.getenv("GEMINI_API_KEY"),
-            http_options={"api_version": "v1alpha"},
-        )
-    return _annotation_client
-
-
-def _build_annotation_request(pack: list[tuple[str, bytes, str]], prompt: str, response_schema: dict) -> dict:
-    parts = []
-    for file_id, media_bytes, mime_type in pack:
-        parts.append({"text": f"[Image ID: {file_id}]"})
-        part: dict = {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(media_bytes).decode()}}
-        if not mime_type.startswith("image/"):
-            part["video_metadata"] = {"resolution": "MEDIA_RESOLUTION_LOW"}
-        parts.append(part)
-    parts.append({"text": prompt})
-    return {
-        "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseJsonSchema": response_schema,
-        },
-    }
-
-
-def _annotation_request_line(index: int, pack: list[tuple[str, bytes, str]], prompt: str, response_schema: dict) -> str:
-    record = {"key": f"pack-{index}", "request": _build_annotation_request(pack, prompt, response_schema)}
-    return json.dumps(record) + "\n"
-
-
-def _chunk_annotation_request_lines(
-    packs: list[list[tuple[str, bytes, str]]],
-    prompt: str,
-    response_schema: dict,
-    max_jsonl_bytes: int,
-) -> Iterable[tuple[list[str], int]]:
-    if max_jsonl_bytes <= 0:
-        raise ValueError("max_jsonl_bytes must be positive")
-
-    chunk: list[str] = []
-    chunk_bytes = 0
-
-    for i, pack in enumerate(packs):
-        line = _annotation_request_line(i, pack, prompt, response_schema)
-        line_bytes = len(line.encode("utf-8"))
-        if line_bytes > MAX_BATCH_INPUT_FILE_BYTES:
-            raise ValueError(
-                f"annotation request pack-{i} is {line_bytes:,} JSONL bytes, "
-                f"above the Batch API input file limit of {MAX_BATCH_INPUT_FILE_BYTES:,} bytes"
-            )
-        if chunk and chunk_bytes + line_bytes > max_jsonl_bytes:
-            yield chunk, chunk_bytes
-            chunk = []
-            chunk_bytes = 0
-        chunk.append(line)
-        chunk_bytes += line_bytes
-
-        if line_bytes > max_jsonl_bytes:
-            yield chunk, chunk_bytes
-            chunk = []
-            chunk_bytes = 0
-
-    if chunk:
-        yield chunk, chunk_bytes
-
-
-def _run_annotation_batch_job(
-    client: genai.Client,
-    model: str,
-    lines: list[str],
-    *,
-    chunk_index: int,
-) -> dict[int, str]:
-    started_at = time.monotonic()
-    with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w", delete=False, encoding="utf-8") as f:
-        tmp_path = f.name
-        for line in lines:
-            f.write(line)
-
-    tmp_size = Path(tmp_path).stat().st_size
-    log.info(
-        "annotation JSONL ready: chunk=%d path=%s size=%s packs=%d",
-        chunk_index,
-        tmp_path,
-        format_bytes(tmp_size),
-        len(lines),
+    # Return the module-level client if set (used by tests via monkeypatch).
+    # In production this is always None, so a fresh client is created per call
+    # to avoid event-loop reuse errors when asyncio.run() is called repeatedly.
+    if _annotation_client is not None:
+        return _annotation_client
+    return genai.Client(
+        api_key=os.getenv("GEMINI_API_KEY"),
+        http_options={"api_version": "v1alpha"},
     )
-    try:
-        uploaded = client.files.upload(
-            file=tmp_path,
+
+
+def _file_state_name(file: types.File) -> str | None:
+    state = getattr(file, "state", None)
+    if state is None:
+        return None
+    if isinstance(state, str):
+        return state
+    return getattr(state, "name", None)
+
+
+async def _wait_for_file_active(client: genai.Client, uploaded: types.File) -> types.File:
+    state = _file_state_name(uploaded)
+    while state == "PROCESSING":
+        log.info("uploaded file processing: file=%s", uploaded.name)
+        await asyncio.sleep(_FILE_POLL_INTERVAL)
+        uploaded = await client.aio.files.get(name=uploaded.name)
+        state = _file_state_name(uploaded)
+    if state not in (None, "ACTIVE"):
+        raise RuntimeError(f"uploaded file {uploaded.name} reached state {state}, cannot proceed")
+    return uploaded
+
+
+async def _upload_one_annotation_media(
+    client: genai.Client,
+    semaphore: asyncio.Semaphore,
+    file_id: str,
+    media_path: Path,
+    mime_type: str,
+    uploaded_files: list[types.File],
+) -> _UploadedAnnotationMedia:
+    async with semaphore:
+        uploaded = await client.aio.files.upload(
+            file=media_path,
             config=types.UploadFileConfig(
-                display_name=f"recall-annotation-requests-{chunk_index:04d}",
-                mime_type="jsonl",
+                display_name=f"recall-annotation-media-{file_id}",
+                mime_type=mime_type,
             ),
         )
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
-
-    log.info("uploaded annotation JSONL: chunk=%d file=%s", chunk_index, uploaded.name)
-    job = client.batches.create(
-        model=model,
-        src=uploaded.name,
-        config={"display_name": f"recall-annotation-{chunk_index:04d}"},
-    )
-    log.info("batch annotation job created: %s", job.name)
-
-    poll_count = 0
-    while job.state.name not in _ANNOTATION_TERMINAL_STATES:
-        poll_count += 1
-        log.info(
-            "annotation batch %s state=%s poll=%d elapsed=%.1fs, waiting %ds",
-            job.name,
-            job.state.name,
-            poll_count,
-            time.monotonic() - started_at,
-            _ANNOTATION_POLL_INTERVAL,
+        uploaded_files.append(uploaded)
+        uploaded = await _wait_for_file_active(client, uploaded)
+        if not uploaded.uri:
+            raise RuntimeError(f"uploaded file {uploaded.name} did not include a file URI")
+        # The v1alpha client returns v1alpha file URIs for video files, but
+        # generate_content can only fetch files via v1beta URIs. Normalize.
+        file_uri = uploaded.uri.replace(
+            "https://generativelanguage.googleapis.com/v1alpha/",
+            "https://generativelanguage.googleapis.com/v1beta/",
         )
-        time.sleep(_ANNOTATION_POLL_INTERVAL)
-        job = client.batches.get(name=job.name)
+        log.info("uploaded annotation media: item=%s file=%s", file_id, uploaded.name)
+        return _UploadedAnnotationMedia(file_id=file_id, uri=file_uri, mime_type=mime_type)
 
-    if job.state.name != "JOB_STATE_SUCCEEDED":
-        raise RuntimeError(f"annotation batch did not succeed: {job.state.name}")
 
-    log.info("annotation batch succeeded: %s elapsed=%.1fs", job.name, time.monotonic() - started_at)
-    raw_bytes = client.files.download(file=job.dest.file_name)
-    log.info("annotation result downloaded: job=%s size=%s", job.name, format_bytes(len(raw_bytes)))
-    pack_texts: dict[int, str] = {}
-    for line in raw_bytes.decode("utf-8").splitlines():
-        if not line:
-            continue
-        record = json.loads(line)
-        if "error" in record:
-            log.error("pack %s failed: %s", record.get("key"), record["error"])
-            continue
+async def _upload_annotation_media(
+    client: genai.Client,
+    pack: list[tuple[str, Path, str]],
+    uploaded_files: list[types.File],
+) -> list[_UploadedAnnotationMedia]:
+    semaphore = asyncio.Semaphore(_MAX_UPLOAD_CONCURRENCY)
+    tasks = [
+        asyncio.create_task(
+            _upload_one_annotation_media(
+                client,
+                semaphore,
+                file_id,
+                media_path,
+                mime_type,
+                uploaded_files,
+            )
+        )
+        for file_id, media_path, mime_type in pack
+    ]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except Exception:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+
+
+async def _delete_uploaded_files(client: genai.Client, uploaded_files: list[types.File]) -> None:
+    async def delete_one(uploaded: types.File) -> None:
         try:
-            idx = int(record["key"].split("-")[1])
-            pack_texts[idx] = record["response"]["candidates"][0]["content"]["parts"][0]["text"]
+            await client.aio.files.delete(name=uploaded.name)
         except Exception as exc:
-            log.error("pack %s parse error: %s", record.get("key"), exc)
+            log.warning("failed to delete uploaded file %s: %s", uploaded.name, exc)
 
-    log.info("annotation result parsed: job=%s packs=%d/%d", job.name, len(pack_texts), len(lines))
-    return pack_texts
+    await asyncio.gather(*(delete_one(uploaded) for uploaded in uploaded_files))
 
 
-def annotate_packs_batch(
-    packs: list[list[tuple[str, bytes, str]]],
+def _build_annotation_contents(pack: list[_UploadedAnnotationMedia], prompt: str) -> list[dict]:
+    parts = []
+    for media in pack:
+        parts.append({"text": f"[Image ID: {media.file_id}]"})
+        parts.append({"file_data": {"mime_type": media.mime_type, "file_uri": media.uri}})
+    parts.append({"text": prompt})
+    return [{"role": "user", "parts": parts}]
+
+
+async def annotate_pack_async(
+    pack: list[tuple[str, Path, str]],
     model: str,
     prompt: str,
     pydantic_schema: dict,
-    max_jsonl_bytes: int = DEFAULT_ANNOTATION_BATCH_MAX_JSONL_BYTES,
-) -> list[str | None]:
-    """Submit all packs as a Gemini batch job; return per-pack JSON response strings."""
-    client = _get_annotation_client()
-    response_schema = inline_schema(pydantic_schema)
+) -> str:
+    """Upload one pack and annotate it, retrying on server errors up to _MAX_RETRIES times."""
+    has_video = any(not mime.startswith("image/") for _, _, mime in pack)
+    for attempt in range(_MAX_RETRIES + 1):
+        client = _get_annotation_client()
+        uploaded_files: list[types.File] = []
+        try:
+            uploaded_pack = await _upload_annotation_media(client, pack, uploaded_files)
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=_build_annotation_contents(uploaded_pack, prompt),
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_json_schema=inline_schema(pydantic_schema),
+                    media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW if has_video else None,
+                ),
+            )
+            if not isinstance(response.text, str) or not response.text:
+                raise RuntimeError("annotation response did not include text")
+            return response.text
+        except ServerError as exc:
+            if attempt == _MAX_RETRIES:
+                raise
+            delay = _RETRY_BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
+            log.warning(
+                "pack attempt %d/%d server error %s, retrying in %.1fs",
+                attempt + 1,
+                _MAX_RETRIES + 1,
+                exc.code,
+                delay,
+            )
+            await asyncio.sleep(delay)
+        finally:
+            await _delete_uploaded_files(client, uploaded_files)
+    raise RuntimeError("unreachable")
 
-    pack_texts: dict[int, str] = {}
-    chunks = list(_chunk_annotation_request_lines(packs, prompt, response_schema, max_jsonl_bytes))
-    for i, (lines, estimated_bytes) in enumerate(chunks, start=1):
-        log.info(
-            "uploading annotation request JSONL %d/%d: %d packs, estimated %.1f MiB",
-            i,
-            len(chunks),
-            len(lines),
-            estimated_bytes / (1024 * 1024),
-        )
-        pack_texts.update(_run_annotation_batch_job(client, model, lines, chunk_index=i))
 
-    return [pack_texts.get(i) for i in range(len(packs))]
+def annotate_pack(
+    pack: list[tuple[str, Path, str]],
+    model: str,
+    prompt: str,
+    pydantic_schema: dict,
+) -> str:
+    """Annotate one prompt pack synchronously and return the JSON response text."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(annotate_pack_async(pack, model, prompt, pydantic_schema))
+    raise RuntimeError(
+        "annotate_pack() cannot run inside an active event loop; await annotate_pack_async() instead"
+    )

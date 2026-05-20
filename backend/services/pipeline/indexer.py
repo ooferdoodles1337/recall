@@ -236,6 +236,7 @@ def index_file(path: Path, force: bool) -> None:
 def run(
     force: bool,
     annotate: bool = False,
+    annotate_sample: int | None = None,
     detect_nsfw: bool = False,
     db_path: str | None = None,
     media_dir: str | None = None,
@@ -337,10 +338,10 @@ def run(
             time.monotonic() - started_at,
         )
 
-    if annotate:
+    if annotate or annotate_sample:
         from services.pipeline import annotator
         log.info("starting annotation pass")
-        annotator.annotate_unannotated()
+        annotator.annotate_unannotated(limit=annotate_sample)
 
     if detect_nsfw:
         from services.pipeline import nsfw
@@ -355,6 +356,13 @@ if __name__ == "__main__":
         "--annotate",
         action="store_true",
         help="Annotate unannotated items with descriptions and search terms via Gemini",
+    )
+    parser.add_argument(
+        "--annotate-sample",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Annotate a random sample of N unannotated items (implies --annotate)",
     )
     parser.add_argument(
         "--detect-nsfw",
@@ -401,6 +409,7 @@ if __name__ == "__main__":
     run(
         force=args.force,
         annotate=args.annotate,
+        annotate_sample=args.annotate_sample,
         detect_nsfw=args.detect_nsfw,
         db_path=args.db_path,
         media_dir=args.media_dir,

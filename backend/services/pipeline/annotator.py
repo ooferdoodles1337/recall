@@ -1,5 +1,8 @@
 import logging
+import random
+import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -9,23 +12,57 @@ import config
 from services.catalog import db as catalog
 from services.catalog import schema as metadata_schema
 from services.providers import gemini_annotation
-from services.utils import format_bytes
+from services.pipeline.media import (
+    IMAGE_EXTENSIONS,
+    VIDEO_EXTENSIONS,
+    ProcessedFile,
+    process_image,
+    process_video,
+)
 
 load_dotenv()
 log = logging.getLogger(__name__)
 
 ANNOTATION_MODEL = "gemini-3.1-flash-lite"
-IMAGE_PACK_SIZE = 50
+IMAGE_PACK_SIZE = 10
 VIDEO_PACK_SIZE = 5
-GEMINI_SUBMISSION_PACK_LIMIT = 50
-GEMINI_SUBMISSION_MEDIA_BYTE_TARGET = 512 * 1024 * 1024
+_ANIMATED_IMAGE_EXTENSIONS = {".gif", ".apng"}
+_GEMINI_IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"}
+_TEMP_SUFFIX_BY_MIME_TYPE = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "video/mp4": ".mp4",
+}
+
+
+@dataclass(frozen=True)
+class AnnotationMedia:
+    file_id: str
+    path: Path
+    mime_type: str
+    temporary: bool = False
+
+    def as_provider_tuple(self) -> tuple[str, Path, str]:
+        return (self.file_id, self.path, self.mime_type)
+
+
+def _item_annotation_mime_type(item: dict) -> str:
+    meta = item["metadata"] or {}
+    mime_type = metadata_schema.mime_type(meta) or ""
+    path = metadata_schema.asset_path(meta) or ""
+    ext = Path(path).suffix.lower()
+
+    if ext in _ANIMATED_IMAGE_EXTENSIONS:
+        return "video/mp4"
+    return mime_type
 
 
 def _make_gemini_packs(
-    loaded: list[tuple[str, bytes, str]],
-) -> list[list[tuple[str, bytes, str]]]:
-    images = [item for item in loaded if not item[2].startswith("video/")]
-    videos = [item for item in loaded if item[2].startswith("video/")]
+    items: list[dict],
+) -> list[list[dict]]:
+    images = [item for item in items if not _item_annotation_mime_type(item).startswith("video/")]
+    videos = [item for item in items if _item_annotation_mime_type(item).startswith("video/")]
     packs = [images[i:i + IMAGE_PACK_SIZE] for i in range(0, len(images), IMAGE_PACK_SIZE)]
     packs += [videos[i:i + VIDEO_PACK_SIZE] for i in range(0, len(videos), VIDEO_PACK_SIZE)]
     return [p for p in packs if p]
@@ -49,32 +86,52 @@ def _get_unannotated() -> list[dict]:
     return [item for item in all_items if not metadata_schema.search_description(item["metadata"] or {})]
 
 
-def _load_item_bytes(item: dict) -> tuple[str, bytes, str] | None:
+def _write_temp_processed_media(file_id: str, processed: ProcessedFile) -> AnnotationMedia:
+    suffix = _TEMP_SUFFIX_BY_MIME_TYPE.get(processed.mime_type, ".bin")
+    with tempfile.NamedTemporaryFile(prefix=f"recall-annotation-{file_id}-", suffix=suffix, delete=False) as f:
+        f.write(processed.data)
+        path = Path(f.name)
+    return AnnotationMedia(file_id=file_id, path=path, mime_type=processed.mime_type, temporary=True)
+
+
+def _load_item_file(item: dict) -> AnnotationMedia | None:
     meta = item["metadata"] or {}
     path = metadata_schema.asset_path(meta)
     mime_type = metadata_schema.mime_type(meta)
     if not path or not mime_type:
         log.warning("item %s missing path or mime_type", item["id"])
         return None
-    try:
-        return (item["id"], (config.DATA_DIR / path).read_bytes(), mime_type)
-    except Exception as exc:
-        log.error("failed to load %s: %s", path, exc)
+    media_path = config.DATA_DIR / path
+    if not media_path.is_file():
+        log.error("media file does not exist: %s", media_path)
         return None
 
-
-def _parse_pack_results(raw_results: list[str | None]) -> dict[str, SingleImageAnnotation]:
-    annotations: dict[str, SingleImageAnnotation] = {}
-    for i, text in enumerate(raw_results):
-        if text is None:
-            continue
+    ext = media_path.suffix.lower()
+    if ext in _ANIMATED_IMAGE_EXTENSIONS or (
+        ext in IMAGE_EXTENSIONS and mime_type.startswith("image/") and mime_type not in _GEMINI_IMAGE_MIME_TYPES
+    ):
         try:
-            parsed = PackedAnnotationResponse.model_validate_json(text)
-            for annotation in parsed.annotations:
-                annotations[annotation.file_id] = annotation
+            processed = process_image(str(media_path))
         except Exception as exc:
-            log.error("pack %d parse error: %s", i, exc)
-    return annotations
+            log.error("failed to prepare annotation image %s: %s", media_path, exc)
+            return None
+        return _write_temp_processed_media(item["id"], processed)
+
+    if ext in VIDEO_EXTENSIONS and mime_type != "video/mp4":
+        try:
+            processed = process_video(str(media_path))
+        except Exception as exc:
+            log.error("failed to prepare annotation video %s: %s", media_path, exc)
+            return None
+        return _write_temp_processed_media(item["id"], processed)
+
+    return AnnotationMedia(file_id=item["id"], path=media_path, mime_type=mime_type)
+
+
+def _cleanup_loaded_media(loaded: list[AnnotationMedia]) -> None:
+    for media in loaded:
+        if media.temporary:
+            media.path.unlink(missing_ok=True)
 
 
 def _write_annotations(
@@ -105,75 +162,70 @@ def _write_annotations(
         log.warning("%d items were not annotated (expected %d)", len(expected_ids) - len(annotations), len(expected_ids))
 
 
-def annotate_unannotated() -> None:
+def annotate_unannotated(limit: int | None = None) -> None:
     started_at = time.monotonic()
     unannotated = _get_unannotated()
     if not unannotated:
         log.info("all items already annotated")
         return
 
+    if limit is not None and limit < len(unannotated):
+        total = len(unannotated)
+        unannotated = random.sample(unannotated, limit)
+        log.info("sample run: annotating %d/%d unannotated items", limit, total)
+
     log.info("annotating %d items", len(unannotated))
-    expected_ids = {item["id"] for item in unannotated}
 
     provider = "gemini"
     model = ANNOTATION_MODEL
 
-    loaded = [x for x in (_load_item_bytes(item) for item in unannotated) if x is not None]
-    loaded_count = len(loaded)
-    log.info("loaded %d/%d items", loaded_count, len(unannotated))
-
-    packs = _make_gemini_packs(loaded)
+    packs = _make_gemini_packs(unannotated)
     log.info("built %d packs", len(packs))
 
-    submission_count = 0
     annotated_count = 0
-    pending_packs: list[list[tuple[str, bytes, str]]] = []
-    pending_bytes = 0
-
-    def submit_pending() -> None:
-        nonlocal annotated_count, pending_packs, pending_bytes, submission_count
-        if not pending_packs:
-            return
-        submission_count += 1
-        submission_ids = {file_id for pack in pending_packs for file_id, _, _ in pack}
+    loaded_count = 0
+    for pack_idx, pack_items in enumerate(packs, start=1):
+        loaded = [x for x in (_load_item_file(item) for item in pack_items) if x is not None]
+        if not loaded:
+            continue
+        loaded_count += len(loaded)
+        expected_ids = {media.file_id for media in loaded}
         log.info(
-            "submitting annotation batch %d: packs=%d items=%d media=%s model=%s",
-            submission_count,
-            len(pending_packs),
-            len(submission_ids),
-            format_bytes(pending_bytes),
+            "annotating pack %d/%d: items=%d model=%s",
+            pack_idx,
+            len(packs),
+            len(loaded),
             ANNOTATION_MODEL,
         )
-        raw_results = gemini_annotation.annotate_packs_batch(
-            pending_packs, ANNOTATION_MODEL, _ANNOTATION_PROMPT, PackedAnnotationResponse.model_json_schema()
-        )
-        annotations = _parse_pack_results(raw_results)
-        _write_annotations(annotations, submission_ids, provider=provider, model=model)
-        annotated_count += len(annotations)
+        try:
+            text = gemini_annotation.annotate_pack(
+                [media.as_provider_tuple() for media in loaded],
+                ANNOTATION_MODEL,
+                _ANNOTATION_PROMPT,
+                PackedAnnotationResponse.model_json_schema(),
+            )
+            parsed = PackedAnnotationResponse.model_validate_json(text)
+        except Exception as exc:
+            log.error("pack %d failed: %s", pack_idx, exc)
+            continue
+        finally:
+            _cleanup_loaded_media(loaded)
+
+        annotations = {ann.file_id: ann for ann in parsed.annotations}
+        _write_annotations(annotations, expected_ids, provider=provider, model=model)
+        annotated_count += len(set(annotations) & expected_ids)
         log.info(
-            "annotation batch %d complete: %d/%d items annotated",
-            submission_count,
+            "annotation pack %d/%d complete: %d/%d items annotated",
+            pack_idx,
+            len(packs),
             len(annotations),
-            len(submission_ids),
+            len(loaded),
         )
-        pending_packs = []
-        pending_bytes = 0
 
-    for pack in packs:
-        pack_bytes = sum(len(item[1]) for item in pack)
-        if pending_packs and (
-            len(pending_packs) >= GEMINI_SUBMISSION_PACK_LIMIT
-            or pending_bytes + pack_bytes > GEMINI_SUBMISSION_MEDIA_BYTE_TARGET
-        ):
-            submit_pending()
-        pending_packs.append(pack)
-        pending_bytes += pack_bytes
-
-    submit_pending()
     log.info(
-        "annotation complete: %d/%d items annotated in %d submissions, elapsed=%.1fs",
+        "annotation complete: %d/%d items annotated in %d packs, elapsed=%.1fs",
         annotated_count,
         loaded_count,
-        submission_count,
+        len(packs),
         time.monotonic() - started_at,
     )

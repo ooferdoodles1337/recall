@@ -89,35 +89,17 @@ def _safety_from_detection(detection: dict[str, Any] | None) -> dict[str, Any]:
     if not detection:
         return {"state": "unknown"}
 
-    label = str(detection.get("label") or "").strip().lower()
-    if label == "safe":
-        state = "safe"
-    elif label == "nsfw":
-        state = "nsfw"
-    elif label:
-        state = "sensitive"
-    else:
-        state = "unknown"
-
+    state = str(detection.get("state") or "unknown")
     safety: dict[str, Any] = {"state": state}
-    score = _as_float(detection.get("score"))
-    if score is not None:
-        safety["score"] = score
 
-    probabilities = detection.get("probabilities")
-    if isinstance(probabilities, dict):
-        labels = {
-            str(key): float(value)
-            for key, value in probabilities.items()
-            if isinstance(value, (int, float)) and not isinstance(value, bool)
-        }
-        if labels:
-            safety["labels"] = labels
+    nsfw_score = _as_float(detection.get("nsfw_score"))
+    if nsfw_score is not None:
+        safety["score"] = nsfw_score
 
     model = detection.get("model")
     if isinstance(model, str) and model:
-        safety["provider"] = "local"
         safety["model"] = model
+
     safety["checked_at"] = _now_iso()
     return safety
 
@@ -478,5 +460,5 @@ def search_phrases(metadata: dict[str, Any]) -> list[str]:
 def has_safety_detection(metadata: dict[str, Any]) -> bool:
     safety = metadata.get("safety")
     if isinstance(safety, dict):
-        return safety.get("state") not in {None, "unknown"} or bool(safety.get("labels"))
+        return safety.get("state") not in {None, "unknown"}
     return isinstance(metadata.get("nsfw_detection"), dict)
