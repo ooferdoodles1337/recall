@@ -42,6 +42,7 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
     assert item["links"] == {"media": "/media/item-1"}
     assert item["metadata"]["asset"]["filename"] == "photo.jpg"
     assert item["metadata"]["asset"]["mime_type"] == "image/jpeg"
+    assert item["metadata"]["asset"]["embedding_mime_type"] == "image/jpeg"
     assert item["metadata"]["asset"]["media_type"] == "image"
     assert item["metadata"]["asset"]["paths"]["original"] == "media/photo.jpg"
     assert item["metadata"]["capture"]["sort_key"] == "2024-03-18T10:00:00"
@@ -253,13 +254,14 @@ def test_configure_migrates_legacy_catalog_columns(tmp_path):
         row = conn.execute(
             """
             SELECT filename, asset_path, thumbnail_path, search_description, has_annotation,
-                   geo_city, geo_country, favorite, folders_json, safety_state, safety_score
+                   geo_city, geo_country, favorite, folders_json, safety_state, safety_score,
+                   embedding_mime_type
             FROM media_items WHERE id = ?
             """,
             ("item-1",),
         ).fetchone()
 
-    assert {"filename", "asset_path", "search_description", "geo_city", "favorite"} <= columns
+    assert {"filename", "asset_path", "embedding_mime_type", "search_description", "geo_city", "favorite"} <= columns
     assert row["filename"] == "photo.jpg"
     assert row["asset_path"] == "media/photo.jpg"
     assert row["thumbnail_path"] == "thumbnails/item-1.webp"
@@ -271,6 +273,7 @@ def test_configure_migrates_legacy_catalog_columns(tmp_path):
     assert json.loads(row["folders_json"]) == ["travel"]
     assert row["safety_state"] == "safe"
     assert row["safety_score"] == 0.99
+    assert row["embedding_mime_type"] == "image/jpeg"
 
     full = catalog.get_item("item-1")
     summary = catalog.get_item_summary("item-1")

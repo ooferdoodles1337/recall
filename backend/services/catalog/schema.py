@@ -140,8 +140,7 @@ def build_metadata(
         "media_type": media_type,
         "paths": asset_paths,
     }
-    if embedding_mime_type and embedding_mime_type != mime_type:
-        asset["embedding_mime_type"] = embedding_mime_type
+    asset["embedding_mime_type"] = embedding_mime_type or mime_type
     width = _as_int(extra.get("width"))
     height = _as_int(extra.get("height"))
     duration = _as_float(extra.get("duration_s"))

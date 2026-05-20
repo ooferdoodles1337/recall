@@ -17,6 +17,7 @@ _PROMOTED_COLUMN_DEFS: dict[str, str] = {
     "thumbnail_path": "TEXT",
     "filename": "TEXT",
     "mime_type": "TEXT",
+    "embedding_mime_type": "TEXT",
     "width": "INTEGER",
     "height": "INTEGER",
     "duration_seconds": "REAL",
@@ -92,6 +93,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             thumbnail_path TEXT,
             filename TEXT,
             mime_type TEXT,
+            embedding_mime_type TEXT,
             width INTEGER,
             height INTEGER,
             duration_seconds REAL,
@@ -128,6 +130,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_has_annotation ON media_items(has_annotation)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_safety_state ON media_items(safety_state)")
     _migrate_embedding_mime_types(conn)
+    _backfill_embedding_mime_type_in_json(conn)
     if added_promoted_columns or _needs_promoted_backfill(conn) or _needs_safety_score_backfill(conn):
         _backfill_promoted_columns(conn)
 
@@ -150,6 +153,7 @@ def _needs_promoted_backfill(conn: sqlite3.Connection) -> bool:
         WHERE asset_path IS NULL
            OR filename IS NULL
            OR mime_type IS NULL
+           OR embedding_mime_type IS NULL
            OR search_phrases_json IS NULL
            OR folders_json IS NULL
         LIMIT 1
@@ -262,6 +266,7 @@ def _promoted_values(metadata: dict) -> dict[str, Any]:
         "thumbnail_path": metadata_schema.thumbnail_path(metadata),
         "filename": metadata_schema.filename(metadata),
         "mime_type": metadata_schema.mime_type(metadata),
+        "embedding_mime_type": metadata_schema.embedding_mime_type(metadata),
         "width": _asset_number(metadata, "width", integer=True),
         "height": _asset_number(metadata, "height", integer=True),
         "duration_seconds": _asset_number(metadata, "duration_seconds", integer=False),
@@ -347,6 +352,22 @@ def _migrate_embedding_mime_types(conn: sqlite3.Connection) -> None:
         _update_metadata_row(conn, row["id"], metadata)
 
 
+def _backfill_embedding_mime_type_in_json(conn: sqlite3.Connection) -> None:
+    rows = conn.execute("SELECT id, metadata_json FROM media_items").fetchall()
+    for row in rows:
+        metadata = json.loads(row["metadata_json"])
+        asset = metadata.get("asset")
+        if not isinstance(asset, dict):
+            continue
+        if isinstance(asset.get("embedding_mime_type"), str):
+            continue
+        mime = asset.get("mime_type")
+        if not isinstance(mime, str) or not mime:
+            continue
+        asset["embedding_mime_type"] = mime
+        _update_metadata_row(conn, row["id"], metadata)
+
+
 def reset() -> None:
     with _connect() as conn:
         conn.execute("DROP TABLE IF EXISTS media_items")
@@ -423,6 +444,7 @@ def _row_to_summary_item(row: sqlite3.Row) -> dict:
     asset: dict[str, Any] = {
         "filename": row["filename"],
         "mime_type": row["mime_type"],
+        "embedding_mime_type": row["embedding_mime_type"],
         "media_type": row["media_type"],
         "paths": asset_paths,
     }
