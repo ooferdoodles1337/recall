@@ -103,6 +103,30 @@ def test_refresh_catalog_dry_run_does_not_write(refresh_catalog_db, monkeypatch)
     assert item["metadata"]["raw"]["exif"]["EXIF_Make"] == "Old"
 
 
+def test_refresh_catalog_backfills_embedding_mime_type(refresh_catalog_db):
+    catalog = refresh_catalog_db["catalog"]
+    data_dir = refresh_catalog_db["data_dir"]
+    webp_path = data_dir / "media" / "photo.webp"
+    Image.new("RGB", (16, 16), color=(0, 255, 0)).save(webp_path, format="WEBP")
+    catalog.upsert_item(
+        "item-1",
+        "media/photo.webp",
+        "photo.webp",
+        "image/webp",
+        "image",
+        extra_metadata={"content_hash": "hash-1"},
+    )
+
+    from services.catalog.refresh import refresh_catalog
+
+    stats = refresh_catalog()
+
+    item = catalog.get_item("item-1")
+    assert stats["updated"] == 1
+    assert item["metadata"]["asset"]["mime_type"] == "image/webp"
+    assert item["metadata"]["asset"]["embedding_mime_type"] == "image/jpeg"
+
+
 def test_refresh_catalog_reverse_geocodes_existing_gps_without_extraction(refresh_catalog_db, monkeypatch):
     catalog = refresh_catalog_db["catalog"]
     catalog.upsert_item(

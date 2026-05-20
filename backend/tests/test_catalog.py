@@ -125,6 +125,33 @@ def test_update_metadata_merges_patch(catalog_db):
     assert "raw" not in summary["metadata"]
 
 
+def test_promoted_safety_score_uses_nsfw_label(catalog_db):
+    catalog_db.upsert_item(
+        "item-1",
+        "media/photo.jpg",
+        "photo.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-1"},
+    )
+
+    catalog_db.update_metadata("item-1", {
+        "safety": {
+            "state": "safe",
+            "score": 0.85,
+            "labels": {"NSFW": 0.15, "SFW": 0.85},
+            "model": "test-model",
+        },
+    })
+
+    with sqlite3.connect(catalog_db._db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT safety_score FROM media_items WHERE id = ?", ("item-1",)).fetchone()
+
+    assert row["safety_score"] == 0.15
+    assert catalog_db.get_item_summary("item-1")["metadata"]["safety"]["score"] == 0.15
+
+
 def test_replace_metadata_rewrites_full_document(catalog_db):
     catalog_db.upsert_item(
         "item-1",

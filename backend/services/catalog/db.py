@@ -128,7 +128,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_has_annotation ON media_items(has_annotation)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_media_items_safety_state ON media_items(safety_state)")
     _migrate_embedding_mime_types(conn)
-    if added_promoted_columns or _needs_promoted_backfill(conn):
+    if added_promoted_columns or _needs_promoted_backfill(conn) or _needs_safety_score_backfill(conn):
         _backfill_promoted_columns(conn)
 
 
@@ -156,6 +156,22 @@ def _needs_promoted_backfill(conn: sqlite3.Connection) -> bool:
         """
     ).fetchone()
     return row is not None
+
+
+def _needs_safety_score_backfill(conn: sqlite3.Connection) -> bool:
+    rows = conn.execute(
+        """
+        SELECT metadata_json, safety_score
+        FROM media_items
+        WHERE metadata_json LIKE '%"labels"%'
+        """
+    ).fetchall()
+    for row in rows:
+        metadata = json.loads(row["metadata_json"])
+        expected = _safety_score(_safety_metadata(metadata))
+        if expected is not None and row["safety_score"] != expected:
+            return True
+    return False
 
 
 def _metadata_json(metadata: dict) -> str:
@@ -205,6 +221,15 @@ def _annotation_metadata(metadata: dict) -> dict:
 def _safety_metadata(metadata: dict) -> dict:
     safety = metadata.get("safety")
     return safety if isinstance(safety, dict) else {}
+
+
+def _safety_score(safety: dict) -> float | None:
+    labels = safety.get("labels")
+    if isinstance(labels, dict):
+        nsfw_score = _as_float(labels.get("NSFW"))
+        if nsfw_score is not None:
+            return nsfw_score
+    return _as_float(safety.get("score"))
 
 
 def _location_metadata(metadata: dict) -> dict:
@@ -258,7 +283,7 @@ def _promoted_values(metadata: dict) -> dict[str, Any]:
         "folders_json": json.dumps(_organization_folders(organization), sort_keys=True),
         "has_annotation": 1 if description else 0,
         "safety_state": _dict_str(safety, "state"),
-        "safety_score": _as_float(safety.get("score")),
+        "safety_score": _safety_score(safety),
     }
 
 

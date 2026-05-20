@@ -13,7 +13,7 @@ import config
 from services.catalog import db as catalog
 from services.catalog import extractor as metadata_svc
 from services.catalog import schema as metadata_schema
-from services.pipeline.media import classify_extension, generate_thumbnail
+from services.pipeline.media import classify_extension, generate_thumbnail, is_animated
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -25,6 +25,27 @@ def _guess_mime_type(path: Path, media_type: str) -> str:
     if guessed:
         return guessed
     return "image/jpeg" if media_type == "image" else "video/mp4"
+
+
+def _embedding_mime_type(path: Path, media_type: str, *, file_exists: bool) -> str | None:
+    ext = path.suffix.lower()
+    if media_type == "video":
+        return "video/mp4"
+    if media_type != "image":
+        return None
+    if ext in {".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp"}:
+        return "image/jpeg"
+    if ext in {".png", ".apng"}:
+        if file_exists and is_animated(str(path)):
+            return "video/mp4"
+        return "image/png"
+    if ext == ".gif":
+        if not file_exists:
+            return None
+        return "video/mp4" if is_animated(str(path)) else "image/jpeg"
+    if file_exists:
+        return "image/jpeg"
+    return None
 
 
 def _refresh_thumbnail(file_id: str, path: Path, media_type: str) -> str:
@@ -146,6 +167,7 @@ def refresh_catalog(
 
         filename = metadata_schema.filename(existing) or abs_path.name
         mime_type = metadata_schema.mime_type(existing) or _guess_mime_type(abs_path, media_type)
+        embedding_mime_type = _embedding_mime_type(abs_path, media_type, file_exists=file_exists)
         thumbnail_path = metadata_schema.thumbnail_path(existing)
 
         try:
@@ -161,6 +183,7 @@ def refresh_catalog(
                 existing_metadata=existing,
                 extracted_metadata=extracted,
                 thumbnail_path=thumbnail_path,
+                embedding_mime_type=embedding_mime_type,
             )
             if reverse_geocode:
                 rebuilt, geocoded = _with_reverse_geocode(rebuilt)

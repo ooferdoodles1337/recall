@@ -290,6 +290,7 @@ def rebuild_metadata(
     extracted_metadata: dict[str, Any] | None = None,
     content_hash: str | None = None,
     thumbnail_path: str | None = None,
+    embedding_mime_type: str | None = None,
 ) -> dict[str, Any]:
     """Rebuild structured metadata without requiring a new embedding or annotation."""
     existing = copy.deepcopy(existing_metadata or {})
@@ -302,6 +303,8 @@ def rebuild_metadata(
         extra["content_hash"] = content_hash
     if thumbnail_path:
         extra["thumbnail_path"] = thumbnail_path
+    if embedding_mime_type:
+        extra["embedding_mime_type"] = embedding_mime_type
 
     rebuilt = build_metadata(
         path=path,
