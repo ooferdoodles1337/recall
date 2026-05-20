@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import logging
 import mimetypes
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -33,6 +35,76 @@ def _refresh_thumbnail(file_id: str, path: Path, media_type: str) -> str:
     return str(thumbnail_abs.relative_to(config.DATA_DIR))
 
 
+def _as_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _existing_coordinates(metadata: dict) -> tuple[float | None, float | None]:
+    capture = metadata.get("capture")
+    location = capture.get("location") if isinstance(capture, dict) else None
+    if isinstance(location, dict):
+        lat = _as_float(location.get("latitude"))
+        lon = _as_float(location.get("longitude"))
+        if lat is not None and lon is not None:
+            return lat, lon
+
+    raw = metadata.get("raw")
+    exif = raw.get("exif") if isinstance(raw, dict) else None
+    if not isinstance(exif, dict):
+        return None, None
+    return _as_float(exif.get("Composite_GPSLatitude")), _as_float(exif.get("Composite_GPSLongitude"))
+
+
+def _with_reverse_geocode(metadata: dict) -> tuple[dict, bool]:
+    lat, lon = _existing_coordinates(metadata)
+    if lat is None or lon is None:
+        return metadata, False
+
+    geo = metadata_svc._reverse_geocode(lat, lon)
+    if not geo:
+        return metadata, False
+
+    updated = copy.deepcopy(metadata)
+    capture = updated.setdefault("capture", {})
+    if not isinstance(capture, dict):
+        capture = {}
+        updated["capture"] = capture
+    location = capture.setdefault("location", {})
+    if not isinstance(location, dict):
+        location = {}
+        capture["location"] = location
+
+    changed = False
+    for source_key, target_key in (
+        ("geo_city", "city"),
+        ("geo_state", "state"),
+        ("geo_country", "country"),
+        ("geo_country_code", "country_code"),
+    ):
+        value = geo.get(source_key)
+        if isinstance(value, str) and value and location.get(target_key) != value:
+            location[target_key] = value
+            changed = True
+
+    if location.get("latitude") != lat:
+        location["latitude"] = lat
+        changed = True
+    if location.get("longitude") != lon:
+        location["longitude"] = lon
+        changed = True
+
+    return updated, changed
+
+
 def refresh_catalog(
     *,
     catalog_db_path: str | None = None,
@@ -47,7 +119,7 @@ def refresh_catalog(
     """
     catalog.configure(catalog_db_path)
     items = catalog.get_all_items_with_metadata()
-    stats = {"total": len(items), "updated": 0, "unchanged": 0, "missing_files": 0, "failed": 0}
+    stats = {"total": len(items), "updated": 0, "geocoded": 0, "unchanged": 0, "missing_files": 0, "failed": 0}
 
     for item in items:
         item_id = item["id"]
@@ -80,11 +152,7 @@ def refresh_catalog(
             if regenerate_thumbnails and file_exists:
                 thumbnail_path = _refresh_thumbnail(item_id, abs_path, media_type)
 
-            extracted = (
-                metadata_svc.extract(str(abs_path), reverse_geocode=reverse_geocode)
-                if extract and file_exists
-                else {}
-            )
+            extracted = metadata_svc.extract(str(abs_path), reverse_geocode=reverse_geocode) if extract and file_exists else None
             rebuilt = metadata_schema.rebuild_metadata(
                 path=rel_path,
                 filename=filename,
@@ -94,6 +162,10 @@ def refresh_catalog(
                 extracted_metadata=extracted,
                 thumbnail_path=thumbnail_path,
             )
+            if reverse_geocode:
+                rebuilt, geocoded = _with_reverse_geocode(rebuilt)
+                if geocoded:
+                    stats["geocoded"] += 1
 
             if rebuilt == existing:
                 stats["unchanged"] += 1
@@ -111,9 +183,10 @@ def refresh_catalog(
 
     action = "would refresh" if dry_run else "refreshed"
     log.info(
-        "catalog refresh complete: %s=%d unchanged=%d missing_files=%d failed=%d total=%d",
+        "catalog refresh complete: %s=%d geocoded=%d unchanged=%d missing_files=%d failed=%d total=%d",
         action,
         stats["updated"],
+        stats["geocoded"],
         stats["unchanged"],
         stats["missing_files"],
         stats["failed"],
@@ -137,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reverse-geocode",
         action="store_true",
-        help="Resolve GPS coordinates to place names during --extract (uses Nominatim/OpenStreetMap)",
+        help="Resolve stored GPS coordinates to place names while preserving media, thumbnails, embeddings, and annotations",
     )
     parser.add_argument(
         "--regenerate-thumbnails",

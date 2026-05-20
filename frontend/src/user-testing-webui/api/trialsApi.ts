@@ -21,6 +21,6 @@ export function resolvedMediaUrl(item: RecallMediaItem): string | null {
 }
 
 export function isVideo(item: RecallMediaItem): boolean {
-  const mime = (item.metadata.mime_type as string | undefined) ?? "";
+  const mime = item.metadata.asset?.mime_type ?? "";
   return mime.startsWith("video/");
 }

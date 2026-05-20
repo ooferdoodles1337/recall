@@ -1,3 +1,5 @@
+import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -96,6 +98,8 @@ def test_list_library_items_filters_and_sorts(catalog_db):
     items = catalog_db.list_library_items(media_type="image", order="desc")
 
     assert [item["id"] for item in items] == ["newer", "older"]
+    assert "raw" not in items[0]["metadata"]
+    assert "system" not in items[0]["metadata"]
 
 
 def test_update_metadata_merges_patch(catalog_db):
@@ -114,6 +118,11 @@ def test_update_metadata_merges_patch(catalog_db):
     assert item["metadata"]["asset"]["filename"] == "photo.jpg"
     assert item["metadata"]["search"]["description"] == "a photo"
     assert item["metadata"]["search"]["phrases"] == ["new"]
+
+    summary = catalog_db.get_item_summary("item-1")
+    assert summary["metadata"]["search"]["description"] == "a photo"
+    assert summary["metadata"]["search"]["phrases"] == ["new"]
+    assert "raw" not in summary["metadata"]
 
 
 def test_replace_metadata_rewrites_full_document(catalog_db):
@@ -143,6 +152,105 @@ def test_replace_metadata_rewrites_full_document(catalog_db):
     item = catalog_db.get_item("item-1")
     assert "EXIF_Make" not in item["metadata"]["raw"]["exif"]
     assert item["metadata"]["raw"]["exif"]["EXIF_Model"] == "New"
+
+
+def test_configure_migrates_legacy_catalog_columns(tmp_path):
+    import services.catalog.db as catalog
+    from services.catalog import schema as metadata_schema
+
+    db_path = tmp_path / "catalog.sqlite"
+    metadata = metadata_schema.build_metadata(
+        path="media/photo.jpg",
+        filename="photo.jpg",
+        mime_type="image/jpeg",
+        media_type="image",
+        extra_metadata={
+            "content_hash": "hash-1",
+            "thumbnail_path": "thumbnails/item-1.webp",
+            "taken_sort": "2024-03-18T10:00:00",
+            "taken_date": "2024-03-18",
+            "taken_year_month": "2024-03",
+            "geo_city": "Paris",
+            "geo_country": "France",
+            "Composite_GPSLatitude": 48.8566,
+            "Composite_GPSLongitude": 2.3522,
+            "search_terms": ["eiffel tower"],
+            "EXIF_Make": "Nikon",
+        },
+    )
+    metadata = metadata_schema.merge_metadata(
+        metadata,
+        {
+            "search": {
+                "description": "a Paris photo",
+                "annotation": {"provider": "gemini", "model": "test-model", "updated_at": "2026-05-20T00:00:00Z"},
+            },
+            "organization": {"favorite": True, "folders": ["travel"]},
+            "safety": {"state": "safe", "score": 0.99},
+        },
+    )
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE media_items (
+                id TEXT PRIMARY KEY,
+                media_type TEXT NOT NULL,
+                content_hash TEXT NOT NULL UNIQUE,
+                taken_sort TEXT,
+                taken_year_month TEXT,
+                metadata_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute(
+            """
+            INSERT INTO media_items (id, media_type, content_hash, taken_sort, taken_year_month, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "item-1",
+                "image",
+                "hash-1",
+                "2024-03-18T10:00:00",
+                "2024-03",
+                json.dumps(metadata, sort_keys=True),
+            ),
+        )
+
+    catalog.configure(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(media_items)").fetchall()}
+        row = conn.execute(
+            """
+            SELECT filename, asset_path, thumbnail_path, search_description, has_annotation,
+                   geo_city, geo_country, favorite, folders_json, safety_state, safety_score
+            FROM media_items WHERE id = ?
+            """,
+            ("item-1",),
+        ).fetchone()
+
+    assert {"filename", "asset_path", "search_description", "geo_city", "favorite"} <= columns
+    assert row["filename"] == "photo.jpg"
+    assert row["asset_path"] == "media/photo.jpg"
+    assert row["thumbnail_path"] == "thumbnails/item-1.webp"
+    assert row["search_description"] == "a Paris photo"
+    assert row["has_annotation"] == 1
+    assert row["geo_city"] == "Paris"
+    assert row["geo_country"] == "France"
+    assert row["favorite"] == 1
+    assert json.loads(row["folders_json"]) == ["travel"]
+    assert row["safety_state"] == "safe"
+    assert row["safety_score"] == 0.99
+
+    full = catalog.get_item("item-1")
+    summary = catalog.get_item_summary("item-1")
+    assert full["metadata"]["raw"]["exif"]["EXIF_Make"] == "Nikon"
+    assert "raw" not in summary["metadata"]
+    assert summary["metadata"]["capture"]["location"]["city"] == "Paris"
+    assert summary["metadata"]["organization"]["favorite"] is True
 
 
 def test_reset_deletes_catalog_data(catalog_db):

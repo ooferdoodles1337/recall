@@ -68,7 +68,7 @@ def test_get_items_batch_returns_found_and_missing(monkeypatch):
     from routes.catalog import BatchRequest, get_items_batch
 
     store = {"a": _item("a"), "b": _item("b")}
-    monkeypatch.setattr("services.catalog.db.get_item", lambda id: store.get(id))
+    monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: store.get(id))
 
     body = get_items_batch(BatchRequest(ids=["a", "b", "c"]))
 

@@ -101,3 +101,45 @@ def test_refresh_catalog_dry_run_does_not_write(refresh_catalog_db, monkeypatch)
     item = catalog.get_item("item-1")
     assert stats["updated"] == 1
     assert item["metadata"]["raw"]["exif"]["EXIF_Make"] == "Old"
+
+
+def test_refresh_catalog_reverse_geocodes_existing_gps_without_extraction(refresh_catalog_db, monkeypatch):
+    catalog = refresh_catalog_db["catalog"]
+    catalog.upsert_item(
+        "item-1",
+        "media/photo.jpg",
+        "photo.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={
+            "content_hash": "hash-1",
+            "EXIF_Make": "Old",
+            "Composite_GPSLatitude": 48.8566,
+            "Composite_GPSLongitude": 2.3522,
+        },
+    )
+
+    def fail_extract(*args, **kwargs):
+        raise AssertionError("ExifTool extraction should not run")
+
+    monkeypatch.setattr("services.catalog.refresh.metadata_svc.extract", fail_extract)
+    monkeypatch.setattr(
+        "services.catalog.refresh.metadata_svc._reverse_geocode",
+        lambda lat, lon: {
+            "geo_city": "Paris",
+            "geo_country": "France",
+            "geo_country_code": "FR",
+        },
+    )
+
+    from services.catalog.refresh import refresh_catalog
+
+    stats = refresh_catalog(reverse_geocode=True)
+
+    full = catalog.get_item("item-1")
+    summary = catalog.get_item_summary("item-1")
+    assert stats["updated"] == 1
+    assert stats["geocoded"] == 1
+    assert full["metadata"]["raw"]["exif"]["EXIF_Make"] == "Old"
+    assert full["metadata"]["capture"]["location"]["city"] == "Paris"
+    assert summary["metadata"]["capture"]["location"]["country_code"] == "FR"

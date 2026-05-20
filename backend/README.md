@@ -80,6 +80,7 @@ To rebuild only the SQLite metadata shape after changing `services/catalog/schem
 ```bash
 uv run python -m services.catalog.refresh
 uv run python -m services.catalog.refresh --dry-run
+uv run python -m services.catalog.refresh --reverse-geocode        # fill place names from stored GPS metadata
 uv run python -m services.catalog.refresh --extract                  # also re-run local ExifTool extraction
 uv run python -m services.catalog.refresh --regenerate-thumbnails    # also regenerate local WebP thumbnails
 ```
@@ -93,7 +94,7 @@ Options:
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
 - `--reset` — wipe the ChromaDB store, SQLite catalog, and thumbnails before indexing
-- `--reverse-geocode` — call Nominatim for GPS reverse geocoding during metadata extraction. This is off by default for bulk runs to avoid public-service rate limits; GPS coordinates are still retained from EXIF.
+- `--reverse-geocode` — resolve GPS coordinates to place names and promote them into catalog columns. `services.catalog.refresh --reverse-geocode` uses stored GPS metadata and does not regenerate media, thumbnails, embeddings, or annotations.
 - `--embedding-batch-max-jsonl-mb <number>` — target maximum size for each Gemini embedding request JSONL file (default: `512` MiB). The indexer automatically creates multiple batch request files when needed.
 
 `--detect-nsfw` uses `Marqo/nsfw-image-detection-384` through TIMM. The model weights are downloaded from Hugging Face on first use and cached locally by the underlying libraries. This pass runs entirely outside the API server path and writes results into `metadata.safety`.
@@ -183,12 +184,7 @@ Semantic (vector) search over the indexed media collection using a natural-langu
           "phrases": ["sunset beach", "golden hour", "ocean waves"]
         },
         "safety": { "state": "safe", "score": 0.99 },
-        "organization": { "favorite": false, "folders": [] },
-        "raw": { "exif": {} },
-        "system": {
-          "schema_version": 2,
-          "content_hash": "e3b0c44298fc1c149afb..."
-        }
+        "organization": { "favorite": false, "folders": [] }
       }
     }
   ]
@@ -204,8 +200,7 @@ Metadata is grouped by purpose:
 - `search` — optional generated description and internal search phrases. These are not user-facing tags.
 - `safety` — UI-ready state (`safe`, `sensitive`, `nsfw`, or `unknown`) plus optional model details.
 - `organization` — user-level state such as `favorite` and `folders`.
-- `raw.exif` — flattened EXIF/tool metadata retained for debugging and future migrations.
-- `system` — schema version, content hash, indexing provenance, and embedding model metadata.
+Search, list, and batch endpoints return compact summary metadata from promoted SQLite columns and omit bulky `raw.exif` and `system` provenance. Use `GET /catalog/items/{id}` when a client needs the full stored metadata document.
 
 ---
 
@@ -331,7 +326,7 @@ Returns 415 for unsupported file types, 413 if the file exceeds 20 MB.
 
 ### `GET /catalog/items`
 
-Returns the complete metadata catalog. Does not serve file bytes — returns IDs, metadata, and links so API consumers can group by `metadata.capture.date` and fetch thumbnails by URL when needed.
+Returns the compact metadata catalog from promoted SQLite columns. Does not serve file bytes — returns IDs, summary metadata, and links so API consumers can group by `metadata.capture.date` and fetch thumbnails by URL when needed. Bulky `raw.exif` and `system` fields are intentionally omitted here.
 
 **Query params**
 
@@ -380,7 +375,7 @@ For same-date browsing, use the selected item's `metadata.capture.date` and filt
 
 ### `GET /catalog/items/{id}`
 
-Returns stored metadata for a single item without serving the file.
+Returns the full stored metadata document for a single item without serving the file. This endpoint includes `raw.exif` and `system` provenance.
 
 **Response**
 
@@ -420,6 +415,8 @@ Returns 404 if the UUID is not in the catalog.
 ### `POST /catalog/items/batch`
 
 Fetch metadata for multiple items in one request. Useful for hydrating search results or pre-loading a set of IDs.
+
+This returns the same compact summary shape as `GET /catalog/items`; fetch `GET /catalog/items/{id}` for full raw metadata.
 
 **Request body**
 

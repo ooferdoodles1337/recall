@@ -4,8 +4,6 @@ import logging
 from rapidfuzz import fuzz, process
 
 from services.catalog import db as catalog
-from services.catalog import schema as metadata_schema
-
 log = logging.getLogger(__name__)
 
 _term_list: list[tuple[str, str]] = []
@@ -19,20 +17,17 @@ def build() -> None:
     _term_list = []
     _term_to_ids = {}
 
-    items = catalog.get_all_items_with_metadata()
-    for item in items:
-        meta = item["metadata"] or {}
-        terms = metadata_schema.search_phrases(meta)
+    for item_id, terms in catalog.get_all_search_terms():
         if not terms:
             continue
         for term in terms:
             normalized = term.strip().lower()
             if not normalized:
                 continue
-            _term_list.append((normalized, item["id"]))
+            _term_list.append((normalized, item_id))
             if normalized not in _term_to_ids:
                 _term_to_ids[normalized] = set()
-            _term_to_ids[normalized].add(item["id"])
+            _term_to_ids[normalized].add(item_id)
 
     _term_list.sort(key=lambda x: x[0])
     log.info(

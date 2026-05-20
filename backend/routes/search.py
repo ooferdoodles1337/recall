@@ -36,7 +36,7 @@ def search_semantic(q: str = Query(..., description="Search query text"), n: int
                 "links": item.get("links", {}),
             }
             for doc_id, dist in zip(ids, distances)
-            if (item := catalog.get_item(doc_id)) is not None
+            if (item := catalog.get_item_summary(doc_id)) is not None
         ],
     }
 
@@ -59,7 +59,7 @@ def search_text(
     if not matched_ids:
         return {"query": q, "results": []}
 
-    items = [catalog.get_item(item_id) for item_id in matched_ids]
+    items = [catalog.get_item_summary(item_id) for item_id in matched_ids]
     items = [item for item in items if item is not None]
     items = items[:n]
 
@@ -90,7 +90,7 @@ def search_similar_by_id(id: str, n: int = Query(5, ge=1)):
         "results": [
             {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
             for doc_id, dist in zip(ids, distances)
-            if doc_id != id and (item := catalog.get_item(doc_id)) is not None
+            if doc_id != id and (item := catalog.get_item_summary(doc_id)) is not None
         ][:n],
     }
 
@@ -126,6 +126,6 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
         "results": [
             {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
             for doc_id, dist in zip(ids, distances)
-            if (item := catalog.get_item(doc_id)) is not None
+            if (item := catalog.get_item_summary(doc_id)) is not None
         ],
     }

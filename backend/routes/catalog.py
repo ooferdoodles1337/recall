@@ -31,7 +31,7 @@ class BatchRequest(BaseModel):
 
 @router.post("/items/batch")
 def get_items_batch(body: BatchRequest):
-    results = [catalog.get_item(item_id) for item_id in body.ids]
+    results = [catalog.get_item_summary(item_id) for item_id in body.ids]
     return {
         "results": [item for item in results if item is not None],
         "missing": [id for id, item in zip(body.ids, results) if item is None],
