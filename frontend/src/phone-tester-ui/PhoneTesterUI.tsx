@@ -1,9 +1,9 @@
-import { SearchViewport } from "./components/SearchViewport";
+import { PhoneViewportFrame } from "../user-testing-webui/components/PhoneViewportFrame";
 
 export function PhoneTesterUI() {
   return (
     <main className="app-shell">
-      <SearchViewport />
+      <PhoneViewportFrame />
     </main>
   );
 }

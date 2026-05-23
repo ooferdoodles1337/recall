@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { PhoneTesterUI } from "./phone-tester-ui/PhoneTesterUI";
 import { UserTestingWebUI } from "./user-testing-webui/UserTestingWebUI";
 
@@ -10,6 +11,19 @@ function getCurrentRoute(pathname: string) {
 }
 
 export function App() {
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const skip = params.get("skipViewport") === "1" || params.get("skipViewport") === "true";
+      if (skip) {
+        document.documentElement.classList.add("skip-viewport-warning");
+      } else {
+        document.documentElement.classList.remove("skip-viewport-warning");
+      }
+    } catch (e) {
+      // ignore in environments without window
+    }
+  }, []);
   const route = getCurrentRoute(window.location.pathname);
   const screen = route === "phone" ? <PhoneTesterUI /> : <UserTestingWebUI />;
 

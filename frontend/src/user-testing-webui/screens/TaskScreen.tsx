@@ -70,7 +70,15 @@ export function TaskScreen({ onComplete }: TaskScreenProps) {
       </div>
       <div className="task-divider" aria-hidden="true" />
       <div className="task-phone-col">
-        <PhoneViewportFrame />
+        <PhoneViewportFrame
+          currentTarget={targets[index]}
+          onSelectCandidate={(id: string) => {
+            // If the participant selected the correct item, advance the trial.
+            if (id === targets[index].id) {
+              advance();
+            }
+          }}
+        />
       </div>
     </div>
   );
