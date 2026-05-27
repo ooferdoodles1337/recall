@@ -7,7 +7,6 @@ import config
 from services.catalog import db as catalog
 from services.providers import gemini
 from services.search import chroma, text_index
-from services.pipeline import media
 
 router = APIRouter()
 
@@ -108,7 +107,9 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
-        processed = media.process_image(tmp_path)
+        from services.pipeline.media import process_image
+
+        processed = process_image(tmp_path)
     finally:
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)

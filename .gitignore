@@ -1,9 +1,13 @@
 .env
 data/
+backend/data/
+*.7z
+*.zip
 __pycache__/
 *.pyc
 .venv/
 backend/.venv/
+backend/.venv313/
 .claude/
 .vscode/
 docs/superpowers/

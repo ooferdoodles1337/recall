@@ -96,3 +96,15 @@ def test_get_facets_delegates_to_catalog(monkeypatch):
 
     assert result["media_type"]["image"] == 10
     assert result["taken_year_month"]["2024-03"] == 5
+
+
+def test_trials_returns_random_target_summaries(monkeypatch):
+    from main import trials
+
+    monkeypatch.setattr("services.catalog.db.get_random_ids", lambda n: ["a", "b"])
+    monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: _item(id))
+
+    result = trials(n=2)
+
+    assert result["n"] == 2
+    assert [item["id"] for item in result["targets"]] == ["a", "b"]
