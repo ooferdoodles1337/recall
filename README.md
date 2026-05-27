@@ -4,13 +4,20 @@ Personal-media semantic-search app. A pre-indexed media catalog is distributed t
 
 ## Prerequisites
 
-| Dependency | Ubuntu / WSL | macOS |
-|------------|-------------|-------|
-| **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | Same |
-| **Python 3.14** | `uv python install 3.14` | Same |
-| **Node.js + npm** | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` |
-| **ExifTool** (maintainers only) | `sudo apt install libimage-exiftool-perl` | `brew install exiftool` |
-| **ffmpeg** (maintainers only) | `sudo apt install ffmpeg` | `brew install ffmpeg` |
+Install the following before running Recall.
+
+| Dependency | Required for | Install instructions |
+|------------|--------------|----------------------|
+| **uv** | Backend dependency management and Python runtime setup | [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) |
+| **Python 3.14** | Backend runtime | [Python downloads](https://www.python.org/downloads/) or [install Python with uv](https://docs.astral.sh/uv/guides/install-python/) |
+| **Node.js** | Frontend development server | [Node.js downloads](https://nodejs.org/en/download)
+
+Maintainers also need the following tools for indexing media.
+
+| Dependency | Required for | Install instructions |
+|------------|--------------|----------------------|
+| **ExifTool** | Metadata extraction during indexing | [ExifTool installation guide](https://exiftool.org/install.html) |
+| **FFmpeg** | Video processing and thumbnail generation during indexing | [FFmpeg download page](https://ffmpeg.org/download.html) |
 
 ## Quick start
 
