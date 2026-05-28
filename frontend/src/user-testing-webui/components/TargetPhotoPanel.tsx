@@ -1,13 +1,10 @@
 import { useState } from "react";
-import * as Progress from "@radix-ui/react-progress";
 import type { RecallMediaItem } from "../../shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "../api/trialsApi";
 
 interface TargetPhotoPanelProps {
   item: RecallMediaItem;
-  taskNumber: number;
-  totalTasks: number;
-  onNext: () => void;
+  trialNumber: number;
 }
 
 function TargetMedia({ item }: { item: RecallMediaItem }) {
@@ -27,7 +24,7 @@ function TargetMedia({ item }: { item: RecallMediaItem }) {
     );
   }
 
-  if (isVideo(item) && mediaUrl) {
+  if (isVideo(item)) {
     return (
       <video
         key={item.id}
@@ -42,19 +39,6 @@ function TargetMedia({ item }: { item: RecallMediaItem }) {
     );
   }
 
-  if (!mediaUrl) {
-    return (
-      <div className="target-photo-placeholder">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-        <span>No media</span>
-      </div>
-    );
-  }
-
   return (
     <img
       key={item.id}
@@ -66,42 +50,21 @@ function TargetMedia({ item }: { item: RecallMediaItem }) {
   );
 }
 
-export function TargetPhotoPanel({ item, taskNumber, totalTasks, onNext }: TargetPhotoPanelProps) {
-  const isLastTask = taskNumber === totalTasks;
-  const progressPercent = Math.round((taskNumber / totalTasks) * 100);
-
+export function TargetPhotoPanel({ item, trialNumber }: TargetPhotoPanelProps) {
   return (
     <div className="target-panel">
       <div className="target-panel-header">
         <div className="target-header-top">
-          <span className="target-task-counter">Task {taskNumber} of {totalTasks}</span>
+          <span className="target-trial-number">Trial {trialNumber}</span>
         </div>
         <h2 className="target-panel-heading">Find this photo</h2>
         <p className="target-panel-hint">
-          Study the image, then use the phone on the right to search for it.
+          Study the image, then use the phone on the right to search for it. Confirm when found.
         </p>
       </div>
 
-      <Progress.Root
-        className="target-progress"
-        value={taskNumber}
-        max={totalTasks}
-        getValueLabel={(value, max) => `Task ${value} of ${max}`}
-      >
-        <Progress.Indicator
-          className="target-progress-bar"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </Progress.Root>
-
       <div className="target-photo-frame" aria-label="Target media">
         <TargetMedia key={item.id} item={item} />
-      </div>
-
-      <div className="target-panel-footer">
-        <button className="btn-primary" onClick={onNext}>
-          {isLastTask ? "Finish Session →" : "Next Task →"}
-        </button>
       </div>
     </div>
   );
