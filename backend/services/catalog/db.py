@@ -596,6 +596,7 @@ def get_all_search_terms() -> list[tuple[str, list[str]]]:
 def list_library_items(
     media_type: str | None = None,
     order: str = "desc",
+    limit: int | None = None,
 ) -> list[dict]:
     columns = ", ".join(_SUMMARY_COLUMNS)
     query = f"SELECT {columns} FROM media_items"
@@ -606,11 +607,32 @@ def list_library_items(
     direction = "DESC" if order == "desc" else "ASC"
     id_direction = "DESC" if order == "desc" else "ASC"
     query += f" ORDER BY taken_sort IS NULL, taken_sort {direction}, id {id_direction}"
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
 
     with _connect() as conn:
         rows = conn.execute(query, params).fetchall()
 
     return [_row_to_summary_item(row) for row in rows]
+
+
+def delete_item(file_id: str) -> None:
+    """Remove a single item from the catalog by ID."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM media_items WHERE id = ?", (file_id,))
+
+
+def get_all_asset_records() -> list[tuple[str, str, str | None, str | None]]:
+    """Return (id, media_type, asset_path, thumbnail_path) for every item using promoted columns."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT id, media_type, asset_path, thumbnail_path FROM media_items"
+        ).fetchall()
+    return [
+        (row["id"], row["media_type"] or "image", row["asset_path"], row["thumbnail_path"])
+        for row in rows
+    ]
 
 
 def get_random_ids(n: int) -> list[str]:

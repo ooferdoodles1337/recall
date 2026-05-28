@@ -65,10 +65,10 @@ uv run pytest -v
 ## Indexing media (maintainers only)
 
 ```bash
-uv run python -m services.indexer            # index everything
-uv run python -m services.indexer --force    # re-index existing files
-uv run python -m services.indexer --annotate # generate descriptions
-uv run python -m services.indexer --reset    # wipe DB + thumbs, re-index
+uv run python -m services.pipeline.indexer            # index everything
+uv run python -m services.pipeline.indexer --force    # re-index existing files
+uv run python -m services.pipeline.indexer --annotate # generate descriptions
+uv run python -m services.pipeline.indexer --reset    # wipe DB + thumbs, re-index
 ```
 
 See `backend/README.md` for the full API reference and indexing documentation.

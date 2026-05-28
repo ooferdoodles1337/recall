@@ -42,6 +42,11 @@ def upsert_content(
     )
 
 
+def delete_content(file_id: str) -> None:
+    """Remove a single item's embedding from the collection."""
+    _collection().delete(ids=[file_id])
+
+
 def get_embedding(file_id: str) -> list[float] | None:
     result = _collection().get(ids=[file_id], include=["embeddings"])
     if not result["ids"]:

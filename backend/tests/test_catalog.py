@@ -102,6 +102,10 @@ def test_list_library_items_filters_and_sorts(catalog_db):
     assert "raw" not in items[0]["metadata"]
     assert "system" not in items[0]["metadata"]
 
+    limited_items = catalog_db.list_library_items(media_type="image", order="desc", limit=1)
+
+    assert [item["id"] for item in limited_items] == ["newer"]
+
 
 def test_update_metadata_merges_patch(catalog_db):
     catalog_db.upsert_item(

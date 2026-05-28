@@ -10,7 +10,7 @@ from typing import Optional
 
 import imageio_ffmpeg
 import imageio.v3 as iio
-from PIL import Image
+from PIL import Image, ImageOps
 
 import config
 
@@ -146,7 +146,7 @@ def generate_thumbnail(path: str, media_type: str) -> bytes:
         img = Image.fromarray(frame).convert("RGB")
     else:
         with Image.open(path) as raw:
-            img = raw.convert("RGB")
+            img = ImageOps.exif_transpose(raw).convert("RGB")
     img.thumbnail((320, 320), Image.Resampling.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="WEBP")
