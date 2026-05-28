@@ -1,13 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RecallMediaItem, RecallSearchResult } from "../../shared/types/recall";
+import {
+  CalendarIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ClockIcon,
+  HistoryIcon,
+  ImageOffIcon,
+  InfoIcon,
+  PlayIcon,
+  SearchIcon,
+  SendIcon,
+  SparklesIcon,
+  XIcon,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { RecallMediaItem, RecallSearchResult } from "@/shared/types/recall";
+import { isVideo, resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
 import {
   listRecentItems,
   searchSemantic,
   searchSimilarById,
   searchText,
   suggestSearches,
-} from "../../phone-tester-ui/api/searchApi";
-import { isVideo, resolvedMediaUrl, resolvedThumbnailUrl } from "../api/trialsApi";
+} from "../api/searchApi";
 
 interface PhoneViewportFrameProps {
   currentTarget?: RecallMediaItem;
@@ -458,29 +486,23 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
             />
           ))}
           {mode === "home" ? (
-            <div className="phone-startpage">
-              <div className="phone-startpage-brand">
-                <div className="phone-startpage-logo" aria-hidden>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-                    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <h1 className="phone-startpage-title">Recall</h1>
-              </div>
+	            <div className="phone-startpage">
+	              <div className="phone-startpage-brand">
+	                <div className="phone-startpage-logo" aria-hidden>
+	                  <SearchIcon />
+	                </div>
+	                <h1 className="phone-startpage-title">Recall</h1>
+	              </div>
 
-              <div className="phone-startpage-search">
-                <div className="search-bar search-bar--semantic search-bar--hero">
-                  <span className="search-icon" aria-hidden>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                  <input
-                    aria-label="Search your media"
-                    value={query}
-                    placeholder="Describe a photo, video, or meme…"
+	              <div className="phone-startpage-search">
+	                <div className="search-bar search-bar--semantic search-bar--hero">
+	                  <span className="search-icon" aria-hidden>
+	                    <SearchIcon />
+	                  </span>
+	                  <Input
+	                    aria-label="Search your media"
+	                    value={query}
+	                    placeholder="Describe a photo, video, or meme…"
                     autoComplete="off"
                     onChange={(event) => {
                       const nextQuery = event.target.value;
@@ -490,83 +512,84 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     onKeyDown={(event) => {
                       if (event.key === "Enter") void runSearch(query);
                     }}
-                  />
-                  {query ? (
-                    <button
-                      className="clear-search-btn"
-                      type="button"
-                      onClick={() => { abortActiveSearch(); setQuery(""); setSubmittedQuery(""); }}
-                      aria-label="Clear search"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                        <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+	                  />
+	                  {query ? (
+	                    <Button
+	                      className="clear-search-btn"
+	                      variant="ghost"
+	                      size="icon-sm"
+	                      type="button"
+	                      onClick={() => { abortActiveSearch(); setQuery(""); setSubmittedQuery(""); }}
+	                      aria-label="Clear search"
+	                    >
+	                      <XIcon />
+	                    </Button>
+	                  ) : null}
+	                </div>
+	              </div>
 
               {history.length > 0 && (
-                <div className="phone-history-section">
-                  <div className="phone-history-header">
-                    <span className="phone-history-header-label">Recent</span>
-                    <button className="phone-history-clear-btn" type="button" onClick={clearHistory}>
-                      Clear all
-                    </button>
-                  </div>
-                  <ul className="phone-history-list">
-                    {history.map((item) => (
-                      <li key={item} className="phone-history-row">
-                        <button
-                          className="phone-history-item"
-                          type="button"
-                          onClick={() => { setQuery(item); void runSearch(item); }}
-                        >
-                          <span className="phone-history-icon" aria-hidden>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                              <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              <path d="M4 12a8 8 0 1 0 2.1-5.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </span>
-                          <span>{item}</span>
-                        </button>
-                        <button
-                          className="phone-history-remove"
-                          type="button"
-                          onClick={() => removeHistoryItem(item)}
-                          aria-label={`Remove ${item}`}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                            <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+	                <div className="phone-history-section">
+	                  <div className="phone-history-header">
+	                    <span className="phone-history-header-label">Recent</span>
+	                    <Button
+	                      className="phone-history-clear-btn h-auto"
+	                      type="button"
+	                      variant="ghost"
+	                      size="xs"
+	                      onClick={clearHistory}
+	                    >
+	                      Clear all
+	                    </Button>
+	                  </div>
+	                  <Card className="phone-history-list" size="sm">
+	                    <CardContent className="p-0">
+	                      <ul>
+	                        {history.map((item) => (
+	                          <li key={item} className="phone-history-row">
+	                            <Button
+	                              className="phone-history-item h-auto justify-start"
+	                              type="button"
+	                              variant="ghost"
+	                              onClick={() => { setQuery(item); void runSearch(item); }}
+	                            >
+	                              <span className="phone-history-icon" aria-hidden>
+	                                <ClockIcon />
+	                              </span>
+	                              <span>{item}</span>
+	                            </Button>
+	                            <Button
+	                              className="phone-history-remove"
+	                              type="button"
+	                              variant="ghost"
+	                              size="icon-sm"
+	                              onClick={() => removeHistoryItem(item)}
+	                              aria-label={`Remove ${item}`}
+	                            >
+	                              <XIcon />
+	                            </Button>
+	                          </li>
+	                        ))}
+	                      </ul>
+	                    </CardContent>
+	                  </Card>
+	                </div>
+	              )}
 
             </div>
-          ) : mode !== "detail" ? (
-            <div className="mobile-top">
-              <div className="search-bar search-bar--semantic">
-                <button className="history-btn" type="button" aria-label="Recent searches">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M4.9 8.7A8 8 0 1 1 4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M4 5v4h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <span className="search-icon" aria-hidden>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <input
-                  ref={topBarInputRef}
-                  aria-label="Search your media"
-                  value={query}
+	          ) : mode !== "detail" ? (
+	            <div className="mobile-top">
+	              <div className="search-bar search-bar--semantic">
+	                <Button className="history-btn" type="button" variant="ghost" size="icon-sm" aria-label="Recent searches">
+	                  <HistoryIcon />
+	                </Button>
+	                <span className="search-icon" aria-hidden>
+	                  <SearchIcon />
+	                </span>
+	                <Input
+	                  ref={topBarInputRef}
+	                  aria-label="Search your media"
+	                  value={query}
                   placeholder="Describe a photo, video, or meme"
                   onChange={(event) => {
                     const nextQuery = event.target.value;
@@ -579,147 +602,163 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       void runSearch(query);
                     }
                   }}
-                />
-                {query ? (
-                  <button
-                    className="clear-search-btn"
-                    type="button"
-                    onClick={() => {
-                      abortActiveSearch();
+	                />
+	                {query ? (
+	                  <Button
+	                    className="clear-search-btn"
+	                    variant="ghost"
+	                    size="icon-sm"
+	                    type="button"
+	                    onClick={() => {
+	                      abortActiveSearch();
                       setQuery("");
                       setSubmittedQuery("");
                       setMode("home");
-                    }}
-                    aria-label="Clear search"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                ) : null}
-              </div>
+	                    }}
+	                    aria-label="Clear search"
+	                  >
+	                    <XIcon />
+	                  </Button>
+	                ) : null}
+	              </div>
 
             </div>
           ) : null}
 
-          {(mode === "typing" || mode === "results") && suggestions.length > 0 && (
-            <div className="suggestions">
-              <ul>
-                {suggestions.map((suggestion) => (
-                  <li key={suggestion}>
-                    <button
-                      className="suggestion-item"
-                      type="button"
-                      onClick={() => {
-                        setQuery(suggestion);
-                        void runSearch(suggestion);
-                      }}
-                    >
-                      <span className="suggestion-icon" aria-hidden>
-                        {history.some((item) => item.toLowerCase() === suggestion.toLowerCase()) ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            <path d="M4 12a8 8 0 1 0 2.1-5.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.5" />
-                          </svg>
-                        )}
-                      </span>
-                      <span>{suggestion}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+	          {(mode === "typing" || mode === "results") && suggestions.length > 0 && (
+	            <Card className="suggestions" size="sm">
+	              <CardContent className="p-0">
+	                <ul>
+	                  {suggestions.map((suggestion) => {
+	                    const fromHistory = history.some((item) => item.toLowerCase() === suggestion.toLowerCase());
+	                    return (
+	                      <li key={suggestion}>
+	                        <Button
+	                          className="suggestion-item h-auto justify-start"
+	                          type="button"
+	                          variant="ghost"
+	                          onClick={() => {
+	                            setQuery(suggestion);
+	                            void runSearch(suggestion);
+	                          }}
+	                        >
+	                          <span className="suggestion-icon" aria-hidden>
+	                            {fromHistory ? <ClockIcon /> : <SearchIcon />}
+	                          </span>
+	                          <span>{suggestion}</span>
+	                        </Button>
+	                      </li>
+	                    );
+	                  })}
+	                </ul>
+	              </CardContent>
+	            </Card>
+	          )}
 
           {(mode === "results" || mode === "typing") && (
-            <div className="grid-wrap">
-              {submittedQuery && mode === "results" ? (
-                <div className="result-context">
-                  <span>{isLoading && results.length === 0 ? "Searching…" : `${results.length} candidates`}</span>
-                  <strong>{submittedQuery}</strong>
-                </div>
-              ) : null}
-              {errorMessage ? <div className="search-notice">{errorMessage}</div> : null}
+	            <div className="grid-wrap">
+	              {submittedQuery && mode === "results" ? (
+	                <div className="result-context">
+	                  <Badge variant="outline" className="result-count-badge">
+	                    {isLoading && results.length === 0 ? "Searching…" : `${results.length} candidates`}
+	                  </Badge>
+	                  <strong>{submittedQuery}</strong>
+	                </div>
+	              ) : null}
+	              {errorMessage ? (
+	                <Alert variant="destructive" className="search-notice">
+	                  <InfoIcon />
+	                  <AlertDescription>{errorMessage}</AlertDescription>
+	                </Alert>
+	              ) : null}
 
-              <div className="grid">
-                {isLoading && results.length === 0 ? (
-                  Array.from({ length: 51 }, (_, i) => (
-                    <div key={i} className="thumb-skeleton" aria-hidden="true" />
-                  ))
-                ) : results.length === 0 ? (
-                  <div className="search-empty">No results</div>
-                ) : results.map((result) => {
-                  const thumb = resolvedThumbnailUrl(result) ?? result.links?.thumbnail ?? result.links?.media;
-                  const selected = selectedItems.some((item) => item.id === result.id);
-                  const video = isVideo(result);
-                  return (
-                    <button
-                      key={result.id}
-                      className={`thumb ${selected ? "thumb--selected" : ""}`}
-                      type="button"
-                      onPointerDown={(e) => handleItemPointerDown(e, result)}
-                      onPointerUp={(e) => handleItemPointerUp(e, result)}
-                      onPointerMove={handleItemPointerMove}
+	              <div className="grid">
+	                {isLoading && results.length === 0 ? (
+	                  Array.from({ length: 51 }, (_, i) => (
+	                    <Skeleton key={i} className="thumb-skeleton" aria-hidden="true" />
+	                  ))
+	                ) : results.length === 0 ? (
+	                  <Empty className="search-empty">
+	                    <EmptyHeader>
+	                      <EmptyMedia variant="icon">
+	                        <ImageOffIcon />
+	                      </EmptyMedia>
+	                      <EmptyTitle>No results</EmptyTitle>
+	                      <EmptyDescription>Try another description.</EmptyDescription>
+	                    </EmptyHeader>
+	                  </Empty>
+	                ) : results.map((result) => {
+	                  const thumb = resolvedThumbnailUrl(result) ?? result.links?.thumbnail ?? result.links?.media;
+	                  const selected = selectedItems.some((item) => item.id === result.id);
+	                  const video = isVideo(result);
+	                  return (
+	                    <Button
+	                      key={result.id}
+	                      className={`thumb h-auto ${selected ? "thumb--selected" : ""}`}
+	                      type="button"
+	                      variant="ghost"
+	                      onPointerDown={(e) => handleItemPointerDown(e, result)}
+	                      onPointerUp={(e) => handleItemPointerUp(e, result)}
+	                      onPointerMove={handleItemPointerMove}
                       onPointerCancel={handleItemPointerCancel}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
                       aria-label={`${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
                       aria-pressed={selected}
-                    >
-                      {thumb ? <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" /> : <span className="thumb-fallback" />}
-                      {video ? (
-                        <span className="video-badge">
-                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
-                            <path d="M3.5 2.5v7l6-3.5-6-3.5z" fill="currentColor" />
-                          </svg>
-                          {durationLabel(result.metadata.asset?.duration_seconds) ?? "video"}
-                        </span>
-                      ) : null}
-                      {selected ? (
-                        <span className="selected-num" aria-hidden>
-                          {selectedItems.findIndex((i) => i.id === result.id) + 1}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+	                    >
+	                      {thumb ? <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" /> : <span className="thumb-fallback" />}
+	                      {video ? (
+	                        <Badge variant="secondary" className="video-badge">
+	                          <PlayIcon />
+	                          {durationLabel(result.metadata.asset?.duration_seconds) ?? "video"}
+	                        </Badge>
+	                      ) : null}
+	                      {selected ? (
+	                        <Badge variant="default" className="selected-num" aria-hidden>
+	                          {selectedItems.findIndex((i) => i.id === result.id) + 1}
+	                        </Badge>
+	                      ) : null}
+	                    </Button>
+	                  );
+	                })}
+	              </div>
 
-              {mode === "results" && !isLoading ? (
-                <div className="results-footer-card">
-                  {hasMore ? (
-                    <button
-                      className="footer-action"
-                      type="button"
-                      onClick={() => void runSearch(submittedQuery || query, visibleCount + SEARCH_BATCH_SIZE)}
-                    >
-                      Show more results
-                    </button>
-                  ) : null}
-                  {refinements.length > 0 ? (
-                    <div className="refinement-row">
-                      <span>Did you mean</span>
-                      {refinements.map((refinement) => (
-                        <button
-                          key={refinement}
-                          className="refinement-chip"
-                          type="button"
-                          onClick={() => {
-                            setQuery(refinement);
-                            void runSearch(refinement);
-                          }}
-                        >
-                          {refinement}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+	              {mode === "results" && !isLoading ? (
+	                <Card className="results-footer-card" size="sm">
+	                  <CardContent className="results-footer-content p-0">
+	                  {hasMore ? (
+	                    <Button
+	                      className="footer-action h-auto"
+	                      type="button"
+	                      variant="outline"
+	                      onClick={() => void runSearch(submittedQuery || query, visibleCount + SEARCH_BATCH_SIZE)}
+		                    >
+		                      <SparklesIcon data-icon="inline-start" />
+		                      Show more results
+		                    </Button>
+		                  ) : null}
+		                  {hasMore && refinements.length > 0 ? <Separator className="results-footer-separator" /> : null}
+		                  {refinements.length > 0 ? (
+	                    <div className="refinement-row">
+	                      <span>Did you mean</span>
+	                      {refinements.map((refinement) => (
+	                        <Button
+	                          key={refinement}
+	                          className="refinement-chip h-auto"
+	                          type="button"
+	                          variant="outline"
+	                          onClick={() => {
+	                            setQuery(refinement);
+	                            void runSearch(refinement);
+	                          }}
+	                        >
+	                          {refinement}
+	                        </Button>
+	                      ))}
+	                    </div>
+	                  ) : null}
+	                  </CardContent>
+	                </Card>
+	              ) : null}
             </div>
           )}
 
@@ -733,89 +772,108 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 )}
               </div>
 
-              <div className="detail-float-top">
-                <button className="detail-float-btn" type="button" onClick={() => setMode("results")} aria-label="Back to results">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                {itemDateLabel(detailItem) ? (
-                  <div className="detail-float-info">
-                    <span>{itemDateLabel(detailItem)}</span>
-                  </div>
-                ) : null}
-              </div>
+	              <div className="detail-float-top">
+	                <Button
+	                  className="detail-float-btn"
+	                  type="button"
+	                  variant="ghost"
+	                  size="icon-sm"
+	                  onClick={() => setMode("results")}
+	                  aria-label="Back to results"
+	                >
+	                  <ChevronLeftIcon />
+	                </Button>
+	                {itemDateLabel(detailItem) ? (
+	                  <Badge variant="outline" className="detail-float-info">
+	                    <span>{itemDateLabel(detailItem)}</span>
+	                  </Badge>
+	                ) : null}
+	              </div>
 
-              <div className="detail-float-bottom">
-                <button className="detail-float-action" type="button" onClick={() => searchSameDate(detailItem)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.4" />
-                    <path d="M3 8h18" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                  </svg>
-                  <span>Same Date</span>
-                </button>
-                <button className="detail-float-action" type="button" onClick={() => void runSimilarSearch(detailItem)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.4" />
-                    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                  </svg>
-                  <span>Similar</span>
-                </button>
-                {onConfirmAnswer ? (
-                  <button className="detail-float-action detail-float-action--primary" type="button" onClick={() => onConfirmAnswer(detailItem.id)}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span>Confirm Answer</span>
-                  </button>
-                ) : (
-                  <button className="detail-float-action detail-float-action--primary" type="button" onClick={() => sendSelection(detailItem)}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M22 2 11 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M22 2 15 22l-4-9-9-4L22 2z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span>Send</span>
-                  </button>
-                )}
-              </div>
+	              <div className="detail-float-bottom">
+	                <Button
+	                  className="detail-float-action h-auto"
+	                  type="button"
+	                  variant="ghost"
+	                  onClick={() => searchSameDate(detailItem)}
+	                >
+	                  <CalendarIcon data-icon="inline-start" />
+	                  <span>Same Date</span>
+	                </Button>
+	                <Button
+	                  className="detail-float-action h-auto"
+	                  type="button"
+	                  variant="ghost"
+	                  onClick={() => void runSimilarSearch(detailItem)}
+	                >
+	                  <SearchIcon data-icon="inline-start" />
+	                  <span>Similar</span>
+	                </Button>
+	                {onConfirmAnswer ? (
+	                  <Button
+	                    className="detail-float-action detail-float-action--primary h-auto"
+	                    type="button"
+	                    onClick={() => onConfirmAnswer(detailItem.id)}
+	                  >
+	                    <CheckIcon data-icon="inline-start" />
+	                    <span>Confirm Answer</span>
+	                  </Button>
+	                ) : (
+	                  <Button
+	                    className="detail-float-action detail-float-action--primary h-auto"
+	                    type="button"
+	                    onClick={() => sendSelection(detailItem)}
+	                  >
+	                    <SendIcon data-icon="inline-start" />
+	                    <span>Send</span>
+	                  </Button>
+	                )}
+	              </div>
             </div>
           )}
 
-          {selectedItems.length > 0 && (
-            <div className="selection-tray" aria-live="polite">
-              <div className="selection-thumbs">
-                {selectedItems.slice(0, 4).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="selection-thumb-btn"
-                    onClick={() => toggleSelected(item)}
-                    aria-label={`Remove ${itemTitle(item)} from selection`}
-                  >
-                    <span className="selection-thumb-x" aria-hidden>
-                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    </span>
-                    <img src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" loading="lazy" decoding="async" />
-                  </button>
-                ))}
-              </div>
-              <span>{selectedItems.length} selected</span>
-              <button
-                className="send-btn"
-                type="button"
-                onClick={() => {
-                  if (onConfirmAnswer && selectedItems.length > 0) {
-                    onConfirmAnswer(selectedItems[0].id);
-                  }
-                  setSelectedItems([]);
-                }}
-              >
-                {onConfirmAnswer ? "Confirm" : "Send"}
-              </button>
-            </div>
-          )}
+		          {selectedItems.length > 0 && mode !== "detail" && (
+	            <Card className="selection-tray" aria-live="polite" size="sm">
+	              <CardContent className="selection-tray-content p-0">
+	                <div className="selection-thumbs">
+	                  {selectedItems.slice(0, 4).map((item) => (
+	                    <Button
+	                      key={item.id}
+	                      type="button"
+	                      variant="ghost"
+	                      size="icon-sm"
+	                      className="selection-thumb-btn"
+	                      onClick={() => toggleSelected(item)}
+	                      aria-label={`Remove ${itemTitle(item)} from selection`}
+	                    >
+	                      <span className="selection-thumb-x" aria-hidden>
+	                        <XIcon />
+	                      </span>
+	                      <img src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" loading="lazy" decoding="async" />
+	                    </Button>
+	                  ))}
+	                </div>
+	                <Badge variant="secondary" className="selection-count">{selectedItems.length} selected</Badge>
+	                <Button
+	                  className="send-btn h-auto"
+	                  type="button"
+	                  onClick={() => {
+	                    if (onConfirmAnswer && selectedItems.length > 0) {
+	                      onConfirmAnswer(selectedItems[0].id);
+	                    }
+	                    setSelectedItems([]);
+	                  }}
+	                >
+	                  {onConfirmAnswer ? (
+	                    <CheckIcon data-icon="inline-start" />
+	                  ) : (
+	                    <SendIcon data-icon="inline-start" />
+	                  )}
+	                  {onConfirmAnswer ? "Confirm" : "Send"}
+	                </Button>
+	              </CardContent>
+	            </Card>
+	          )}
         </div>
       </div>
     </div>

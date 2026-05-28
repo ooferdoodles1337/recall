@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PhoneViewportFrame } from "../components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "@/features/phone/components/PhoneViewportFrame";
 import type { TrialResult } from "../types";
 
 const RESULTS_KEY = "recall.trialResults.v1";

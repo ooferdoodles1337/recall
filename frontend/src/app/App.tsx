@@ -1,10 +1,10 @@
 import { lazy, Suspense } from "react";
 
 const PhoneTesterUI = lazy(() =>
-  import("./phone-tester-ui/PhoneTesterUI").then((m) => ({ default: m.PhoneTesterUI })),
+  import("../features/phone/PhoneTesterUI").then((m) => ({ default: m.PhoneTesterUI })),
 );
 const UserTestingWebUI = lazy(() =>
-  import("./user-testing-webui/UserTestingWebUI").then((m) => ({ default: m.UserTestingWebUI })),
+  import("../features/user-testing/UserTestingWebUI").then((m) => ({ default: m.UserTestingWebUI })),
 );
 
 function getCurrentRoute(pathname: string) {

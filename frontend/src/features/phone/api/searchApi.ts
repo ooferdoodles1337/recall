@@ -1,5 +1,5 @@
-import { recallFetch } from "../../shared/api/client";
-import type { RecallMediaItem, RecallSearchResult } from "../../shared/types/recall";
+import { recallFetch } from "@/shared/api/client";
+import type { RecallMediaItem, RecallSearchResult } from "@/shared/types/recall";
 
 export interface RecallSearchResponse {
   query: string;

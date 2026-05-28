@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { RecallMediaItem } from "../../shared/types/recall";
-import { isVideo, resolvedMediaUrl } from "../api/trialsApi";
+import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
+import type { RecallMediaItem } from "@/shared/types/recall";
 
 interface TargetPhotoPanelProps {
   item: RecallMediaItem;

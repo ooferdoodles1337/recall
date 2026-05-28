@@ -2,10 +2,10 @@
 
 React/Vite frontend for the Recall user-testing demo.
 
-The main app is a fullscreen desktop user-testing harness. Participants are
-shown a target photo, then use an embedded phone-sized Recall viewport to find
-the matching item. The standalone `/phone` route is still a placeholder for
-freely exploring the phone UI outside a guided trial.
+The main app is a fullscreen desktop user-testing harness. Participants move
+through welcome, instructions, timed phone-search trials, and results. The
+standalone `/phone` route opens the same phone search UI for free exploration
+outside a guided trial.
 
 ## Requirements
 
@@ -50,11 +50,11 @@ npm run preview
 
 ## User Testing UI
 
-`src/user-testing-webui/` owns the guided participant flow:
+`src/features/user-testing/` owns the guided participant flow:
 
 - Welcome screen
 - Instructions screen
-- Task screen with target media, progress rail, and participant viewport frame
+- Timed task screen with answer confirmation
 - Results screen
 
 The guided UI is intentionally desktop-only. It is meant to run fullscreen or in
@@ -73,7 +73,7 @@ external Google Fonts CSS imports.
 
 ## Phone Tester UI
 
-`src/phone-tester-ui/` contains the standalone phone tester shell at `/phone`.
+`src/features/phone/` contains the standalone phone tester shell at `/phone`.
 `PhoneViewportFrame` implements the full Recall search UI: semantic + text
 search, autocomplete suggestions, photo grid with selection, detail view, and
 similar/same-date discovery. The guided task screen embeds the same viewport.
@@ -84,11 +84,13 @@ similar/same-date discovery. The guided task screen embeds the same viewport.
 frontend/
   src/
     main.tsx               Fontsource imports and React entrypoint
-    App.tsx                Route switch and desktop-size warning
+    app/App.tsx            Route switch
     styles/global.css      Shared visual system and screen layouts
-    shared/                API client, shared types, and utilities
-    user-testing-webui/    Guided participant test harness
-    phone-tester-ui/       Standalone phone tester route
+    components/ui/         shadcn/ui primitives
+    features/
+      phone/               Standalone phone route and shared phone viewport
+      user-testing/        Guided participant test harness
+    shared/                API client, media helpers, shared types
 ```
 
 ## Dependencies

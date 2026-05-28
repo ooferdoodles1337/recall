@@ -1,4 +1,4 @@
-import type { RecallMediaItem } from "../../shared/types/recall";
+import type { RecallMediaItem } from "@/shared/types/recall";
 
 export interface UserTestTarget {
   id: string;
@@ -6,4 +6,3 @@ export interface UserTestTarget {
 }
 
 export const userTestTargets: UserTestTarget[] = [];
-

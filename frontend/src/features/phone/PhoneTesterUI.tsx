@@ -1,4 +1,4 @@
-import { PhoneViewportFrame } from "../user-testing-webui/components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "./components/PhoneViewportFrame";
 
 export function PhoneTesterUI() {
   return (
@@ -7,4 +7,3 @@ export function PhoneTesterUI() {
     </main>
   );
 }
-

@@ -385,8 +385,6 @@ a {
 
 .action-card-arrow {
   color: inherit;
-  font-family: var(--font-mono);
-  font-size: 1rem;
   opacity: 0.6;
   flex-shrink: 0;
 }
@@ -1039,12 +1037,19 @@ a {
 .detail-float-btn:hover { background: rgba(0, 0, 0, 0.64); }
 
 .detail-float-info {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  padding-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  width: fit-content;
+  max-width: calc(100% - 52px);
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .detail-float-info strong {
@@ -1059,9 +1064,12 @@ a {
 }
 
 .detail-float-info span {
-  color: rgba(255, 255, 255, 0.65);
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 0.76rem;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
 }
 
 .detail-float-bottom {
@@ -1126,6 +1134,20 @@ a {
   font-size: 0.92rem;
 }
 
+.search-bar--semantic [data-slot="input"] {
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.search-bar--semantic [data-slot="input"]:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
 .history-btn,
 .clear-search-btn,
 .icon-btn {
@@ -1152,6 +1174,13 @@ a {
 .search-icon {
   color: #7a8781;
   display: inline-flex;
+}
+
+.search-icon svg,
+.phone-history-icon svg,
+.suggestion-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .quick-chips {
@@ -1205,7 +1234,7 @@ a {
 
 .result-context {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 10px;
@@ -1215,6 +1244,18 @@ a {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.result-count-badge {
+  flex-shrink: 0;
+  height: 22px;
+  border-color: rgba(159, 146, 127, 0.52);
+  background: rgba(251, 247, 239, 0.76);
+  color: var(--ut-muted-dark);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .result-context strong {
@@ -1316,6 +1357,15 @@ a {
   background: rgba(251, 247, 239, 0.94);
 }
 
+.results-footer-content {
+  display: grid;
+  gap: 10px;
+}
+
+.results-footer-separator {
+  background: rgba(159, 146, 127, 0.36);
+}
+
 .results-footer-prompt {
   display: grid;
   gap: 9px;
@@ -1413,10 +1463,6 @@ a {
   position: sticky;
   bottom: 0;
   z-index: 5;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 12px;
   margin: 18px -6px -12px;
   padding: 14px 16px;
   border: 1px solid rgba(22, 33, 30, 0.18);
@@ -1424,6 +1470,14 @@ a {
   background: rgba(22, 33, 30, 0.94);
   color: var(--ut-paper);
   box-shadow: 0 -10px 28px rgba(22, 33, 30, 0.18);
+}
+
+.selection-tray-content {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .selection-thumbs {
@@ -1435,6 +1489,8 @@ a {
 .selection-thumb-btn {
   position: relative;
   flex-shrink: 0;
+  width: auto;
+  height: auto;
   margin-right: -8px;
   padding: 0;
   border: none;
@@ -1467,7 +1523,16 @@ a {
   pointer-events: none;
 }
 
-.selection-tray span {
+.selection-thumb-x svg {
+  width: 8px;
+  height: 8px;
+}
+
+.selection-count {
+  border-color: rgba(251, 247, 239, 0.18);
+  background: rgba(251, 247, 239, 0.1);
+  color: var(--ut-paper);
+  font-family: var(--font-ui);
   font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1550,10 +1615,6 @@ a {
 }
 
 .metric-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
   min-height: 112px;
   padding: 18px;
   border: 1px solid var(--ut-line);
@@ -1561,6 +1622,14 @@ a {
   background: rgba(251, 247, 239, 0.76);
   box-shadow: var(--ut-shadow-sm);
   text-align: left;
+}
+
+.metric-card-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .metric-value {
@@ -1925,13 +1994,19 @@ html {
 }
 
 .phone-history-list {
-  list-style: none;
   margin: 0;
   padding: 0;
+  gap: 0;
   border: 1px solid rgba(159, 146, 127, 0.44);
   border-radius: 12px;
   background: rgba(255, 253, 248, 0.96);
   overflow: hidden;
+}
+
+.phone-history-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .phone-history-row {
