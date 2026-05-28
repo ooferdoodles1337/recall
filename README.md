@@ -4,13 +4,15 @@ Personal-media semantic-search app. A pre-indexed media catalog is distributed t
 
 ## Prerequisites
 
-| Dependency | Ubuntu / WSL | macOS |
-|------------|-------------|-------|
-| **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | Same |
-| **Python 3.14** | `uv python install 3.14` | Same |
-| **Node.js + npm** | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh \| bash`<br>`\. "$HOME/.nvm/nvm.sh"`<br>`nvm install 24`<br>`node -v  # should print v24.15.0`<br>`npm -v   # should print 11.12.1` |
-| **ExifTool** (maintainers only) | `sudo apt install libimage-exiftool-perl` | `brew install exiftool` |
-| **ffmpeg** (maintainers only) | `sudo apt install ffmpeg` | `brew install ffmpeg` |
+Install these before running Recall.
+
+| Dependency      | Install instructions                                                             | Notes                                                       |
+| --------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **uv**          | [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) | Required for backend dependency management                  |
+| **Python 3.14** | [Installing Python with uv](https://docs.astral.sh/uv/guides/install-python/)    | Install through `uv`                                        |
+| **Node.js**     | [Node.js download page](https://nodejs.org/en/download)                          | Required for the frontend. `npm` comes bundled with Node.js |
+| **ExifTool**    | [ExifTool installation guide](https://exiftool.org/install.html)                 | Maintainers only                                            |
+| **ffmpeg**      | [FFmpeg download page](https://ffmpeg.org/download.html)                         | Maintainers only                                            |
 
 ## Quick start
 
