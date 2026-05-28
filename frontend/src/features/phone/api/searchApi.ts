@@ -52,3 +52,12 @@ export function listRecentItems(count = 51, options?: RecallRequestOptions) {
       results: response.results.slice(0, count),
     }));
 }
+
+export function listFavoriteItems(count = 34, options?: RecallRequestOptions) {
+  const params = new URLSearchParams({ favorite: "true", order: "desc", limit: String(count) });
+  return recallFetch<RecallCatalogItemsResponse>(`/catalog/items?${params.toString()}`, { signal: options?.signal })
+    .then((response) => ({
+      ...response,
+      results: response.results.slice(0, count),
+    }));
+}

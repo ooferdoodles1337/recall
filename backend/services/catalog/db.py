@@ -15,6 +15,7 @@ _db_path: Path | None = None
 _PROMOTED_COLUMN_DEFS: dict[str, str] = {
     "asset_path": "TEXT",
     "thumbnail_path": "TEXT",
+    "animated_thumbnail_path": "TEXT",
     "filename": "TEXT",
     "mime_type": "TEXT",
     "embedding_mime_type": "TEXT",
@@ -264,6 +265,7 @@ def _promoted_values(metadata: dict) -> dict[str, Any]:
     return {
         "asset_path": metadata_schema.asset_path(metadata),
         "thumbnail_path": metadata_schema.thumbnail_path(metadata),
+        "animated_thumbnail_path": metadata_schema.animated_thumbnail_path(metadata),
         "filename": metadata_schema.filename(metadata),
         "mime_type": metadata_schema.mime_type(metadata),
         "embedding_mime_type": metadata_schema.embedding_mime_type(metadata),
@@ -440,6 +442,8 @@ def _row_to_summary_item(row: sqlite3.Row) -> dict:
         asset_paths["original"] = row["asset_path"]
     if row["thumbnail_path"]:
         asset_paths["thumbnail"] = row["thumbnail_path"]
+    if row["animated_thumbnail_path"]:
+        asset_paths["animated_thumbnail"] = row["animated_thumbnail_path"]
 
     asset: dict[str, Any] = {
         "filename": row["filename"],
@@ -595,15 +599,22 @@ def get_all_search_terms() -> list[tuple[str, list[str]]]:
 
 def list_library_items(
     media_type: str | None = None,
+    favorite: bool | None = None,
     order: str = "desc",
     limit: int | None = None,
 ) -> list[dict]:
     columns = ", ".join(_SUMMARY_COLUMNS)
     query = f"SELECT {columns} FROM media_items"
     params: list[Any] = []
+    filters: list[str] = []
     if media_type is not None:
-        query += " WHERE media_type = ?"
+        filters.append("media_type = ?")
         params.append(media_type)
+    if favorite is not None:
+        filters.append("favorite = ?")
+        params.append(1 if favorite else 0)
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
     direction = "DESC" if order == "desc" else "ASC"
     id_direction = "DESC" if order == "desc" else "ASC"
     query += f" ORDER BY taken_sort IS NULL, taken_sort {direction}, id {id_direction}"
@@ -723,6 +734,35 @@ def replace_safety(file_id: str, safety: dict) -> None:
         cursor = _update_metadata_row(conn, file_id, metadata)
         if cursor.rowcount == 0:
             raise ValueError(f"Item not found: {file_id}")
+
+
+def get_records_for_animated_regen() -> list[tuple[str, str | None, str | None]]:
+    """Return (id, asset_path, animated_thumbnail_path) for all GIF items."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT id, asset_path, animated_thumbnail_path FROM media_items WHERE mime_type = 'image/gif'"
+        ).fetchall()
+    return [(row["id"], row["asset_path"], row["animated_thumbnail_path"]) for row in rows]
+
+
+def update_animated_thumbnail_path(file_id: str, animated_thumbnail_path: str | None) -> None:
+    """Set or clear the animated_thumbnail_path for a single item."""
+    with _connect() as conn:
+        row = conn.execute("SELECT metadata_json FROM media_items WHERE id = ?", (file_id,)).fetchone()
+        if row is None:
+            return
+        metadata = json.loads(row["metadata_json"])
+        asset = metadata.get("asset")
+        if isinstance(asset, dict):
+            paths = asset.setdefault("paths", {})
+            if animated_thumbnail_path:
+                paths["animated_thumbnail"] = animated_thumbnail_path
+            else:
+                paths.pop("animated_thumbnail", None)
+        conn.execute(
+            "UPDATE media_items SET animated_thumbnail_path = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (animated_thumbnail_path, _metadata_json(metadata), file_id),
+        )
 
 
 def get_stats() -> dict:

@@ -8,6 +8,20 @@ from services.catalog import schema as metadata_schema
 router = APIRouter()
 
 
+@router.get("/{id}/animated-thumbnail")
+def serve_animated_thumbnail(id: str):
+    item = catalog.get_item(id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    anim_path = metadata_schema.animated_thumbnail_path(item["metadata"] or {})
+    if not anim_path:
+        raise HTTPException(status_code=404, detail="Animated thumbnail not available")
+    p = config.DATA_DIR / anim_path
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="Animated thumbnail file not found on disk")
+    return FileResponse(p, media_type="image/webp")
+
+
 @router.get("/{id}/thumbnail")
 def serve_thumbnail(id: str):
     item = catalog.get_item(id)

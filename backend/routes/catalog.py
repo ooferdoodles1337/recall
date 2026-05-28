@@ -11,10 +11,11 @@ router = APIRouter()
 @router.get("/items")
 def list_items(
     media_type: Annotated[Literal["image", "video"] | None, Query()] = None,
+    favorite: Annotated[bool | None, Query()] = None,
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
     limit: Annotated[int | None, Query(ge=1, le=500)] = None,
 ):
-    results = catalog.list_library_items(media_type=media_type, order=order, limit=limit)
+    results = catalog.list_library_items(media_type=media_type, favorite=favorite, order=order, limit=limit)
     return {"count": len(results), "results": results}
 
 

@@ -3,6 +3,7 @@ export type RecallMediaType = "image" | "video";
 export interface RecallMediaLinks {
   media?: string;
   thumbnail?: string;
+  animated_thumbnail?: string;
 }
 
 export interface RecallMediaMetadata {

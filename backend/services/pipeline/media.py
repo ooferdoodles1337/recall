@@ -10,7 +10,7 @@ from typing import Optional
 
 import imageio_ffmpeg
 import imageio.v3 as iio
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageSequence
 
 import config
 
@@ -151,6 +151,54 @@ def generate_thumbnail(path: str, media_type: str) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="WEBP")
     return buf.getvalue()
+
+
+ANIMATED_THUMBNAIL_MAX_SOURCE_BYTES = 5 * 1024 * 1024  # skip GIFs larger than 5 MB
+ANIMATED_THUMBNAIL_MAX_FRAMES = 200                     # cap frame extraction
+
+
+def generate_animated_thumbnail(
+    path: str,
+    *,
+    max_source_bytes: int = ANIMATED_THUMBNAIL_MAX_SOURCE_BYTES,
+) -> bytes | None:
+    """Generate an animated WebP thumbnail for a GIF/animated image.
+
+    Returns None if the source is too large, not animated, or on any error.
+    The static thumbnail is unaffected regardless of the outcome here.
+    """
+    try:
+        if Path(path).stat().st_size > max_source_bytes:
+            return None
+        with Image.open(path) as img:
+            n_frames = getattr(img, "n_frames", 1)
+            if n_frames <= 1:
+                return None
+            frames: list[Image.Image] = []
+            durations: list[int] = []
+            for i, frame in enumerate(ImageSequence.Iterator(img)):
+                if i >= ANIMATED_THUMBNAIL_MAX_FRAMES:
+                    break
+                copy = frame.copy().convert("RGBA")
+                copy.thumbnail((320, 320), Image.Resampling.LANCZOS)
+                frames.append(copy)
+                durations.append(int(img.info.get("duration", 100)))
+            if not frames:
+                return None
+            buf = io.BytesIO()
+            frames[0].save(
+                buf,
+                format="WEBP",
+                save_all=True,
+                append_images=frames[1:],
+                duration=durations,
+                loop=0,
+                lossless=False,
+                quality=75,
+            )
+            return buf.getvalue()
+    except Exception:
+        return None
 
 
 def process_video(path: str) -> ProcessedFile:

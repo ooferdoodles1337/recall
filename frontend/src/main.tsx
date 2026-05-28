@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-// Fonts: Source Serif 4 and Geist are declared directly in global.css (latin subset only).
+// Fonts: Source Serif 4, Geist, and Inter are declared directly in global.css (latin subset only).
 // IBM Plex Sans and IBM Plex Mono are loaded per-weight from Fontsource.
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";

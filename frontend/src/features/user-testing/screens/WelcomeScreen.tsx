@@ -12,10 +12,6 @@ export function WelcomeScreen({ onStartTrial }: WelcomeScreenProps) {
         <header className="welcome-header">
           <span className="ut-eyebrow">Recall</span>
           <h1 className="welcome-title">User Testing Session</h1>
-          <p className="welcome-subtitle">
-            Welcome! This session takes about 10 minutes. You'll use a phone
-            interface to search for photos — no preparation needed.
-          </p>
         </header>
 
         <div className="welcome-actions">

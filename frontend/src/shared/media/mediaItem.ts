@@ -19,3 +19,12 @@ export function isVideo(item: RecallMediaItem): boolean {
   const mime = item.metadata.asset?.mime_type ?? "";
   return mime.startsWith("video/");
 }
+
+export function isAnimatedImage(item: RecallMediaItem): boolean {
+  const mime = item.metadata.asset?.mime_type?.toLowerCase() ?? "";
+  return mime === "image/gif" || mime === "image/webp";
+}
+
+export function resolvedAnimatedThumbnailUrl(item: RecallMediaItem): string | null {
+  return resolveRecallLink(item.links?.animated_thumbnail);
+}
