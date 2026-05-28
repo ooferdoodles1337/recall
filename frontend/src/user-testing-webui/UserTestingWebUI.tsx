@@ -1,29 +1,64 @@
-import { useState } from "react";
-import { InstructionsScreen } from "./screens/InstructionsScreen";
-import { ResultsScreen } from "./screens/ResultsScreen";
-import { TaskScreen } from "./screens/TaskScreen";
-import { WelcomeScreen } from "./screens/WelcomeScreen";
-import type { UserTestScreen } from "./types";
+import { lazy, Suspense, useState } from "react";
+import type { TrialResult, UserTestScreen } from "./types";
+
+const InstructionsScreen = lazy(() =>
+  import("./screens/InstructionsScreen").then((m) => ({ default: m.InstructionsScreen })),
+);
+const ResultsScreen = lazy(() =>
+  import("./screens/ResultsScreen").then((m) => ({ default: m.ResultsScreen })),
+);
+const TaskScreen = lazy(() =>
+  import("./screens/TaskScreen").then((m) => ({ default: m.TaskScreen })),
+);
+const WelcomeScreen = lazy(() =>
+  import("./screens/WelcomeScreen").then((m) => ({ default: m.WelcomeScreen })),
+);
 
 export function UserTestingWebUI() {
   const [screen, setScreen] = useState<UserTestScreen>("welcome");
+  const [sessionResults, setSessionResults] = useState<TrialResult[]>([]);
 
   if (screen === "instructions") {
     return (
-      <InstructionsScreen
-        onBack={() => setScreen("welcome")}
-        onBegin={() => setScreen("task")}
-      />
+      <Suspense fallback={null}>
+        <InstructionsScreen
+          onBack={() => setScreen("welcome")}
+          onBegin={() => setScreen("task")}
+        />
+      </Suspense>
     );
   }
 
   if (screen === "task") {
-    return <TaskScreen onComplete={() => setScreen("results")} />;
+    return (
+      <Suspense fallback={null}>
+        <TaskScreen
+          onExit={(results) => {
+            setSessionResults(results);
+            setScreen("results");
+          }}
+        />
+      </Suspense>
+    );
   }
 
   if (screen === "results") {
-    return <ResultsScreen onRestart={() => setScreen("welcome")} />;
+    return (
+      <Suspense fallback={null}>
+        <ResultsScreen
+          results={sessionResults}
+          onRestart={() => {
+            setSessionResults([]);
+            setScreen("welcome");
+          }}
+        />
+      </Suspense>
+    );
   }
 
-  return <WelcomeScreen onStartTrial={() => setScreen("instructions")} />;
+  return (
+    <Suspense fallback={null}>
+      <WelcomeScreen onStartTrial={() => setScreen("instructions")} />
+    </Suspense>
+  );
 }

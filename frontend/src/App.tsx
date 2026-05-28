@@ -1,6 +1,11 @@
-import { useEffect } from "react";
-import { PhoneTesterUI } from "./phone-tester-ui/PhoneTesterUI";
-import { UserTestingWebUI } from "./user-testing-webui/UserTestingWebUI";
+import { lazy, Suspense } from "react";
+
+const PhoneTesterUI = lazy(() =>
+  import("./phone-tester-ui/PhoneTesterUI").then((m) => ({ default: m.PhoneTesterUI })),
+);
+const UserTestingWebUI = lazy(() =>
+  import("./user-testing-webui/UserTestingWebUI").then((m) => ({ default: m.UserTestingWebUI })),
+);
 
 function getCurrentRoute(pathname: string) {
   if (pathname.startsWith("/phone")) {
@@ -11,35 +16,12 @@ function getCurrentRoute(pathname: string) {
 }
 
 export function App() {
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const skip = params.get("skipViewport") === "1" || params.get("skipViewport") === "true";
-      if (skip) {
-        document.documentElement.classList.add("skip-viewport-warning");
-      } else {
-        document.documentElement.classList.remove("skip-viewport-warning");
-      }
-    } catch (e) {
-      // ignore in environments without window
-    }
-  }, []);
   const route = getCurrentRoute(window.location.pathname);
   const screen = route === "phone" ? <PhoneTesterUI /> : <UserTestingWebUI />;
 
   return (
-    <>
-      <div className="app-content">{screen}</div>
-      <aside className="viewport-size-warning" role="alert" aria-live="polite">
-        <div className="viewport-size-warning-panel">
-          <span className="viewport-size-warning-kicker">Window size check</span>
-          <h1 className="viewport-size-warning-title">Use fullscreen desktop mode</h1>
-          <p className="viewport-size-warning-copy">
-            Recall user testing needs a window at least 1280 x 720 px. Enlarge
-            this window or switch to fullscreen, then continue the session.
-          </p>
-        </div>
-      </aside>
-    </>
+    <div className="app-content">
+      <Suspense fallback={null}>{screen}</Suspense>
+    </div>
   );
 }
