@@ -94,7 +94,8 @@
 body {
   margin: 0;
   min-width: 1024px;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background:
     linear-gradient(90deg, rgba(22, 33, 30, 0.035) 1px, transparent 1px) 0 0 / 72px 72px,
     linear-gradient(0deg, rgba(22, 33, 30, 0.03) 1px, transparent 1px) 0 0 / 72px 72px,
@@ -121,18 +122,20 @@ a {
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
 }
 
 .app-content {
-  min-height: 100vh;
+  height: 100%;
 }
 
 .app-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   padding: 48px 24px;
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
 .placeholder-panel {
@@ -251,7 +254,8 @@ a {
    ============================================================ */
 
 .welcome-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,7 +398,8 @@ a {
    ============================================================ */
 
 .instructions-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -521,7 +526,7 @@ a {
 .task-shell {
   display: grid;
   grid-template-columns: minmax(430px, 0.88fr) 1px minmax(620px, 1.12fr);
-  height: 100vh;
+  height: 100dvh;
   min-width: 1050px;
   overflow: hidden;
   background: var(--ut-bg);
@@ -765,8 +770,16 @@ a {
 
 .phone-rect-content {
   position: relative;
-  min-height: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 22px 16px 32px;
+  box-sizing: border-box;
+  scrollbar-width: none;
+}
+
+.phone-rect-content::-webkit-scrollbar {
+  display: none;
 }
 
 /* Mobile header inside the phone frame */
@@ -1556,7 +1569,8 @@ a {
    ============================================================ */
 
 .results-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
