@@ -659,9 +659,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 	            <div className="grid-wrap">
 	              {submittedQuery && mode === "results" ? (
 	                <div className="result-context">
-	                  <Badge variant="outline" className="result-count-badge">
-	                    {isLoading && results.length === 0 ? "Searching…" : `${results.length} candidates`}
-	                  </Badge>
 	                  <strong>{submittedQuery}</strong>
 	                </div>
 	              ) : null}

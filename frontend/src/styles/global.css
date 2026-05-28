@@ -852,9 +852,14 @@ a {
 
 /* --- Mobile search UI --- */
 .mobile-top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-bottom: 10px;
+  background: #fffdf8;
 }
 
 .search-bar {
@@ -1257,18 +1262,6 @@ a {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.result-count-badge {
-  flex-shrink: 0;
-  height: 22px;
-  border-color: rgba(159, 146, 127, 0.52);
-  background: rgba(251, 247, 239, 0.76);
-  color: var(--ut-muted-dark);
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
 }
 
 .result-context strong {
@@ -2116,6 +2109,46 @@ html {
   .task-phone-col {
     padding-right: 32px;
     padding-left: 32px;
+  }
+}
+
+@media (max-width: 768px), (max-height: 560px) and (max-width: 1024px) {
+  body {
+    min-width: 0;
+    background: #fffdf8;
+  }
+
+  .app-shell,
+  .task-phone-only {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: #fffdf8;
+  }
+
+  .phone-stage {
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+  }
+
+  .phone-rect {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .phone-rect-content {
+    height: 100dvh;
+    padding:
+      max(16px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
   }
 }
 

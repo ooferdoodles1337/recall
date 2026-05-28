@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = "http://localhost:8000";
+const DEFAULT_API_BASE_URL = "";
 
 export const recallApiBaseUrl =
   import.meta.env.VITE_RECALL_API_BASE_URL?.replace(/\/$/, "") ?? DEFAULT_API_BASE_URL;
