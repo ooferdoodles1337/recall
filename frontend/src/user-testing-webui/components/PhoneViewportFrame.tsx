@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RecallMediaItem, RecallSearchResult } from "../../shared/types/recall";
 import {
   listRecentItems,
@@ -12,12 +12,16 @@ import { isVideo, resolvedMediaUrl, resolvedThumbnailUrl } from "../api/trialsAp
 interface PhoneViewportFrameProps {
   currentTarget?: RecallMediaItem;
   onSelectCandidate?: (id: string) => void;
+  onConfirmAnswer?: (id: string) => void;
 }
 
 type PhoneMode = "home" | "typing" | "results" | "detail";
 
-const SEARCH_BATCH_SIZE = 24;
+interface TapRipple { id: number; clientX: number; clientY: number; }
+
+const SEARCH_BATCH_SIZE = 51;
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
+
 
 function makeMockItem(seed: string, q?: string): RecallMediaItem {
   const thumb = `https://picsum.photos/seed/${encodeURIComponent(seed)}/440/330`;
@@ -139,7 +143,7 @@ function durationLabel(seconds?: number) {
   return `${minutes}:${remainder}`;
 }
 
-export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneViewportFrameProps) {
+export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer }: PhoneViewportFrameProps) {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [results, setResults] = useState<RecallMediaItem[]>([]);
@@ -151,8 +155,25 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
   const [mode, setMode] = useState<PhoneMode>("home");
   const [detailItem, setDetailItem] = useState<RecallMediaItem | null>(null);
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
+  const [tapRipples, setTapRipples] = useState<TapRipple[]>([]);
 
-  const quickChips = ["waterfall video", "truth nuke gif", "birthday dinner", "dog at beach"];
+  // Track in-flight search abort controller so we can cancel stale requests
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const topBarInputRef = useRef<HTMLInputElement>(null);
+  const prevModeRef = useRef<PhoneMode>("home");
+  const nextRippleIdRef = useRef(0);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      searchAbortRef.current?.abort();
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setDetailItem(null);
@@ -161,15 +182,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
   }, [currentTarget?.id]);
 
   useEffect(() => {
-    listRecentItems(18)
+    const controller = new AbortController();
+    listRecentItems(SEARCH_BATCH_SIZE, { signal: controller.signal })
       .then((response) => {
+        if (controller.signal.aborted) return;
         if (response.results.length > 0) {
           setResults(response.results);
         }
       })
       .catch(() => {
-        setResults(Array.from({ length: 12 }).map((_, index) => makeMockItem(`recent-${index}`)));
+        if (controller.signal.aborted) return;
+        setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, index) => makeMockItem(`recent-${index}`)));
       });
+    return () => { controller.abort(); };
   }, []);
 
   useEffect(() => {
@@ -179,9 +204,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
       return;
     }
 
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      suggestSearches(q, 6)
+      suggestSearches(q, 6, { signal: controller.signal })
         .then((response) => {
+          if (controller.signal.aborted) return;
           const nextSuggestions = [...response.suggestions, ...localSuggestions(q, history)];
           setSuggestions(
             nextSuggestions
@@ -189,10 +216,16 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
               .slice(0, 6),
           );
         })
-        .catch(() => setSuggestions(localSuggestions(q, history)));
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setSuggestions(localSuggestions(q, history));
+        });
     }, 140);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [history, query]);
 
   useEffect(() => {
@@ -201,91 +234,124 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
 
     const timer = window.setTimeout(() => {
       void runSearch(q, SEARCH_BATCH_SIZE, { remember: false });
-    }, 560);
+    }, 500);
 
     return () => window.clearTimeout(timer);
+    // runSearch is stable via useCallback; mode and query are the real deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, mode]);
 
-  async function runSearch(
+  useEffect(() => {
+    if (prevModeRef.current === "home" && (mode === "typing" || mode === "results")) {
+      topBarInputRef.current?.focus();
+    }
+    prevModeRef.current = mode;
+  }, [mode]);
+
+  const runSearch = useCallback(async (
     rawQuery: string,
     count = SEARCH_BATCH_SIZE,
     options: { remember: boolean } = { remember: true },
-  ) {
+  ) => {
     const q = rawQuery.trim();
     if (!q) {
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
+      setIsLoading(false);
       setSubmittedQuery("");
       setResults([]);
       setMode("home");
       return;
     }
 
+    // Cancel any previous in-flight search
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+
     setIsLoading(true);
     setErrorMessage(null);
+    setResults([]);
     setMode("results");
     setSubmittedQuery(q);
     setVisibleCount(count);
 
-    const [semanticResponse, textResponse] = await Promise.allSettled([
-      searchSemantic(q, count),
-      searchText(q, Math.min(count, 30)),
-    ]);
+    try {
+      const [semanticResponse, textResponse] = await Promise.allSettled([
+        searchSemantic(q, count, { signal: controller.signal }),
+        searchText(q, Math.min(count, 30), { signal: controller.signal }),
+      ]);
 
-    const semanticResults = semanticResponse.status === "fulfilled" ? semanticResponse.value.results : [];
-    const textResults = textResponse.status === "fulfilled" ? textResponse.value.results : [];
-    const nextResults = mergeResults(semanticResults, textResults);
+      if (controller.signal.aborted) return;
 
-    if (nextResults.length > 0) {
-      setResults(nextResults);
-    } else if (semanticResponse.status === "rejected" && textResponse.status === "rejected") {
-      setResults(Array.from({ length: 9 }).map((_, index) => makeMockItem(`${q}-${index}`, q)));
-      setErrorMessage("Backend unavailable. Showing sample tiles until the media bundle is indexed.");
-    } else {
-      setResults([]);
+      const semanticResults = semanticResponse.status === "fulfilled" ? semanticResponse.value.results : [];
+      const textResults = textResponse.status === "fulfilled" ? textResponse.value.results : [];
+      const nextResults = mergeResults(semanticResults, textResults).slice(0, count);
+
+      if (nextResults.length > 0) {
+        setResults(nextResults);
+      } else if (semanticResponse.status === "rejected" && textResponse.status === "rejected") {
+        setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, index) => makeMockItem(`${q}-${index}`, q)));
+        setErrorMessage("Backend unavailable. Showing sample tiles until the media bundle is indexed.");
+      } else {
+        setResults([]);
+      }
+
+      if (options.remember) {
+        rememberSearch(q);
+        setHistory(readSearchHistory());
+      }
+    } finally {
+      if (!controller.signal.aborted && searchAbortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
+  }, []);
 
-    if (options.remember) {
-      rememberSearch(q);
-      setHistory(readSearchHistory());
-    }
+  const runSimilarSearch = useCallback(async (item: RecallMediaItem) => {
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
 
-    setIsLoading(false);
-  }
-
-  async function runSimilarSearch(item: RecallMediaItem) {
     setIsLoading(true);
     setErrorMessage(null);
+    setResults([]);
     setMode("results");
     setDetailItem(null);
     setSubmittedQuery("similar items");
     setQuery("");
 
     try {
-      const response = await searchSimilarById(item.id, SEARCH_BATCH_SIZE);
+      const response = await searchSimilarById(item.id, SEARCH_BATCH_SIZE, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setResults(response.results);
     } catch {
+      if (controller.signal.aborted) return;
       setErrorMessage("Similar search is available after this item has an indexed embedding.");
       setResults([]);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted && searchAbortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
-  }
+  }, []);
 
-  function openDetail(item: RecallMediaItem) {
+  const openDetail = useCallback((item: RecallMediaItem) => {
     setDetailItem(item);
     setMode("detail");
     onSelectCandidate?.(item.id);
-  }
+  }, [onSelectCandidate]);
 
-  function toggleSelected(item: RecallMediaItem) {
+  const toggleSelected = useCallback((item: RecallMediaItem) => {
     setSelectedItems((existing) => {
       if (existing.some((candidate) => candidate.id === item.id)) {
         return existing.filter((candidate) => candidate.id !== item.id);
       }
       return [...existing, item];
     });
-  }
+  }, []);
 
-  function searchSameDate(item: RecallMediaItem) {
+  const searchSameDate = useCallback((item: RecallMediaItem) => {
     const date = itemDateLabel(item);
     if (!date) {
       setErrorMessage("This item has no date metadata yet.");
@@ -297,41 +363,191 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
     setQuery(date);
     void runSearch(date, SEARCH_BATCH_SIZE);
     setDetailItem(null);
-  }
+  }, [runSearch]);
 
-  function sendSelection(item?: RecallMediaItem) {
+  const sendSelection = useCallback((item?: RecallMediaItem) => {
     const nextSelection = item && !selectedItems.some((candidate) => candidate.id === item.id)
       ? [...selectedItems, item]
       : selectedItems;
     setSelectedItems(nextSelection);
-  }
+  }, [selectedItems]);
 
-  const refinements = useMemo(() => refinementSuggestions(submittedQuery || query, results), [query, results, submittedQuery]);
+  const removeHistoryItem = useCallback((item: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => h.toLowerCase() !== item.toLowerCase());
+      writeSearchHistory(next);
+      return next;
+    });
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    writeSearchHistory([]);
+  }, []);
+
+  const abortActiveSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setIsLoading(false);
+  }, []);
+
+  const spawnRipple = useCallback((clientX: number, clientY: number) => {
+    const id = ++nextRippleIdRef.current;
+    setTapRipples((prev) => [...prev, { id, clientX, clientY }]);
+    setTimeout(() => setTapRipples((prev) => prev.filter((r) => r.id !== id)), 600);
+  }, []);
+
+  const handlePhonePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    spawnRipple(e.clientX, e.clientY);
+  }, [spawnRipple]);
+
+  const handleItemPointerDown = useCallback((e: React.PointerEvent, item: RecallMediaItem) => {
+    e.stopPropagation();
+    longPressTriggeredRef.current = false;
+    pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+    spawnRipple(e.clientX, e.clientY);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      longPressTimerRef.current = null;
+      openDetail(item);
+    }, 500);
+  }, [spawnRipple, openDetail]);
+
+  const handleItemPointerUp = useCallback((_e: React.PointerEvent, item: RecallMediaItem) => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (!longPressTriggeredRef.current) {
+      toggleSelected(item);
+    }
+    pointerDownPosRef.current = null;
+  }, [toggleSelected]);
+
+  const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
+    if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
+      const dx = e.clientX - pointerDownPosRef.current.x;
+      const dy = e.clientY - pointerDownPosRef.current.y;
+      if (dx * dx + dy * dy > 64) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  }, []);
+
+  const handleItemPointerCancel = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pointerDownPosRef.current = null;
+  }, []);
+
+  const refinements = useMemo(() => refinementSuggestions(submittedQuery || query, results), [submittedQuery, query, results]);
   const hasMore = results.length >= visibleCount && mode === "results";
 
   return (
     <div className="phone-stage">
-      <div className="phone-stage-header" aria-hidden="true">
-        <div className="mobile-header">
-          <div className="recall-logo" aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-              <circle cx="12" cy="12" r="11" fill="var(--ut-gold)" />
-              <g fill="#fff">
-                <path d="M12 7.2c.9-.9 2.4-.9 3.3 0 .9.9.9 2.4 0 3.3-.9.9-2.4.9-3.3 0-.9-.9-2.4-.9-3.3 0z" />
-                <path d="M7.2 12c-.9.9-.9 2.4 0 3.3.9.9 2.4.9 3.3 0 .9-.9.9-2.4 0-3.3-.9-.9-2.4-.9-3.3 0z" />
-                <path d="M12 16.8c-.9.9-2.4.9-3.3 0-.9-.9-.9-2.4 0-3.3.9-.9 2.4-.9 3.3 0 .9.9.9 2.4 0 3.3z" />
-                <path d="M16.8 12c.9-.9.9-2.4 0-3.3-.9-.9-2.4-.9-3.3 0-.9.9-.9 2.4 0 3.3.9.9 2.4.9 3.3 0z" />
-              </g>
-            </svg>
-          </div>
-          <div className="mobile-header-title">Recall</div>
-          <div className="phone-stage-size">390 x 844</div>
-        </div>
-      </div>
-
       <div className="phone-rect" aria-label="Phone interface viewport">
-        <div className="phone-rect-content">
-          {mode !== "detail" && (
+        <div className="phone-rect-content" onPointerDown={handlePhonePointerDown}>
+          {tapRipples.map((r) => (
+            <div
+              key={r.id}
+              className="tap-ripple"
+              style={{ top: r.clientY - 28, left: r.clientX - 28 }}
+            />
+          ))}
+          {mode === "home" ? (
+            <div className="phone-startpage">
+              <div className="phone-startpage-brand">
+                <div className="phone-startpage-logo" aria-hidden>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <h1 className="phone-startpage-title">Recall</h1>
+              </div>
+
+              <div className="phone-startpage-search">
+                <div className="search-bar search-bar--semantic search-bar--hero">
+                  <span className="search-icon" aria-hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  <input
+                    aria-label="Search your media"
+                    value={query}
+                    placeholder="Describe a photo, video, or meme…"
+                    autoComplete="off"
+                    onChange={(event) => {
+                      const nextQuery = event.target.value;
+                      setQuery(nextQuery);
+                      if (nextQuery.trim()) setMode("typing");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void runSearch(query);
+                    }}
+                  />
+                  {query ? (
+                    <button
+                      className="clear-search-btn"
+                      type="button"
+                      onClick={() => { abortActiveSearch(); setQuery(""); setSubmittedQuery(""); }}
+                      aria-label="Clear search"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {history.length > 0 && (
+                <div className="phone-history-section">
+                  <div className="phone-history-header">
+                    <span className="phone-history-header-label">Recent</span>
+                    <button className="phone-history-clear-btn" type="button" onClick={clearHistory}>
+                      Clear all
+                    </button>
+                  </div>
+                  <ul className="phone-history-list">
+                    {history.map((item) => (
+                      <li key={item} className="phone-history-row">
+                        <button
+                          className="phone-history-item"
+                          type="button"
+                          onClick={() => { setQuery(item); void runSearch(item); }}
+                        >
+                          <span className="phone-history-icon" aria-hidden>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <path d="M4 12a8 8 0 1 0 2.1-5.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </span>
+                          <span>{item}</span>
+                        </button>
+                        <button
+                          className="phone-history-remove"
+                          type="button"
+                          onClick={() => removeHistoryItem(item)}
+                          aria-label={`Remove ${item}`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            </div>
+          ) : mode !== "detail" ? (
             <div className="mobile-top">
               <div className="search-bar search-bar--semantic">
                 <button className="history-btn" type="button" aria-label="Recent searches">
@@ -348,6 +564,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                   </svg>
                 </span>
                 <input
+                  ref={topBarInputRef}
                   aria-label="Search your media"
                   value={query}
                   placeholder="Describe a photo, video, or meme"
@@ -368,6 +585,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                     className="clear-search-btn"
                     type="button"
                     onClick={() => {
+                      abortActiveSearch();
                       setQuery("");
                       setSubmittedQuery("");
                       setMode("home");
@@ -381,25 +599,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                 ) : null}
               </div>
 
-              <div className="quick-chips" aria-label="Example searches">
-                {quickChips.map((chip) => (
-                  <button
-                    key={chip}
-                    className="chip"
-                    type="button"
-                    onClick={() => {
-                      setQuery(chip);
-                      void runSearch(chip);
-                    }}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
             </div>
-          )}
+          ) : null}
 
-          {mode === "typing" && suggestions.length > 0 && (
+          {(mode === "typing" || mode === "results") && suggestions.length > 0 && (
             <div className="suggestions">
               <ul>
                 {suggestions.map((suggestion) => (
@@ -433,11 +636,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
             </div>
           )}
 
-          {(mode === "home" || mode === "results" || mode === "typing") && (
+          {(mode === "results" || mode === "typing") && (
             <div className="grid-wrap">
               {submittedQuery && mode === "results" ? (
                 <div className="result-context">
-                  <span>{isLoading ? "Searching media" : `${results.length} matches`}</span>
+                  <span>{isLoading && results.length === 0 ? "Searching…" : `${results.length} candidates`}</span>
                   <strong>{submittedQuery}</strong>
                 </div>
               ) : null}
@@ -445,10 +648,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
 
               <div className="grid">
                 {isLoading && results.length === 0 ? (
-                  <div className="search-loading">
-                    <span className="task-loading-spinner" aria-hidden="true" />
-                    Searching semantically...
-                  </div>
+                  Array.from({ length: 51 }, (_, i) => (
+                    <div key={i} className="thumb-skeleton" aria-hidden="true" />
+                  ))
                 ) : results.length === 0 ? (
                   <div className="search-empty">No results</div>
                 ) : results.map((result) => {
@@ -460,10 +662,15 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                       key={result.id}
                       className={`thumb ${selected ? "thumb--selected" : ""}`}
                       type="button"
-                      onClick={() => openDetail(result)}
-                      aria-label={`Open ${itemTitle(result)}`}
+                      onPointerDown={(e) => handleItemPointerDown(e, result)}
+                      onPointerUp={(e) => handleItemPointerUp(e, result)}
+                      onPointerMove={handleItemPointerMove}
+                      onPointerCancel={handleItemPointerCancel}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
+                      aria-label={`${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
+                      aria-pressed={selected}
                     >
-                      {thumb ? <img src={thumb} alt={result.metadata.search?.description ?? ""} /> : <span className="thumb-fallback" />}
+                      {thumb ? <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" /> : <span className="thumb-fallback" />}
                       {video ? (
                         <span className="video-badge">
                           <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -473,10 +680,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                         </span>
                       ) : null}
                       {selected ? (
-                        <span className="selected-check" aria-hidden>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                        <span className="selected-num" aria-hidden>
+                          {selectedItems.findIndex((i) => i.id === result.id) + 1}
                         </span>
                       ) : null}
                     </button>
@@ -490,7 +695,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                     <button
                       className="footer-action"
                       type="button"
-                      onClick={() => void runSearch(submittedQuery || query, visibleCount + 20)}
+                      onClick={() => void runSearch(submittedQuery || query, visibleCount + SEARCH_BATCH_SIZE)}
                     >
                       Show more results
                     </button>
@@ -520,20 +725,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
 
           {mode === "detail" && detailItem && (
             <div className="detail-screen">
-              <div className="detail-top">
-                <button className="icon-btn" type="button" onClick={() => setMode("results")} aria-label="Back to results">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <button className="icon-btn" type="button" onClick={() => toggleSelected(detailItem)} aria-label="Select item">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="detail-media">
+              <div className="detail-media-fill">
                 {isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
                   <video src={resolvedMediaUrl(detailItem) ?? undefined} poster={resolvedThumbnailUrl(detailItem) ?? undefined} controls muted />
                 ) : (
@@ -541,35 +733,50 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
                 )}
               </div>
 
-              <div className="detail-caption">
-                <strong>{itemTitle(detailItem)}</strong>
-                {itemDateLabel(detailItem) ? <span>{itemDateLabel(detailItem)}</span> : null}
+              <div className="detail-float-top">
+                <button className="detail-float-btn" type="button" onClick={() => setMode("results")} aria-label="Back to results">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {itemDateLabel(detailItem) ? (
+                  <div className="detail-float-info">
+                    <span>{itemDateLabel(detailItem)}</span>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="detail-actions">
-                <button className="action" type="button" onClick={() => searchSameDate(detailItem)}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <div className="detail-float-bottom">
+                <button className="detail-float-action" type="button" onClick={() => searchSameDate(detailItem)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                     <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.4" />
                     <path d="M3 8h18" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
                   <span>Same Date</span>
                 </button>
-
-                <button className="action" type="button" onClick={() => void runSimilarSearch(detailItem)}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <button className="detail-float-action" type="button" onClick={() => void runSimilarSearch(detailItem)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                     <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.4" />
                     <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
                   <span>Similar</span>
                 </button>
-
-                <button className="action action--primary" type="button" onClick={() => sendSelection(detailItem)}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M22 2 11 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M22 2 15 22l-4-9-9-4L22 2z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>Send</span>
-                </button>
+                {onConfirmAnswer ? (
+                  <button className="detail-float-action detail-float-action--primary" type="button" onClick={() => onConfirmAnswer(detailItem.id)}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="m5 12 4 4L19 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Confirm Answer</span>
+                  </button>
+                ) : (
+                  <button className="detail-float-action detail-float-action--primary" type="button" onClick={() => sendSelection(detailItem)}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M22 2 11 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                      <path d="M22 2 15 22l-4-9-9-4L22 2z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Send</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -578,12 +785,34 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate }: PhoneVi
             <div className="selection-tray" aria-live="polite">
               <div className="selection-thumbs">
                 {selectedItems.slice(0, 4).map((item) => (
-                  <img key={item.id} src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" />
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="selection-thumb-btn"
+                    onClick={() => toggleSelected(item)}
+                    aria-label={`Remove ${itemTitle(item)} from selection`}
+                  >
+                    <span className="selection-thumb-x" aria-hidden>
+                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                    <img src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" loading="lazy" decoding="async" />
+                  </button>
                 ))}
               </div>
               <span>{selectedItems.length} selected</span>
-              <button className="send-btn" type="button" onClick={() => setSelectedItems([])}>
-                Send
+              <button
+                className="send-btn"
+                type="button"
+                onClick={() => {
+                  if (onConfirmAnswer && selectedItems.length > 0) {
+                    onConfirmAnswer(selectedItems[0].id);
+                  }
+                  setSelectedItems([]);
+                }}
+              >
+                {onConfirmAnswer ? "Confirm" : "Send"}
               </button>
             </div>
           )}

@@ -73,9 +73,10 @@ external Google Fonts CSS imports.
 
 ## Phone Tester UI
 
-`src/phone-tester-ui/` currently contains the standalone phone tester shell. The
-actual Recall phone search UI still needs to be implemented. The guided task
-screen embeds a framed participant viewport through `PhoneViewportFrame`.
+`src/phone-tester-ui/` contains the standalone phone tester shell at `/phone`.
+`PhoneViewportFrame` implements the full Recall search UI: semantic + text
+search, autocomplete suggestions, photo grid with selection, detail view, and
+similar/same-date discovery. The guided task screen embeds the same viewport.
 
 ## Directory Layout
 
@@ -94,12 +95,11 @@ frontend/
 
 - React 19
 - Vite 7
-- Fontsource packages for self-hosted fonts
-- Radix Progress for accessible task progress state
-
-Use custom CSS for the app's visual identity. Radix primitives are useful for
-accessible behavior, but avoid introducing a large styled component kit unless
-the design direction is intentionally revisited.
+- Tailwind v4 (via `@tailwindcss/vite`)
+- shadcn/ui component registry (`src/components/ui/`)
+- lucide-react for icons
+- Fontsource packages for self-hosted fonts (Source Serif 4, Geist, IBM Plex Sans/Mono)
+- Radix UI primitives for accessible behavior
 
 ## Backend API Usage
 
