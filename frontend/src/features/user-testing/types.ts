@@ -1,4 +1,4 @@
-export type UserTestScreen = "welcome" | "instructions" | "task" | "results";
+export type UserTestScreen = "welcome" | "task" | "results";
 
 export type TrialPhase = "idle" | "active";
 

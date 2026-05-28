@@ -393,131 +393,6 @@ a {
   flex-shrink: 0;
 }
 
-/* ============================================================
-   Instructions Screen
-   ============================================================ */
-
-.instructions-shell {
-  height: 100dvh;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 56px 72px;
-}
-
-.instructions-content {
-  width: min(100%, 1080px);
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 80px;
-  align-items: start;
-}
-
-.instructions-header {
-  position: sticky;
-  top: 56px;
-  display: flex;
-  flex-direction: column;
-}
-
-.instructions-title {
-  margin: 0 0 16px;
-  color: var(--ut-ink);
-  font-family: var(--font-display);
-  font-size: 3.3rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.instructions-subtitle {
-  margin: 0;
-  color: var(--ut-muted-dark);
-  font-size: 1rem;
-  line-height: 1.65;
-}
-
-.steps-list {
-  list-style: none;
-  margin: 0;
-  padding: 8px 0 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.step-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 50px 42px minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
-  padding: 24px 0 24px 24px;
-  border-bottom: 1px solid var(--ut-line);
-  background: rgba(251, 247, 239, 0.34);
-  transition: background 0.16s ease;
-}
-
-.step-item:first-child {
-  border-top: 1px solid var(--ut-line);
-}
-
-.step-item:hover {
-  background: rgba(251, 247, 239, 0.7);
-}
-
-.step-number {
-  position: relative;
-  z-index: 1;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ut-line-strong);
-  border-radius: var(--ut-radius-sm);
-  background: var(--ut-paper);
-  color: var(--ut-muted-dark);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ut-blue);
-}
-
-.step-body {
-  min-width: 0;
-}
-
-.step-title {
-  margin: 0 0 7px;
-  color: var(--ut-ink);
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.step-desc {
-  max-width: 58ch;
-  margin: 0;
-  color: var(--ut-muted-dark);
-  font-size: 0.92rem;
-  line-height: 1.65;
-}
-
-.instructions-footer {
-  grid-column: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 4px;
-}
 
 /* ============================================================
    Task Screen
@@ -2086,7 +1961,6 @@ html {
 
 @media (max-width: 1180px) {
   .welcome-shell,
-  .instructions-shell,
   .results-shell {
     padding-right: 48px;
     padding-left: 48px;
@@ -2101,11 +1975,6 @@ html {
     font-size: 4rem;
   }
 
-  .instructions-content {
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 48px;
-  }
-
   .task-phone-col {
     padding-right: 32px;
     padding-left: 32px;
@@ -2115,6 +1984,10 @@ html {
 @media (max-width: 768px), (max-height: 560px) and (max-width: 1024px) {
   body {
     min-width: 0;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: #fffdf8;
   }
 
@@ -2149,6 +2022,71 @@ html {
       max(12px, env(safe-area-inset-right))
       max(24px, env(safe-area-inset-bottom))
       max(12px, env(safe-area-inset-left));
+  }
+}
+
+/* ============================================================
+   Mobile responsive — User Testing Harness screens
+   ============================================================ */
+
+@media (max-width: 767px) {
+  body {
+    background: var(--ut-bg);
+  }
+
+  /* Welcome Screen */
+  .welcome-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding: 40px 20px 48px;
+  }
+
+  .welcome-content {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+
+  .welcome-title {
+    font-size: 3.2rem;
+    line-height: 1;
+  }
+
+  /* Task Screen (idle phase) */
+  .trial-idle-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding: 40px 20px 48px;
+    justify-content: flex-start;
+    align-items: stretch;
+  }
+
+  .trial-idle-content {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .trial-idle-title {
+    font-size: 3rem;
+    line-height: 1.02;
+  }
+
+  /* Results Screen */
+  .results-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding: 40px 20px 48px;
+  }
+
+  .results-title {
+    font-size: 2.8rem;
+  }
+
+  .results-metrics {
+    grid-template-columns: 1fr;
   }
 }
 

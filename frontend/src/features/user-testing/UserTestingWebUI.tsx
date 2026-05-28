@@ -1,33 +1,17 @@
 import { lazy, Suspense, useState } from "react";
 import type { TrialResult, UserTestScreen } from "./types";
+import { WelcomeScreen } from "./screens/WelcomeScreen";
 
-const InstructionsScreen = lazy(() =>
-  import("./screens/InstructionsScreen").then((m) => ({ default: m.InstructionsScreen })),
-);
 const ResultsScreen = lazy(() =>
   import("./screens/ResultsScreen").then((m) => ({ default: m.ResultsScreen })),
 );
 const TaskScreen = lazy(() =>
   import("./screens/TaskScreen").then((m) => ({ default: m.TaskScreen })),
 );
-const WelcomeScreen = lazy(() =>
-  import("./screens/WelcomeScreen").then((m) => ({ default: m.WelcomeScreen })),
-);
 
 export function UserTestingWebUI() {
   const [screen, setScreen] = useState<UserTestScreen>("welcome");
   const [sessionResults, setSessionResults] = useState<TrialResult[]>([]);
-
-  if (screen === "instructions") {
-    return (
-      <Suspense fallback={null}>
-        <InstructionsScreen
-          onBack={() => setScreen("welcome")}
-          onBegin={() => setScreen("task")}
-        />
-      </Suspense>
-    );
-  }
 
   if (screen === "task") {
     return (
@@ -56,9 +40,5 @@ export function UserTestingWebUI() {
     );
   }
 
-  return (
-    <Suspense fallback={null}>
-      <WelcomeScreen onStartTrial={() => setScreen("instructions")} />
-    </Suspense>
-  );
+  return <WelcomeScreen onStartTrial={() => setScreen("task")} />;
 }

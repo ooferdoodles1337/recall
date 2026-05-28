@@ -29,8 +29,8 @@ export function WelcomeScreen({ onStartTrial }: WelcomeScreenProps) {
               <PlayCircleIcon data-icon="inline-start" />
             </span>
             <span className="action-card-body">
-              <span className="action-card-title">Start Guided Trial</span>
-              <span className="action-card-desc">Walk through instructions, then complete photo-finding tasks</span>
+              <span className="action-card-title">Start Trial</span>
+              <span className="action-card-desc">Begin timed photo-finding tasks</span>
             </span>
             <ArrowRightIcon className="action-card-arrow" aria-hidden="true" data-icon="inline-end" />
           </Button>
