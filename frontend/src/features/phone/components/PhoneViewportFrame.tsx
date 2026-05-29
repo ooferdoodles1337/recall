@@ -125,10 +125,10 @@ const MOTION_EASE = {
   exit: [0.4, 0, 1, 1] as [number, number, number, number],
 };
 const screenMotionVariants = {
-  enter: (direction: MotionDirection) => ({
+  enter: ({ direction, reason }: ModeTransition) => ({
     opacity: 0,
-    y: direction === "back" ? -10 : 14,
-    scale: direction === "back" ? 1.012 : 0.988,
+    y: reason === "search-clear" ? 0 : direction === "back" ? -10 : 14,
+    scale: reason === "search-clear" ? 1 : direction === "back" ? 1.012 : 0.988,
   }),
   center: {
     opacity: 1,
@@ -139,13 +139,13 @@ const screenMotionVariants = {
       ease: MOTION_EASE.standard,
     },
   },
-  exit: (direction: MotionDirection) => ({
+  exit: ({ direction, reason }: ModeTransition) => ({
     opacity: 0,
-    y: direction === "back" ? 16 : -8,
-    scale: direction === "back" ? 0.986 : 1.01,
+    y: reason === "search-clear" ? 0 : direction === "back" ? 16 : -8,
+    scale: reason === "search-clear" ? 0.96 : direction === "back" ? 0.986 : 1.01,
     transition: {
-      duration: PHONE_MOTION.exitMs / 1000,
-      ease: MOTION_EASE.exit,
+      duration: reason === "search-clear" ? 0.2 : PHONE_MOTION.exitMs / 1000,
+      ease: reason === "search-clear" ? ([0.4, 0, 0.2, 1] as [number, number, number, number]) : MOTION_EASE.exit,
     },
   }),
 };
@@ -1462,12 +1462,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         >
           <MotionConfig reducedMotion="user">
             <LayoutGroup id="phone-ui">
-              <AnimatePresence initial={false} mode="popLayout" custom={modeTransition.direction}>
+              <AnimatePresence initial={false} mode="popLayout" custom={modeTransition}>
                 {contentMode === "home" ? (
                   <motion.div
                     key={`screen-${contentMode}`}
                     className="phone-screen phone-screen--home"
-                    custom={modeTransition.direction}
+                    custom={modeTransition}
                     variants={screenMotionVariants}
                     initial="enter"
                     animate="center"
@@ -1635,7 +1635,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                   <motion.div
                     key={`screen-${contentMode}`}
                     className="phone-screen phone-screen--search"
-                    custom={modeTransition.direction}
+                    custom={modeTransition}
                     variants={screenMotionVariants}
                     initial="enter"
                     animate="center"
