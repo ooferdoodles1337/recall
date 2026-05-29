@@ -718,6 +718,26 @@ def _update_metadata_row(conn: sqlite3.Connection, file_id: str, metadata: dict)
     )
 
 
+def patch_item(file_id: str, patch: dict) -> dict:
+    """Deep-merge a partial metadata patch into an existing item's metadata_json.
+    Promotes changed fields to SQLite columns. Returns the updated item."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT id, metadata_json FROM media_items WHERE id = ?",
+            (file_id,),
+        ).fetchone()
+    if row is None:
+        raise ValueError(f"Item not found: {file_id}")
+
+    existing_metadata = json.loads(row["metadata_json"])
+    merged = metadata_schema.merge_metadata(existing_metadata, patch)
+
+    with _connect() as conn:
+        _update_metadata_row(conn, file_id, merged)
+
+    return get_item(file_id) or {"id": file_id, "metadata": merged}
+
+
 def replace_safety(file_id: str, safety: dict) -> None:
     with _connect() as conn:
         row = conn.execute(

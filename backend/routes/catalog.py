@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -25,6 +25,18 @@ def get_item(id: str):
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
+
+
+@router.patch("/items/{id}")
+def patch_item(id: str, body: dict[str, Any]):
+    item = catalog.get_item(id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        updated = catalog.patch_item(id, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return updated
 
 
 class BatchRequest(BaseModel):

@@ -9,10 +9,13 @@ import {
   HistoryIcon,
   ImageOffIcon,
   InfoIcon,
+  MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
   SearchIcon,
   ShieldAlertIcon,
+  ShieldCheckIcon,
+  StarIcon,
   UserIcon,
   SendIcon,
   SparklesIcon,
@@ -26,6 +29,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -38,9 +48,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { RecallMediaItem, RecallSearchResult } from "@/shared/types/recall";
 import { isAnimatedImage, isVideo, resolvedAnimatedThumbnailUrl, resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
+import { AboutSheet } from "./AboutSheet";
 import {
   listFavoriteItems,
   listRecentItems,
+  patchCatalogItem,
   searchSemantic,
   searchSimilarById,
   searchText,
@@ -51,6 +63,7 @@ interface PhoneViewportFrameProps {
   currentTarget?: RecallMediaItem;
   onSelectCandidate?: (id: string) => void;
   onConfirmAnswer?: (id: string) => void;
+  onExit?: () => void;
 }
 
 type PhoneMode = "home" | "typing" | "results" | "detail";
@@ -439,9 +452,10 @@ interface NsfwDialogProps {
   onKeepHidden: () => void;
   onRevealOne: (id: string) => void;
   onRevealAll: () => void;
+  onMarkSafe: (item: RecallMediaItem) => void;
 }
 
-function NsfwDialog({ item, onKeepHidden, onRevealOne, onRevealAll }: NsfwDialogProps) {
+function NsfwDialog({ item, onKeepHidden, onRevealOne, onRevealAll, onMarkSafe }: NsfwDialogProps) {
   const mediaType = item.metadata.asset?.media_type === "video" ? "video" : "photo";
   return (
     <div className="nsfw-backdrop" role="dialog" aria-modal aria-label="Sensitive content warning" onClick={onKeepHidden}>
@@ -459,6 +473,9 @@ function NsfwDialog({ item, onKeepHidden, onRevealOne, onRevealAll }: NsfwDialog
           </button>
           <button className="nsfw-sheet-btn nsfw-sheet-btn--reveal-one" type="button" onClick={() => onRevealOne(item.id)}>
             Reveal This One
+          </button>
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--mark-safe" type="button" onClick={() => onMarkSafe(item)}>
+            Mark as Safe
           </button>
           <button className="nsfw-sheet-btn nsfw-sheet-btn--cancel" type="button" onClick={onKeepHidden}>
             Keep Hidden
@@ -513,6 +530,9 @@ interface VideoDetailViewProps {
   onRunSimilarSearch: (item: RecallMediaItem) => void;
   onConfirmAnswer?: (id: string) => void;
   onSendSelection: (item: RecallMediaItem) => void;
+  onToggleFavorite: (item: RecallMediaItem) => void;
+  onToggleSafety: (item: RecallMediaItem, state: "safe" | "nsfw") => void;
+  onOpenAbout: (item: RecallMediaItem) => void;
   layoutId?: string;
 }
 
@@ -523,6 +543,9 @@ function VideoDetailView({
   onRunSimilarSearch,
   onConfirmAnswer,
   onSendSelection,
+  onToggleFavorite,
+  onToggleSafety,
+  onOpenAbout,
   layoutId,
 }: VideoDetailViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -628,6 +651,7 @@ function VideoDetailView({
   return (
     <motion.div
       className={`detail-screen detail-screen--video phone-detail-motion ${chromeVisible ? "detail-screen--chrome-visible" : "detail-screen--chrome-hidden"}${isScrubbing ? " detail-screen--scrubbing" : ""}`}
+      aria-label={`${itemTitle(item)} detail view`}
       variants={detailBackdropMotion}
       initial="initial"
       animate="animate"
@@ -670,10 +694,55 @@ function VideoDetailView({
           <Badge variant="outline" className="detail-float-info">
             <span>{itemDateLabel(item)}</span>
           </Badge>
-        ) : null}
+        ) : <div className="detail-float-info-spacer" />}
+        <Button
+          className="detail-float-btn"
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => onToggleFavorite(item)}
+          aria-label={item.metadata.organization?.favorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          {item.metadata.organization?.favorite ? (
+            <StarIcon fill="currentColor" />
+          ) : (
+            <StarIcon />
+          )}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="detail-float-btn"
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="More actions"
+            >
+              <MoreHorizontalIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {item.metadata.safety?.state === "nsfw" ? (
+              <DropdownMenuItem onClick={() => onToggleSafety(item, "safe")}>
+                <ShieldCheckIcon />
+                Mark as Safe
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onToggleSafety(item, "nsfw")}>
+                <ShieldAlertIcon />
+                Mark as NSFW
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onOpenAbout(item)}>
+              <InfoIcon />
+              About
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="video-control-panel video-chrome" onPointerMove={revealChrome}>
+      <div className="video-control-panel video-chrome" role="group" aria-label="Detail actions" onPointerMove={revealChrome}>
         <div className="video-action-row">
           <Button
             className="detail-float-action h-auto"
@@ -750,7 +819,7 @@ function VideoDetailView({
   );
 }
 
-export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer }: PhoneViewportFrameProps) {
+export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer, onExit }: PhoneViewportFrameProps) {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [results, setResults] = useState<RecallMediaItem[]>([]);
@@ -805,6 +874,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const [nsfwRevealedIds, setNsfwRevealedIds] = useState<Set<string>>(new Set());
   const [nsfwRevealedAll, setNsfwRevealedAll] = useState(false);
   const [nsfwPendingItem, setNsfwPendingItem] = useState<RecallMediaItem | null>(null);
+  const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
 
   const transitionToMode = useCallback((nextMode: PhoneMode, reason: ModeTransitionReason = "initial") => {
     const fromMode = modeRef.current;
@@ -1181,11 +1251,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setIsLoadingMore(false);
     setIsLoading(true);
     setErrorMessage(null);
+    setResults([]);
     setVisibleCount(count);
 
     if (!isPreview) {
       setShowHistory(false);
       transitionToMode("results", "search-commit");
+      scrollContainerRef.current?.scrollTo({ top: 0 });
       setSubmittedQuery(q);
     }
 
@@ -1231,6 +1303,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setResults([]);
     setDetailItem(null);
     transitionToMode("results", "similar-search");
+    scrollContainerRef.current?.scrollTo({ top: 0 });
     setSubmittedQuery("similar items");
     setQuery("");
 
@@ -1298,6 +1371,45 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       : selectedItems;
     setSelectedItems(nextSelection);
   }, [selectedItems]);
+
+  const handleToggleFavorite = useCallback(async (item: RecallMediaItem) => {
+    const current = item.metadata.organization?.favorite ?? false;
+    const patch = { organization: { favorite: !current } };
+    try {
+      const updated = await patchCatalogItem(item.id, patch);
+      if (detailItem?.id === item.id) {
+        setDetailItem(updated);
+      }
+      const existsInFavorites = favoriteItems.some((f) => f.id === item.id);
+      if (existsInFavorites && current) {
+        setFavoriteItems((prev) => prev.filter((f) => f.id !== item.id));
+      } else if (!existsInFavorites && !current) {
+        setFavoriteItems((prev) => [updated, ...prev]);
+      } else {
+        setFavoriteItems((prev) =>
+          prev.map((f) => (f.id === item.id ? updated : f)),
+        );
+      }
+    } catch {
+      // no-op
+    }
+  }, [detailItem, favoriteItems]);
+
+  const handleToggleSafety = useCallback(async (item: RecallMediaItem, state: "safe" | "nsfw") => {
+    const patch = { safety: { state } };
+    try {
+      const updated = await patchCatalogItem(item.id, patch);
+      if (detailItem?.id === item.id) {
+        setDetailItem(updated);
+      }
+      if (state === "safe") {
+        setNsfwRevealedIds((prev) => new Set([...prev, item.id]));
+        setNsfwPendingItem(null);
+      }
+    } catch {
+      // no-op
+    }
+  }, [detailItem]);
 
   const removeHistoryItem = useCallback((item: string) => {
     setHistory((prev) => {
@@ -1604,14 +1716,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   );
 
   return (
-    <div className="phone-stage">
-      <div
-        ref={phoneRectRef}
-        className={`phone-rect${contentMode === "home" ? " phone-rect--home" : ""}${showSelectionTray ? " phone-rect--has-selection" : ""}`}
-        style={gridDensityStyle}
-        data-reduced-motion={prefersReducedMotion ? "true" : undefined}
-        aria-label="Phone interface viewport"
-      >
+    <div
+      ref={phoneRectRef}
+      className={`phone-rect${contentMode === "home" ? " phone-rect--home" : ""}${showSelectionTray ? " phone-rect--has-selection" : ""}`}
+      style={gridDensityStyle}
+      data-reduced-motion={prefersReducedMotion ? "true" : undefined}
+      aria-label="Phone interface viewport"
+    >
         {mode === "results" && hasMore ? (
           <div
             className={`pull-indicator${overscrollProgress > 0 ? " pull-indicator--visible" : ""}${overscrollProgress >= 1 ? " pull-indicator--ready" : ""}`}
@@ -1720,11 +1831,25 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                   </div>
                   <h1 className="phone-startpage-title">Recall</h1>
                 </div>
-                <Avatar className="phone-avatar" aria-label="Profile">
-                  <AvatarFallback>
-                    <UserIcon className="size-3.5" />
-                  </AvatarFallback>
-                </Avatar>
+                <div className="phone-startpage-actions">
+                  <Avatar className="phone-avatar" aria-label="Profile">
+                    <AvatarFallback>
+                      <UserIcon className="size-3.5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  {onExit ? (
+                    <Button
+                      className="phone-exit-btn"
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={onExit}
+                      aria-label="Exit phone tester"
+                    >
+                      <XIcon />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="phone-startpage-search-sticky">
@@ -1791,7 +1916,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               </div>
 
               {showFavoritesSection ? (
-                <section className="phone-favorites-section phone-media-grid-zone" aria-labelledby="phone-favorites-title" {...gridGestureHandlers}>
+                <section className="phone-favorites-section phone-media-grid-zone" data-testid="phone-favorites-grid-zone" aria-labelledby="phone-favorites-title" {...gridGestureHandlers}>
                   <div className="phone-favorites-header">
                     <h2 id="phone-favorites-title" className="phone-favorites-title">Favorites</h2>
                     <div className="phone-favorites-actions">
@@ -1801,7 +1926,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
                     </div>
                   </div>
-                  <div ref={favoritesGridRef} className={`${mediaGridClassName} phone-favorites-grid`} data-phone-grid-scope="favorites">
+                  <div ref={favoritesGridRef} className={`${mediaGridClassName} phone-favorites-grid`} data-phone-grid-scope="favorites" role="group" aria-label="Favorite media grid">
                     {isLoadingFavorites ? (
                       Array.from({ length: 9 }, (_, index) => (
                         <Skeleton key={index} className="thumb-skeleton" data-phone-grid-item={`favorite-skeleton-${index}`} aria-hidden="true" />
@@ -1837,7 +1962,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     animate="center"
                     exit="exit"
                   >
-                    <div className="grid-wrap phone-media-grid-zone" {...gridGestureHandlers}>
+                    <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...gridGestureHandlers}>
               <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
                 {submittedQuery && contentMode === "results" ? (
                   <div className="result-context">
@@ -1853,9 +1978,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 </Alert>
               ) : null}
 
-              <div ref={searchGridRef} className={mediaGridClassName} data-phone-grid-scope="search">
+              <div ref={searchGridRef} className={mediaGridClassName} data-phone-grid-scope="search" role="group" aria-label="Search results">
                 {isLoading && results.length === 0 ? (
-                  Array.from({ length: 51 }, (_, i) => (
+                  Array.from({ length: SEARCH_BATCH_SIZE }, (_, i) => (
                     <Skeleton key={i} className="thumb-skeleton" data-phone-grid-item={`loading-${i}`} aria-hidden="true" />
                   ))
                 ) : results.length === 0 && contentMode === "results" ? (
@@ -1946,12 +2071,16 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 onRunSimilarSearch={(item) => void runSimilarSearch(item)}
                 onConfirmAnswer={onConfirmAnswer}
                 onSendSelection={sendSelection}
+                onToggleFavorite={handleToggleFavorite}
+                onToggleSafety={handleToggleSafety}
+                onOpenAbout={setAboutSheetItem}
                 layoutId={mediaLayoutId(detailItem.id)}
               />
             ) : (
               <motion.div
                 key={detailItem.id}
                 className="detail-screen phone-detail-motion"
+                aria-label={`${itemTitle(detailItem)} detail view`}
                 variants={detailBackdropMotion}
                 initial="initial"
                 animate="animate"
@@ -1980,10 +2109,55 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     <Badge variant="outline" className="detail-float-info">
                       <span>{itemDateLabel(detailItem)}</span>
                     </Badge>
-                  ) : null}
+                  ) : <div className="detail-float-info-spacer" />}
+                  <Button
+                    className="detail-float-btn"
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleToggleFavorite(detailItem)}
+                    aria-label={detailItem.metadata.organization?.favorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    {detailItem.metadata.organization?.favorite ? (
+                      <StarIcon fill="currentColor" />
+                    ) : (
+                      <StarIcon />
+                    )}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="detail-float-btn"
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="More actions"
+                      >
+                        <MoreHorizontalIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {detailItem.metadata.safety?.state === "nsfw" ? (
+                        <DropdownMenuItem onClick={() => handleToggleSafety(detailItem, "safe")}>
+                          <ShieldCheckIcon />
+                          Mark as Safe
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleToggleSafety(detailItem, "nsfw")}>
+                          <ShieldAlertIcon />
+                          Mark as NSFW
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setAboutSheetItem(detailItem)}>
+                        <InfoIcon />
+                        About
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
-                <div className="detail-float-bottom">
+                <div className="detail-float-bottom" role="group" aria-label="Detail actions">
                   <Button
                     className="detail-float-action h-auto"
                     type="button"
@@ -2038,8 +2212,17 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
             onKeepHidden={() => setNsfwPendingItem(null)}
             onRevealOne={(id) => { setNsfwRevealedIds((prev) => new Set([...prev, id])); setNsfwPendingItem(null); }}
             onRevealAll={() => { setNsfwRevealedAll(true); setNsfwPendingItem(null); }}
+            onMarkSafe={(item) => void handleToggleSafety(item, "safe")}
           />
         )}
+
+        <MotionConfig reducedMotion="user">
+          <AnimatePresence initial={false}>
+            {aboutSheetItem && (
+              <AboutSheet item={aboutSheetItem} onClose={() => setAboutSheetItem(null)} />
+            )}
+          </AnimatePresence>
+        </MotionConfig>
 
         {/* Selection tray — floats above the scroll area */}
         <MotionConfig reducedMotion="user">
@@ -2047,6 +2230,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
             {showSelectionTray && (
               <motion.div
                 className="selection-tray"
+                role="region"
+                aria-label="Selection tray"
                 aria-live="polite"
                 initial={{ opacity: 0, y: 22, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2096,7 +2281,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
             )}
           </AnimatePresence>
         </MotionConfig>
-      </div>
     </div>
   );
 }

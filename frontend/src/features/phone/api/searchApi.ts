@@ -61,3 +61,11 @@ export function listFavoriteItems(count = 34, options?: RecallRequestOptions) {
       results: response.results.slice(0, count),
     }));
 }
+
+export function patchCatalogItem(id: string, patch: Record<string, unknown>) {
+  return recallFetch<RecallMediaItem>(`/catalog/items/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
