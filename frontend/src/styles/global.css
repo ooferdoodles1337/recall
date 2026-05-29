@@ -788,8 +788,55 @@ a {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+}
+
+.phone-screen {
+  min-height: 100%;
+  transform-origin: center top;
+  will-change: opacity, transform;
+}
+
+.phone-screen--search {
+  min-height: 100%;
+}
+
+.phone-panel-motion {
+  transform-origin: top center;
+  will-change: opacity, transform;
+}
+
+.phone-media-grid-zone,
+.phone-media-grid,
+.phone-media-grid .thumb {
+  touch-action: pan-y;
+}
+
+.phone-media-grid {
+  grid-template-columns: repeat(var(--phone-grid-columns, 3), minmax(0, 1fr));
+  gap: var(--phone-grid-gap, 6px);
+}
+
+.phone-thumb-motion {
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  border-radius: var(--phone-grid-radius, var(--r-1));
+}
+
+.phone-thumb-motion .thumb {
+  width: 100%;
+  height: 100%;
+}
+
+.phone-media-grid--natural .phone-thumb-motion {
+  aspect-ratio: var(--phone-thumb-aspect-ratio, 1 / 1);
+}
+
+.phone-media-grid--natural .thumb {
+  aspect-ratio: auto;
+}
+
+.phone-media-grid--natural .thumb-skeleton {
+  aspect-ratio: 4 / 3;
 }
 
 .search-loading,
@@ -803,7 +850,7 @@ a {
 
 .thumb-skeleton {
   aspect-ratio: 1 / 1;
-  border-radius: var(--r-1);
+  border-radius: var(--phone-grid-radius, var(--r-1));
   background: linear-gradient(
     90deg,
     #e5e5ea 0%,
@@ -824,7 +871,7 @@ a {
   padding: 0;
   background: transparent;
   display: block;
-  border-radius: 12px;
+  border-radius: var(--phone-grid-radius, 12px);
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(18,24,20,0.06);
@@ -860,6 +907,19 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .thumb-animated { display: none; }
+
+  .phone-screen,
+  .phone-panel-motion,
+  .phone-detail-motion,
+  .phone-detail-media-motion,
+  .selection-tray {
+    transition: none;
+    animation: none;
+  }
+
+  .selected-num {
+    animation: none;
+  }
 }
 
 /* Full-screen gallery detail view */
@@ -871,12 +931,21 @@ a {
   background: #000;
 }
 
+.phone-detail-motion {
+  transform-origin: center;
+}
+
 .detail-media-fill {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.phone-detail-media-motion {
+  overflow: hidden;
+  will-change: transform;
 }
 
 .detail-media-fill img,
@@ -1122,12 +1191,26 @@ a {
 }
 
 /* Result context label */
+.phone-grid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 32px;
+  margin: var(--sp-1) 0 var(--sp-2);
+}
+
+.phone-grid-toolbar--controls-only {
+  justify-content: flex-end;
+}
+
 .result-context {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 8px 0;
+  min-width: 0;
+  margin: 0;
   color: var(--ios-label-secondary);
   font-size: 0.78rem;
   font-weight: 600;
@@ -1145,6 +1228,35 @@ a {
   font-weight: 600;
 }
 
+.phone-grid-zoom-controls {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.phone-grid-zoom-btn {
+  border-radius: 50%;
+  color: var(--ios-label-secondary);
+}
+
+.phone-grid-zoom-btn:hover {
+  color: var(--ios-label);
+  background: rgba(60, 60, 67, 0.08);
+}
+
+.phone-grid-zoom-btn:disabled {
+  color: var(--ios-label-tertiary);
+  opacity: 0.5;
+}
+
 .search-notice {
   margin-bottom: 10px;
   border-radius: 10px;
@@ -1153,15 +1265,15 @@ a {
 }
 
 /* iOS Photos-style tight grid */
-.grid {
-  gap: var(--sp-xs);
+.phone-media-grid {
+  gap: var(--phone-grid-gap, var(--sp-xs));
 }
 
 .thumb {
   position: relative;
   aspect-ratio: 1 / 1;
   border: none;
-  border-radius: var(--r-1);
+  border-radius: var(--phone-grid-radius, var(--r-1));
   background: var(--ios-sys-bg-secondary);
   box-shadow: none;
 }
@@ -1226,6 +1338,18 @@ a {
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1;
+  animation: selected-badge-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes selected-badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Results footer card */
@@ -1967,10 +2091,16 @@ html {
 
 .phone-favorites-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
   padding: 0 var(--sp-1) var(--sp-2);
+}
+
+.phone-favorites-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
 /* iOS section header style */
@@ -1994,8 +2124,6 @@ html {
 /* Tight iOS Photos grid */
 .phone-favorites-grid {
   width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-xs);
 }
 
 /* History section */
