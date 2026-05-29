@@ -5,12 +5,14 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ClockIcon,
+  EyeOffIcon,
   HistoryIcon,
   ImageOffIcon,
   InfoIcon,
   PauseIcon,
   PlayIcon,
   SearchIcon,
+  ShieldAlertIcon,
   UserIcon,
   SendIcon,
   SparklesIcon,
@@ -81,7 +83,7 @@ type ModeTransition = {
   key: number;
 };
 
-const SEARCH_BATCH_SIZE = 51;
+const SEARCH_BATCH_SIZE = 50;
 const FAVORITES_COUNT = 34;
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
@@ -170,6 +172,10 @@ const detailBackdropMotion = {
   exit: { opacity: 0, transition: { duration: 0.16, ease: MOTION_EASE.exit } },
 };
 
+
+function isItemNsfw(item: RecallMediaItem) {
+  return item.metadata.safety?.state === "nsfw";
+}
 
 function makeMockItem(seed: string, q?: string): RecallMediaItem {
   const thumb = `https://picsum.photos/seed/${encodeURIComponent(seed)}/440/330`;
@@ -350,6 +356,7 @@ function playbackTimeLabel(seconds: number) {
 
 interface ThumbCellProps {
   result: RecallMediaItem;
+  isBlurred: boolean;
   selected: boolean;
   selectionIndex: number;
   naturalAspectRatio: boolean;
@@ -360,7 +367,7 @@ interface ThumbCellProps {
   toggleSelected: (item: RecallMediaItem) => void;
 }
 
-const ThumbCell = React.memo(function ThumbCell({ result, selected, selectionIndex, naturalAspectRatio, onPointerDown, onPointerUp, onPointerMove, onPointerCancel, toggleSelected }: ThumbCellProps) {
+const ThumbCell = React.memo(function ThumbCell({ result, isBlurred, selected, selectionIndex, naturalAspectRatio, onPointerDown, onPointerUp, onPointerMove, onPointerCancel, toggleSelected }: ThumbCellProps) {
   const [staticLoaded, setStaticLoaded] = useState(false);
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<string | null>(null);
   const thumb = resolvedThumbnailUrl(result) ?? result.links?.thumbnail ?? result.links?.media;
@@ -395,32 +402,72 @@ const ThumbCell = React.memo(function ThumbCell({ result, selected, selectionInd
         onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
-        aria-label={`${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
-        aria-pressed={selected}
+        aria-label={isBlurred ? "Sensitive content — tap to review" : `${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
+        aria-pressed={isBlurred ? undefined : selected}
       >
         {thumb ? (
-          <div className="thumb-img-wrap">
+          <div className={`thumb-img-wrap${isBlurred ? " thumb-img-wrap--nsfw" : ""}`}>
             <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" onLoad={handleStaticThumbLoad} />
-            {staticLoaded && animatedThumb ? (
+            {!isBlurred && staticLoaded && animatedThumb ? (
               <img src={animatedThumb} alt="" aria-hidden loading="lazy" decoding="async" className="thumb-animated" onLoad={(e) => { e.currentTarget.style.opacity = "1"; }} />
+            ) : null}
+            {isBlurred ? (
+              <div className="nsfw-thumb-overlay" aria-hidden>
+                <EyeOffIcon />
+              </div>
             ) : null}
           </div>
         ) : <span className="thumb-fallback" />}
-        {video ? (
+        {!isBlurred && video ? (
           <Badge variant="secondary" className="video-badge">
             <PlayIcon />
             {durationLabel(result.metadata.asset?.duration_seconds) ?? "video"}
           </Badge>
-        ) : animated ? (
+        ) : !isBlurred && animated ? (
           <Badge variant="secondary" className="video-badge video-badge--gif">GIF</Badge>
         ) : null}
-        {selected ? (
+        {!isBlurred && selected ? (
           <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
         ) : null}
       </Button>
     </motion.div>
   );
 });
+
+interface NsfwDialogProps {
+  item: RecallMediaItem;
+  onKeepHidden: () => void;
+  onRevealOne: (id: string) => void;
+  onRevealAll: () => void;
+}
+
+function NsfwDialog({ item, onKeepHidden, onRevealOne, onRevealAll }: NsfwDialogProps) {
+  const mediaType = item.metadata.asset?.media_type === "video" ? "video" : "photo";
+  return (
+    <div className="nsfw-backdrop" role="dialog" aria-modal aria-label="Sensitive content warning" onClick={onKeepHidden}>
+      <div className="nsfw-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="nsfw-sheet-header">
+          <div className="nsfw-sheet-icon" aria-hidden>
+            <ShieldAlertIcon />
+          </div>
+          <p className="nsfw-sheet-title">Sensitive Content</p>
+          <p className="nsfw-sheet-body">This {mediaType} was flagged as potentially inappropriate.</p>
+        </div>
+        <div className="nsfw-sheet-actions">
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--reveal-all" type="button" onClick={onRevealAll}>
+            Reveal for Session
+          </button>
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--reveal-one" type="button" onClick={() => onRevealOne(item.id)}>
+            Reveal This One
+          </button>
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--cancel" type="button" onClick={onKeepHidden}>
+            Keep Hidden
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface GridZoomControlsProps {
   columns: GridColumns;
@@ -729,6 +776,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   });
   const prefersReducedMotion = useReducedMotion();
 
+  const phoneRectRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const loadMoreAbortRef = useRef<AbortController | null>(null);
   const topBarInputRef = useRef<HTMLInputElement>(null);
@@ -748,10 +797,14 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const gridFlipAnimationsRef = useRef<Animation[]>([]);
   const activeTouchPointersRef = useRef<Map<number, GridPoint>>(new Map());
   const pinchGestureRef = useRef<PinchGesture | null>(null);
+  const wheelAccumRef = useRef(0);
   const suppressSelectionUntilRef = useRef(0);
   const liveRef = useRef({ hasMore: false, submittedQuery: "", query: "", visibleCount: SEARCH_BATCH_SIZE, prefetchedResults: null as RecallMediaItem[] | null });
   const [prefetchedResults, setPrefetchedResults] = useState<RecallMediaItem[] | null>(null);
   const [overscrollProgress, setOverscrollProgress] = useState(0);
+  const [nsfwRevealedIds, setNsfwRevealedIds] = useState<Set<string>>(new Set());
+  const [nsfwRevealedAll, setNsfwRevealedAll] = useState(false);
+  const [nsfwPendingItem, setNsfwPendingItem] = useState<RecallMediaItem | null>(null);
 
   const transitionToMode = useCallback((nextMode: PhoneMode, reason: ModeTransitionReason = "initial") => {
     const fromMode = modeRef.current;
@@ -768,6 +821,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setMode(nextMode);
   }, []);
 
+  const isItemBlurred = useCallback((item: RecallMediaItem) =>
+    isItemNsfw(item) && !nsfwRevealedAll && !nsfwRevealedIds.has(item.id),
+  [nsfwRevealedAll, nsfwRevealedIds]);
+
+  const contentMode = mode === "detail" ? detailReturnModeRef.current : mode;
+
   useEffect(() => {
     return () => {
       searchAbortRef.current?.abort();
@@ -780,6 +839,22 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       activeTouchPointersRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    const bar = barRef.current;
+    const rect = phoneRectRef.current;
+    if (!rect) return;
+    if (contentMode === "home") {
+      rect.style.setProperty("--bar-height", "0px");
+      return;
+    }
+    if (!bar) return;
+    const ro = new ResizeObserver(([entry]) => {
+      rect.style.setProperty("--bar-height", `${entry.contentRect.height}px`);
+    });
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, [contentMode]);
 
   useEffect(() => {
     setDetailItem(null);
@@ -1109,6 +1184,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setVisibleCount(count);
 
     if (!isPreview) {
+      setShowHistory(false);
       transitionToMode("results", "search-commit");
       setSubmittedQuery(q);
     }
@@ -1174,6 +1250,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, [transitionToMode]);
 
   const openDetail = useCallback((item: RecallMediaItem) => {
+    if (isItemBlurred(item)) {
+      setNsfwPendingItem(item);
+      return;
+    }
     const currentMode = modeRef.current;
     if (currentMode !== "detail") {
       detailReturnModeRef.current = currentMode;
@@ -1181,7 +1261,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setDetailItem(item);
     transitionToMode("detail", "detail-open");
     onSelectCandidate?.(item.id);
-  }, [onSelectCandidate, transitionToMode]);
+  }, [isItemBlurred, onSelectCandidate, transitionToMode]);
 
   const closeDetail = useCallback(() => {
     const returnMode = detailReturnModeRef.current;
@@ -1319,7 +1399,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const el = scrollContainerRef.current;
     if (!el || mode !== "typing") return;
     const handleScroll = () => {
-      if (el.scrollTop > 10) transitionToMode("results", "scroll-commit");
+      if (el.scrollTop > 10) {
+        setShowHistory(false);
+        transitionToMode("results", "scroll-commit");
+      }
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
@@ -1385,6 +1468,33 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      const currentMode = modeRef.current;
+      if (currentMode !== "home" && currentMode !== "results") return;
+
+      e.preventDefault();
+
+      const normalized = e.deltaMode === 0 ? e.deltaY : e.deltaY * 20;
+      wheelAccumRef.current += normalized;
+
+      if (wheelAccumRef.current > 60) {
+        wheelAccumRef.current = 0;
+        zoomGridOut();
+      } else if (wheelAccumRef.current < -60) {
+        wheelAccumRef.current = 0;
+        zoomGridIn();
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [zoomGridIn, zoomGridOut]);
+
   const handleItemPointerDown = useCallback((e: React.PointerEvent, item: RecallMediaItem) => {
     e.stopPropagation();
     if (isTileSelectionSuppressed()) {
@@ -1393,20 +1503,26 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     }
     longPressTriggeredRef.current = false;
     pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTriggeredRef.current = true;
-      longPressTimerRef.current = null;
-      openDetail(item);
-    }, 500);
-  }, [cancelLongPress, isTileSelectionSuppressed, openDetail]);
+    if (!isItemBlurred(item)) {
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTriggeredRef.current = true;
+        longPressTimerRef.current = null;
+        openDetail(item);
+      }, 500);
+    }
+  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, openDetail]);
 
   const handleItemPointerUp = useCallback((_e: React.PointerEvent, item: RecallMediaItem) => {
     cancelLongPress();
     if (isTileSelectionSuppressed()) return;
     if (!longPressTriggeredRef.current) {
-      toggleSelected(item);
+      if (isItemBlurred(item)) {
+        setNsfwPendingItem(item);
+      } else {
+        toggleSelected(item);
+      }
     }
-  }, [cancelLongPress, isTileSelectionSuppressed, toggleSelected]);
+  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, toggleSelected]);
 
   const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
     if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
@@ -1427,7 +1543,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     () => suggestions.filter((s) => s.toLowerCase() !== submittedQuery.toLowerCase()).slice(0, 4),
     [suggestions, submittedQuery],
   );
-  const contentMode = mode === "detail" ? detailReturnModeRef.current : mode;
   const usesNaturalAspectGrid = gridColumns === 1;
   const mediaGridClassName = `grid phone-media-grid${usesNaturalAspectGrid ? " phone-media-grid--natural" : ""}`;
   const hasMore = results.length >= visibleCount && contentMode === "results";
@@ -1435,10 +1550,64 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const showFavoritesSection = isLoadingFavorites || favoriteItems.length > 0;
   liveRef.current = { hasMore, submittedQuery, query, visibleCount, prefetchedResults };
 
+  const renderSearchBar = (className?: string) => (
+    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
+      <Button
+        className={`history-btn${showHistory ? " history-btn--active" : ""}`}
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Recent searches"
+        aria-pressed={showHistory}
+        onClick={() => setShowHistory((prev) => !prev)}
+      >
+        <HistoryIcon />
+      </Button>
+      <Input
+        ref={topBarInputRef}
+        aria-label="Search your media"
+        value={query}
+        placeholder="Describe a photo or video…"
+        autoComplete="off"
+        onChange={(event) => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          setShowHistory(false);
+          if (nextQuery.trim()) {
+            if (modeRef.current === "home" || modeRef.current === "results") transitionToMode("typing", "search-focus");
+          } else if (modeRef.current === "results") {
+            transitionToMode("typing", "search-clear");
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") void runSearch(query);
+        }}
+      />
+      {query ? (
+        <Button
+          className="clear-search-btn"
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={() => {
+            abortActiveSearch();
+            setQuery("");
+            setSubmittedQuery("");
+            transitionToMode("home", "search-clear");
+          }}
+          aria-label="Clear search"
+        >
+          <XIcon />
+        </Button>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="phone-stage">
       <div
-        className={`phone-rect${showSelectionTray ? " phone-rect--has-selection" : ""}`}
+        ref={phoneRectRef}
+        className={`phone-rect${contentMode === "home" ? " phone-rect--home" : ""}${showSelectionTray ? " phone-rect--has-selection" : ""}`}
         style={gridDensityStyle}
         data-reduced-motion={prefersReducedMotion ? "true" : undefined}
         aria-label="Phone interface viewport"
@@ -1460,134 +1629,38 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           </div>
         ) : null}
 
-        {/* Main scrollable content — ScrollArea with forwarded ref for touch/scroll events */}
-        <ScrollArea
-          className="phone-rect-content"
-          viewportRef={scrollContainerRef}
-          viewportClassName="phone-rect-viewport"
-        >
-          <MotionConfig reducedMotion="user">
-            <LayoutGroup id="phone-ui">
-              <AnimatePresence initial={false} mode="popLayout" custom={modeTransition}>
-                {contentMode === "home" ? (
-                  <motion.div
-                    key={`screen-${contentMode}`}
-                    className="phone-screen phone-screen--home"
-                    custom={modeTransition}
-                    variants={screenMotionVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                  >
-                    <div className="phone-startpage">
-              <div className="phone-startpage-header">
-                <div className="phone-startpage-brand">
-                  <div className="phone-startpage-logo" aria-hidden>
-                    <SearchIcon />
-                  </div>
-                  <h1 className="phone-startpage-title">Recall</h1>
-                </div>
-                {/* Avatar replaces the disabled ghost icon button */}
-                <Avatar className="phone-avatar" aria-label="Profile">
-                  <AvatarFallback>
-                    <UserIcon className="size-3.5" />
-                  </AvatarFallback>
-                </Avatar>
-              </div>
+        <MotionConfig reducedMotion="user">
+        <LayoutGroup id="phone-ui">
 
-              <div className="phone-startpage-search-sticky">
-                <div className="phone-startpage-search">
-                  <div className="search-bar search-bar--semantic search-bar--hero">
-                    <Button
-                      className={`history-btn${showHistory ? " history-btn--active" : ""}`}
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Recent searches"
-                      aria-pressed={showHistory}
-                      onClick={() => setShowHistory((prev) => !prev)}
-                    >
-                      <HistoryIcon />
-                    </Button>
-                    <span className="search-icon" aria-hidden>
-                      <SearchIcon />
-                    </span>
-                    <Input
-                      aria-label="Search your media"
-                      value={query}
-                      placeholder="Describe a photo, video, or meme…"
-                      autoComplete="off"
-                      onChange={(event) => {
-                        const nextQuery = event.target.value;
-                        setQuery(nextQuery);
-                        if (nextQuery.trim()) transitionToMode("typing", "search-focus");
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void runSearch(query);
-                      }}
-                    />
-                    {query ? (
-                      <Button
-                        className="clear-search-btn"
-                        variant="ghost"
-                        size="icon-sm"
-                        type="button"
-                        onClick={() => { abortActiveSearch(); setQuery(""); setSubmittedQuery(""); }}
-                        aria-label="Clear search"
-                      >
-                        <XIcon />
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {showHistory && history.length > 0 && (
-                  <motion.div
-                    key="home-history"
-                    className="phone-history-section phone-panel-motion"
-                    variants={panelMotion}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                  >
+        {/* Persistent search bar — non-home overlay only */}
+        {contentMode !== "home" ? (
+          <div ref={barRef} className="phone-persistent-search">
+            <motion.div
+              className="phone-persistent-bar-wrap"
+              initial={false}
+              animate={{ padding: "var(--sp-2) var(--sp-4) var(--sp-2)" }}
+              transition={{ duration: 0.22, ease: MOTION_EASE.standard }}
+            >
+              {renderSearchBar()}
+            </motion.div>
+            <div className="phone-persistent-panel">
+              <AnimatePresence initial={false} mode="wait">
+                {showHistory && history.length > 0 && contentMode === "typing" ? (
+                  <motion.div key="panel-history" className="phone-panel-motion" variants={panelMotion} initial="initial" animate="animate" exit="exit">
                     <div className="phone-history-header">
                       <span className="phone-history-header-label">Recent</span>
-                      <Button
-                        className="phone-history-clear-btn h-auto"
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={clearHistory}
-                      >
-                        Clear all
-                      </Button>
+                      <Button className="phone-history-clear-btn h-auto" type="button" variant="ghost" size="xs" onClick={clearHistory}>Clear all</Button>
                     </div>
-                    {/* Card with Separator between rows instead of CSS border-bottom */}
-                    <Card className="phone-history-list" size="sm">
+                    <Card className="suggestions" size="sm">
                       <CardContent className="p-0">
                         {history.map((item, idx) => (
                           <React.Fragment key={item}>
                             <div className="phone-history-row">
-                              <Button
-                                className="phone-history-item h-auto justify-start"
-                                type="button"
-                                variant="ghost"
-                                onClick={() => { setShowHistory(false); setQuery(item); void runSearch(item); }}
-                              >
-                                <span className="phone-history-icon" aria-hidden>
-                                  <ClockIcon />
-                                </span>
+                              <Button className="suggestion-item h-auto justify-start" type="button" variant="ghost" onClick={() => { setShowHistory(false); setQuery(item); void runSearch(item); }}>
+                                <span className="suggestion-icon" aria-hidden><ClockIcon /></span>
                                 <span>{item}</span>
                               </Button>
-                              <Button
-                                className="phone-history-remove"
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => removeHistoryItem(item)}
-                                aria-label={`Remove ${item}`}
-                              >
+                              <Button className="phone-history-remove" type="button" variant="ghost" size="icon-sm" onClick={() => removeHistoryItem(item)} aria-label={`Remove ${item}`}>
                                 <XIcon />
                               </Button>
                             </div>
@@ -1597,7 +1670,123 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       </CardContent>
                     </Card>
                   </motion.div>
-                )}
+                ) : (contentMode === "typing" && suggestions.length > 0) ? (
+                  <motion.div key="panel-suggestions" className="phone-panel-motion" variants={panelMotion} initial="initial" animate="animate" exit="exit">
+                    <Card className="suggestions" size="sm">
+                      <CardContent className="p-0">
+                        {suggestions.map((suggestion, idx) => {
+                          const fromHistory = history.some((item) => item.toLowerCase() === suggestion.toLowerCase());
+                          return (
+                            <React.Fragment key={suggestion}>
+                              <Button className="suggestion-item h-auto justify-start w-full" type="button" variant="ghost" onClick={() => { setShowHistory(false); setQuery(suggestion); void runSearch(suggestion); }}>
+                                <span className="suggestion-icon" aria-hidden>{fromHistory ? <ClockIcon /> : <SearchIcon />}</span>
+                                <span>{suggestion}</span>
+                              </Button>
+                              {idx < suggestions.length - 1 ? <Separator className="phone-list-separator" /> : null}
+                            </React.Fragment>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Main scrollable content */}
+        <ScrollArea
+          className="phone-rect-content"
+          viewportRef={scrollContainerRef}
+          viewportClassName="phone-rect-viewport"
+        >
+          <AnimatePresence initial={false} mode="popLayout" custom={modeTransition}>
+            {contentMode === "home" ? (
+              <motion.div
+                key={contentMode === "home" ? "screen-home" : "screen-search"}
+                className="phone-screen phone-screen--home"
+                custom={modeTransition}
+                variants={screenMotionVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+              >
+                <div className="phone-startpage">
+              <div className="phone-startpage-header">
+                <div className="phone-startpage-brand">
+                  <div className="phone-startpage-logo" aria-hidden>
+                    <SearchIcon />
+                  </div>
+                  <h1 className="phone-startpage-title">Recall</h1>
+                </div>
+                <Avatar className="phone-avatar" aria-label="Profile">
+                  <AvatarFallback>
+                    <UserIcon className="size-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+
+              <div className="phone-startpage-search-sticky">
+                <div className="phone-startpage-search">
+                  {renderSearchBar("search-bar--hero")}
+                </div>
+                <AnimatePresence initial={false}>
+                  {showHistory && history.length > 0 ? (
+                    <motion.div
+                      key="home-history"
+                      className="phone-history-section phone-panel-motion"
+                      variants={panelMotion}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                    >
+                      <div className="phone-history-header">
+                        <span className="phone-history-header-label">Recent</span>
+                        <Button
+                          className="phone-history-clear-btn h-auto"
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={clearHistory}
+                        >
+                          Clear all
+                        </Button>
+                      </div>
+                      <Card className="phone-history-list" size="sm">
+                        <CardContent className="p-0">
+                          {history.map((item, idx) => (
+                            <React.Fragment key={item}>
+                              <div className="phone-history-row">
+                                <Button
+                                  className="phone-history-item h-auto justify-start"
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => { setShowHistory(false); setQuery(item); void runSearch(item); }}
+                                >
+                                  <span className="phone-history-icon" aria-hidden>
+                                    <ClockIcon />
+                                  </span>
+                                  <span>{item}</span>
+                                </Button>
+                                <Button
+                                  className="phone-history-remove"
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => removeHistoryItem(item)}
+                                  aria-label={`Remove ${item}`}
+                                >
+                                  <XIcon />
+                                </Button>
+                              </div>
+                              {idx < history.length - 1 ? <Separator className="phone-list-separator" /> : null}
+                            </React.Fragment>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ) : null}
                 </AnimatePresence>
               </div>
 
@@ -1621,6 +1810,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       <ThumbCell
                         key={result.id}
                         result={result}
+                        isBlurred={isItemBlurred(result)}
                         selected={selectedItems.some((item) => item.id === result.id)}
                         selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
                         naturalAspectRatio={usesNaturalAspectGrid}
@@ -1639,7 +1829,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                   </motion.div>
                 ) : (
                   <motion.div
-                    key={`screen-${contentMode}`}
+                    key="screen-search"
                     className="phone-screen phone-screen--search"
                     custom={modeTransition}
                     variants={screenMotionVariants}
@@ -1647,145 +1837,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     animate="center"
                     exit="exit"
                   >
-                    <div className="mobile-top">
-              <div className="search-bar search-bar--semantic">
-                <Button
-                  className={`history-btn${showHistory ? " history-btn--active" : ""}`}
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Recent searches"
-                  aria-pressed={showHistory}
-                  onClick={() => setShowHistory((prev) => !prev)}
-                >
-                  <HistoryIcon />
-                </Button>
-                <span className="search-icon" aria-hidden>
-                  <SearchIcon />
-                </span>
-                <Input
-                  ref={topBarInputRef}
-                  aria-label="Search your media"
-                  value={query}
-                  placeholder="Describe a photo, video, or meme"
-                  onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    setQuery(nextQuery);
-                    setShowHistory(false);
-                    transitionToMode(nextQuery.trim() ? "typing" : "home", nextQuery.trim() ? "search-focus" : "search-clear");
-                  }}
-                  onFocus={() => { if (modeRef.current !== "results") transitionToMode(query.trim() ? "typing" : "home", "search-focus"); }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      void runSearch(query);
-                    }
-                  }}
-                />
-                {query ? (
-                  <Button
-                    className="clear-search-btn"
-                    variant="ghost"
-                    size="icon-sm"
-                    type="button"
-                    onClick={() => {
-                      abortActiveSearch();
-                      setQuery("");
-                      setSubmittedQuery("");
-                      transitionToMode("home", "search-clear");
-                    }}
-                    aria-label="Clear search"
-                  >
-                    <XIcon />
-                  </Button>
-                ) : null}
-              </div>
-
-              {/* History overlay — Separator replaces CSS border-bottom */}
-              <AnimatePresence initial={false} mode="wait">
-              {showHistory && history.length > 0 ? (
-                <motion.div
-                  key="search-history"
-                  className="phone-panel-motion"
-                  variants={panelMotion}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                >
-                <Card className="suggestions" size="sm">
-                  <CardContent className="p-0">
-                    {history.map((item, idx) => (
-                      <React.Fragment key={item}>
-                        <div className="phone-history-row">
-                          <Button
-                            className="suggestion-item h-auto justify-start"
-                            type="button"
-                            variant="ghost"
-                            onClick={() => { setShowHistory(false); setQuery(item); void runSearch(item); }}
-                          >
-                            <span className="suggestion-icon" aria-hidden><ClockIcon /></span>
-                            <span>{item}</span>
-                          </Button>
-                          <Button
-                            className="phone-history-remove"
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => removeHistoryItem(item)}
-                            aria-label={`Remove ${item}`}
-                          >
-                            <XIcon />
-                          </Button>
-                        </div>
-                        {idx < history.length - 1 ? <Separator className="phone-list-separator" /> : null}
-                      </React.Fragment>
-                    ))}
-                  </CardContent>
-                </Card>
-                </motion.div>
-              ) : contentMode === "typing" && suggestions.length > 0 ? (
-                /* Suggestions list — Separator between rows */
-                <motion.div
-                  key="search-suggestions"
-                  className="phone-panel-motion"
-                  variants={panelMotion}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                >
-                <Card className="suggestions" size="sm">
-                  <CardContent className="p-0">
-                    {suggestions.map((suggestion, idx) => {
-                      const fromHistory = history.some((item) => item.toLowerCase() === suggestion.toLowerCase());
-                      return (
-                        <React.Fragment key={suggestion}>
-                          <Button
-                            className="suggestion-item h-auto justify-start w-full"
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                              setShowHistory(false);
-                              setQuery(suggestion);
-                              void runSearch(suggestion);
-                            }}
-                          >
-                            <span className="suggestion-icon" aria-hidden>
-                              {fromHistory ? <ClockIcon /> : <SearchIcon />}
-                            </span>
-                            <span>{suggestion}</span>
-                          </Button>
-                          {idx < suggestions.length - 1 ? <Separator className="phone-list-separator" /> : null}
-                        </React.Fragment>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-                </motion.div>
-              ) : null}
-              </AnimatePresence>
-                    </div>
-
-                    {(contentMode === "results" || contentMode === "typing") && (
-            <div className="grid-wrap phone-media-grid-zone" {...gridGestureHandlers}>
+                    <div className="grid-wrap phone-media-grid-zone" {...gridGestureHandlers}>
               <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
                 {submittedQuery && contentMode === "results" ? (
                   <div className="result-context">
@@ -1820,6 +1872,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                   <ThumbCell
                     key={result.id}
                     result={result}
+                    isBlurred={isItemBlurred(result)}
                     selected={selectedItems.some((item) => item.id === result.id)}
                     selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
                     naturalAspectRatio={usesNaturalAspectGrid}
@@ -1876,13 +1929,14 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 </Card>
               ) : null}
             </div>
-          )}
                   </motion.div>
                 )}
-              </AnimatePresence>
+          </AnimatePresence>
+        </ScrollArea>
 
-              <AnimatePresence initial={false}>
-                {mode === "detail" && detailItem && (
+        {/* Detail view — outside ScrollArea so it covers the persistent search bar */}
+        <AnimatePresence initial={false}>
+          {mode === "detail" && detailItem && (
             isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
               <VideoDetailView
                 key={detailItem.id}
@@ -1971,11 +2025,21 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               </motion.div>
             )
           )}
-              </AnimatePresence>
-            </LayoutGroup>
-          </MotionConfig>
+        </AnimatePresence>
 
-        </ScrollArea>
+        </LayoutGroup>
+        </MotionConfig>
+
+
+        {/* NSFW reveal dialog */}
+        {nsfwPendingItem && (
+          <NsfwDialog
+            item={nsfwPendingItem}
+            onKeepHidden={() => setNsfwPendingItem(null)}
+            onRevealOne={(id) => { setNsfwRevealedIds((prev) => new Set([...prev, id])); setNsfwPendingItem(null); }}
+            onRevealAll={() => { setNsfwRevealedAll(true); setNsfwPendingItem(null); }}
+          />
+        )}
 
         {/* Selection tray — floats above the scroll area */}
         <MotionConfig reducedMotion="user">

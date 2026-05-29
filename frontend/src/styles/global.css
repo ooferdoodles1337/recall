@@ -655,6 +655,8 @@ a {
    is the closest open-weight web equivalent on other platforms. */
 .phone-rect {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(640px, 100%);
   aspect-ratio: 4 / 5;
   overflow: hidden;
@@ -743,10 +745,25 @@ a {
   --sp-8:  calc(var(--r) * 8 / 3);      /* 32px */
 }
 
-/* ScrollArea root — just overflow containment */
+/* Persistent search header — transparent wrapper; glass lives on the pill itself */
+.phone-persistent-search {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  flex-shrink: 0;
+}
+
+.phone-persistent-panel {
+  padding: 0 var(--sp-4);
+}
+
+/* ScrollArea root — fills remaining flex height */
 .phone-rect-content {
   position: relative;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Viewport — the actual scrollable element (Radix ScrollArea.Viewport) */
@@ -754,8 +771,12 @@ a {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 0 var(--sp-8);
+  padding: var(--bar-height, 60px) 0 var(--sp-8);
   scrollbar-width: none;
+}
+
+.phone-rect--home .phone-rect-viewport {
+  padding-top: 0;
 }
 
 .phone-rect-viewport::-webkit-scrollbar {
@@ -1078,7 +1099,7 @@ a {
 .search-bar--semantic {
   min-height: 44px;
   display: grid;
-  grid-template-columns: var(--sp-5) 18px minmax(0, 1fr) var(--sp-5);
+  grid-template-columns: var(--sp-5) minmax(0, 1fr) var(--sp-5);
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
@@ -2029,6 +2050,7 @@ html {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .phone-startpage-logo {
@@ -2040,10 +2062,10 @@ html {
   color: var(--ios-tint);
 }
 
-/* iOS Large Title */
+/* iOS Large Title — HIG specifies 34pt Bold */
 .phone-startpage-title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 2.125rem;
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -2077,7 +2099,7 @@ html {
 
 /* Hero search bar — same pill, slightly taller on home screen */
 .search-bar--hero {
-  grid-template-columns: var(--sp-5) 18px minmax(0, 1fr) auto;
+  grid-template-columns: var(--sp-5) minmax(0, 1fr) auto;
   min-height: 46px;
   border-radius: var(--r-3);
 }
@@ -2453,22 +2475,46 @@ html {
     box-shadow: none;
   }
 
-  /* Viewport — actual scrollable element inside ScrollArea */
+  /* Viewport: bar-height covers top (includes safe-area-inset-top the bar absorbs) */
   .phone-rect-viewport {
-    height: 100dvh;
     padding:
-      0
-      max(12px, env(safe-area-inset-right))
+      var(--bar-height, 60px)
+      env(safe-area-inset-right, 0px)
       max(24px, env(safe-area-inset-bottom))
-      max(12px, env(safe-area-inset-left));
+      env(safe-area-inset-left, 0px);
   }
 
-  .mobile-top {
-    padding-top: max(16px, env(safe-area-inset-top));
+  .phone-rect--home .phone-rect-viewport {
+    padding-top: 0;
+  }
+
+  /* Persistent bar absorbs the status-bar safe area at the top */
+  .phone-persistent-search {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .phone-startpage-header {
     padding-top: max(20px, env(safe-area-inset-top));
+  }
+}
+
+/* Proportional spacing reduction on smaller phones.
+   Every --sp-* and --r-* derives from --r, so this scales the full grid. */
+@media (max-width: 390px) {
+  .phone-rect {
+    --r: 11px;
+  }
+  .phone-startpage-title {
+    font-size: 1.875rem; /* 30pt — still within iOS Large Title range */
+  }
+}
+
+@media (max-width: 340px) {
+  .phone-rect {
+    --r: 10px;
+  }
+  .phone-startpage-title {
+    font-size: 1.625rem; /* 26pt */
   }
 }
 
@@ -2650,4 +2696,118 @@ html {
   html {
     @apply font-sans;
   }
+}
+
+/* NSFW content guard */
+
+.thumb-img-wrap--nsfw img,
+.thumb-img-wrap--nsfw .thumb-animated {
+  filter: blur(20px);
+  transform: scale(1.08);
+}
+
+.nsfw-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: inherit;
+  color: white;
+  pointer-events: none;
+}
+
+.nsfw-thumb-overlay svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  opacity: 0.9;
+}
+
+.nsfw-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.nsfw-sheet {
+  background: white;
+  border-radius: 14px;
+  width: min(300px, 90vw);
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+}
+
+.nsfw-sheet-header {
+  padding: 24px 20px 18px;
+  text-align: center;
+}
+
+.nsfw-sheet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #d97706;
+}
+
+.nsfw-sheet-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #111827;
+}
+
+.nsfw-sheet-body {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.nsfw-sheet-actions {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.nsfw-sheet-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  text-align: center;
+  transition: background 0.1s;
+}
+
+.nsfw-sheet-btn:first-child {
+  border-top: none;
+}
+
+.nsfw-sheet-btn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.nsfw-sheet-btn--reveal-all {
+  color: #d97706;
+}
+
+.nsfw-sheet-btn--reveal-one {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.nsfw-sheet-btn--cancel {
+  color: #111827;
+  font-weight: 700;
 }
