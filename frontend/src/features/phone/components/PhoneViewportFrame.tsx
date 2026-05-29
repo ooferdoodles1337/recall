@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import {
   CalendarIcon,
   CheckIcon,
@@ -14,6 +15,8 @@ import {
   SendIcon,
   SparklesIcon,
   XIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -50,11 +53,122 @@ interface PhoneViewportFrameProps {
 
 type PhoneMode = "home" | "typing" | "results" | "detail";
 type SearchIntent = "preview" | "commit";
+type GridColumns = 1 | 2 | 3 | 4 | 5 | 6;
+type GridPoint = { x: number; y: number };
+type GridItemSnapshot = Map<string, DOMRect>;
+type PinchGesture = {
+  startColumns: GridColumns;
+  startDistance: number;
+  midpoint: GridPoint;
+};
+type MotionDirection = "forward" | "back" | "neutral";
+type ModeTransitionReason =
+  | "initial"
+  | "target-reset"
+  | "search-focus"
+  | "search-clear"
+  | "search-commit"
+  | "search-preview"
+  | "scroll-commit"
+  | "similar-search"
+  | "detail-open"
+  | "detail-close";
+type ModeTransition = {
+  from: PhoneMode;
+  to: PhoneMode;
+  direction: MotionDirection;
+  reason: ModeTransitionReason;
+  key: number;
+};
 
 const SEARCH_BATCH_SIZE = 51;
 const FAVORITES_COUNT = 34;
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
+const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
 const OVERSCROLL_THRESHOLD = 80;
+const GRID_COLUMN_OPTIONS = [1, 2, 3, 4, 5, 6] as const satisfies readonly GridColumns[];
+const DEFAULT_GRID_COLUMNS: GridColumns = 3;
+const MIN_GRID_COLUMNS = GRID_COLUMN_OPTIONS[0];
+const MAX_GRID_COLUMNS = GRID_COLUMN_OPTIONS[GRID_COLUMN_OPTIONS.length - 1];
+const GRID_GAP_BY_COLUMNS: Record<GridColumns, string> = {
+  1: "12px",
+  2: "8px",
+  3: "6px",
+  4: "4px",
+  5: "3px",
+  6: "2px",
+};
+const GRID_RADIUS_BY_COLUMNS: Record<GridColumns, string> = {
+  1: "16px",
+  2: "14px",
+  3: "12px",
+  4: "10px",
+  5: "8px",
+  6: "6px",
+};
+const MODE_DEPTH: Record<PhoneMode, number> = {
+  home: 0,
+  typing: 1,
+  results: 2,
+  detail: 3,
+};
+const PHONE_MOTION = {
+  screenMs: 220,
+  detailMs: 300,
+  exitMs: 180,
+  standard: "cubic-bezier(0.22, 1, 0.36, 1)",
+  gentle: "cubic-bezier(0.16, 1, 0.3, 1)",
+};
+const MOTION_EASE = {
+  standard: [0.22, 1, 0.36, 1] as [number, number, number, number],
+  gentle: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  exit: [0.4, 0, 1, 1] as [number, number, number, number],
+};
+const screenMotionVariants = {
+  enter: (direction: MotionDirection) => ({
+    opacity: 0,
+    y: direction === "back" ? -10 : 14,
+    scale: direction === "back" ? 1.012 : 0.988,
+  }),
+  center: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: PHONE_MOTION.screenMs / 1000,
+      ease: MOTION_EASE.standard,
+    },
+  },
+  exit: (direction: MotionDirection) => ({
+    opacity: 0,
+    y: direction === "back" ? 16 : -8,
+    scale: direction === "back" ? 0.986 : 1.01,
+    transition: {
+      duration: PHONE_MOTION.exitMs / 1000,
+      ease: MOTION_EASE.exit,
+    },
+  }),
+};
+const panelMotion = {
+  initial: { opacity: 0, y: -6, scale: 0.985 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.18, ease: MOTION_EASE.standard },
+  },
+  exit: {
+    opacity: 0,
+    y: -4,
+    scale: 0.99,
+    transition: { duration: 0.12, ease: MOTION_EASE.exit },
+  },
+};
+const detailBackdropMotion = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.18, ease: MOTION_EASE.standard } },
+  exit: { opacity: 0, transition: { duration: 0.16, ease: MOTION_EASE.exit } },
+};
 
 
 function makeMockItem(seed: string, q?: string): RecallMediaItem {
@@ -85,6 +199,88 @@ function readSearchHistory(): string[] {
 
 function writeSearchHistory(nextHistory: string[]) {
   localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory.slice(0, 8)));
+}
+
+function isGridColumns(value: number): value is GridColumns {
+  return GRID_COLUMN_OPTIONS.includes(value as GridColumns);
+}
+
+function clampGridColumns(value: number): GridColumns {
+  const rounded = Math.round(value);
+  if (rounded <= MIN_GRID_COLUMNS) return MIN_GRID_COLUMNS;
+  if (rounded >= MAX_GRID_COLUMNS) return MAX_GRID_COLUMNS;
+  return isGridColumns(rounded) ? rounded : DEFAULT_GRID_COLUMNS;
+}
+
+function readGridColumns(): GridColumns {
+  if (typeof window === "undefined") return DEFAULT_GRID_COLUMNS;
+
+  try {
+    const stored = window.localStorage.getItem(GRID_COLUMNS_STORAGE_KEY);
+    if (stored === null) return DEFAULT_GRID_COLUMNS;
+
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? clampGridColumns(parsed) : DEFAULT_GRID_COLUMNS;
+  } catch {
+    return DEFAULT_GRID_COLUMNS;
+  }
+}
+
+function writeGridColumns(nextColumns: GridColumns) {
+  try {
+    window.localStorage.setItem(GRID_COLUMNS_STORAGE_KEY, String(nextColumns));
+  } catch {
+    // Persistence is a nice-to-have; the in-memory density still updates.
+  }
+}
+
+function nearestGridColumns(value: number): GridColumns {
+  return clampGridColumns(value);
+}
+
+function pointerDistance(first: GridPoint, second: GridPoint) {
+  return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+function pointerMidpoint(first: GridPoint, second: GridPoint): GridPoint {
+  return {
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  };
+}
+
+function reduceMotionEnabled() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function modeDirection(from: PhoneMode, to: PhoneMode): MotionDirection {
+  const delta = MODE_DEPTH[to] - MODE_DEPTH[from];
+  if (delta > 0) return "forward";
+  if (delta < 0) return "back";
+  return "neutral";
+}
+
+function mediaLayoutId(itemId: string) {
+  return `phone-media-${itemId}`;
+}
+
+function aspectRatioFromDimensions(width?: number, height?: number) {
+  if (
+    typeof width === "number" &&
+    typeof height === "number" &&
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0
+  ) {
+    return `${width} / ${height}`;
+  }
+
+  return null;
+}
+
+function mediaAspectRatio(item: RecallMediaItem) {
+  return aspectRatioFromDimensions(item.metadata.asset?.width, item.metadata.asset?.height);
 }
 
 function rememberSearch(query: string) {
@@ -156,6 +352,7 @@ interface ThumbCellProps {
   result: RecallMediaItem;
   selected: boolean;
   selectionIndex: number;
+  naturalAspectRatio: boolean;
   onPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
   onPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
   onPointerMove: (e: React.PointerEvent) => void;
@@ -163,48 +360,104 @@ interface ThumbCellProps {
   toggleSelected: (item: RecallMediaItem) => void;
 }
 
-const ThumbCell = React.memo(function ThumbCell({ result, selected, selectionIndex, onPointerDown, onPointerUp, onPointerMove, onPointerCancel, toggleSelected }: ThumbCellProps) {
+const ThumbCell = React.memo(function ThumbCell({ result, selected, selectionIndex, naturalAspectRatio, onPointerDown, onPointerUp, onPointerMove, onPointerCancel, toggleSelected }: ThumbCellProps) {
   const [staticLoaded, setStaticLoaded] = useState(false);
+  const [measuredAspectRatio, setMeasuredAspectRatio] = useState<string | null>(null);
   const thumb = resolvedThumbnailUrl(result) ?? result.links?.thumbnail ?? result.links?.media;
   const animatedThumb = resolvedAnimatedThumbnailUrl(result);
   const video = isVideo(result);
   const animated = isAnimatedImage(result);
+  const metadataAspectRatio = mediaAspectRatio(result);
+  const naturalAspectStyle = naturalAspectRatio
+    ? ({ "--phone-thumb-aspect-ratio": metadataAspectRatio ?? measuredAspectRatio ?? "1 / 1" } as React.CSSProperties)
+    : undefined;
+  const handleStaticThumbLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>) => {
+    setStaticLoaded(true);
+    const image = event.currentTarget;
+    setMeasuredAspectRatio(aspectRatioFromDimensions(image.naturalWidth, image.naturalHeight));
+  }, []);
+
   return (
-    <Button
-      className={`thumb h-auto ${selected ? "thumb--selected" : ""}`}
-      type="button"
-      variant="ghost"
-      onPointerDown={(e) => onPointerDown(e, result)}
-      onPointerUp={(e) => onPointerUp(e, result)}
-      onPointerMove={onPointerMove}
-      onPointerCancel={onPointerCancel}
-      onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
-      aria-label={`${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
-      aria-pressed={selected}
+    <motion.div
+      className="phone-thumb-motion"
+      layoutId={mediaLayoutId(result.id)}
+      style={naturalAspectStyle}
+      transition={{ duration: PHONE_MOTION.detailMs / 1000, ease: MOTION_EASE.gentle }}
     >
-      {thumb ? (
-        <div className="thumb-img-wrap">
-          <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" onLoad={() => setStaticLoaded(true)} />
-          {staticLoaded && animatedThumb ? (
-            <img src={animatedThumb} alt="" aria-hidden loading="lazy" decoding="async" className="thumb-animated" onLoad={(e) => { e.currentTarget.style.opacity = "1"; }} />
-          ) : null}
-        </div>
-      ) : <span className="thumb-fallback" />}
-      {video ? (
-        <Badge variant="secondary" className="video-badge">
-          <PlayIcon />
-          {durationLabel(result.metadata.asset?.duration_seconds) ?? "video"}
-        </Badge>
-      ) : animated ? (
-        <Badge variant="secondary" className="video-badge video-badge--gif">GIF</Badge>
-      ) : null}
-      {selected ? (
-        <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
-      ) : null}
-    </Button>
+      <Button
+        className={`thumb h-auto ${selected ? "thumb--selected" : ""}`}
+        type="button"
+        variant="ghost"
+        data-phone-grid-item={result.id}
+        onPointerDown={(e) => onPointerDown(e, result)}
+        onPointerUp={(e) => onPointerUp(e, result)}
+        onPointerMove={onPointerMove}
+        onPointerCancel={onPointerCancel}
+        onContextMenu={(e) => e.preventDefault()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
+        aria-label={`${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
+        aria-pressed={selected}
+      >
+        {thumb ? (
+          <div className="thumb-img-wrap">
+            <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" onLoad={handleStaticThumbLoad} />
+            {staticLoaded && animatedThumb ? (
+              <img src={animatedThumb} alt="" aria-hidden loading="lazy" decoding="async" className="thumb-animated" onLoad={(e) => { e.currentTarget.style.opacity = "1"; }} />
+            ) : null}
+          </div>
+        ) : <span className="thumb-fallback" />}
+        {video ? (
+          <Badge variant="secondary" className="video-badge">
+            <PlayIcon />
+            {durationLabel(result.metadata.asset?.duration_seconds) ?? "video"}
+          </Badge>
+        ) : animated ? (
+          <Badge variant="secondary" className="video-badge video-badge--gif">GIF</Badge>
+        ) : null}
+        {selected ? (
+          <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
+        ) : null}
+      </Button>
+    </motion.div>
   );
 });
+
+interface GridZoomControlsProps {
+  columns: GridColumns;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+}
+
+function GridZoomControls({ columns, onZoomIn, onZoomOut }: GridZoomControlsProps) {
+  return (
+    <div className="phone-grid-zoom-controls" role="group" aria-label={`Grid zoom, ${columns} ${columns === 1 ? "column" : "columns"}`}>
+      <Button
+        className="phone-grid-zoom-btn"
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onZoomOut}
+        disabled={columns >= MAX_GRID_COLUMNS}
+        aria-label="Zoom out to show more thumbnails"
+        title="Show more thumbnails"
+      >
+        <ZoomOutIcon />
+      </Button>
+      <Button
+        className="phone-grid-zoom-btn"
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onZoomIn}
+        disabled={columns <= MIN_GRID_COLUMNS}
+        aria-label="Zoom in to show fewer thumbnails"
+        title="Show fewer thumbnails"
+      >
+        <ZoomInIcon />
+      </Button>
+    </div>
+  );
+}
 
 interface VideoDetailViewProps {
   item: RecallMediaItem;
@@ -213,6 +466,7 @@ interface VideoDetailViewProps {
   onRunSimilarSearch: (item: RecallMediaItem) => void;
   onConfirmAnswer?: (id: string) => void;
   onSendSelection: (item: RecallMediaItem) => void;
+  layoutId?: string;
 }
 
 function VideoDetailView({
@@ -222,6 +476,7 @@ function VideoDetailView({
   onRunSimilarSearch,
   onConfirmAnswer,
   onSendSelection,
+  layoutId,
 }: VideoDetailViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,10 +579,18 @@ function VideoDetailView({
   }
 
   return (
-    <div
-      className={`detail-screen detail-screen--video ${chromeVisible ? "detail-screen--chrome-visible" : "detail-screen--chrome-hidden"}${isScrubbing ? " detail-screen--scrubbing" : ""}`}
+    <motion.div
+      className={`detail-screen detail-screen--video phone-detail-motion ${chromeVisible ? "detail-screen--chrome-visible" : "detail-screen--chrome-hidden"}${isScrubbing ? " detail-screen--scrubbing" : ""}`}
+      variants={detailBackdropMotion}
+      initial="initial"
+      animate="animate"
+      exit="exit"
     >
-      <div className="detail-media-fill detail-media-fill--video">
+      <motion.div
+        className="detail-media-fill detail-media-fill--video phone-detail-media-motion"
+        layoutId={layoutId}
+        transition={{ duration: PHONE_MOTION.detailMs / 1000, ease: MOTION_EASE.gentle }}
+      >
         <video
           ref={videoRef}
           src={mediaUrl}
@@ -343,7 +606,7 @@ function VideoDetailView({
           onPause={() => { setIsPlaying(false); setChromeVisible(true); }}
           onEnded={() => { setIsPlaying(false); setChromeVisible(true); }}
         />
-      </div>
+      </motion.div>
 
       <div className="detail-float-top video-chrome">
         <Button
@@ -436,7 +699,7 @@ function VideoDetailView({
           <span className="video-time video-time--duration">{playbackTimeLabel(duration)}</span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -456,21 +719,54 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const [favoriteItems, setFavoriteItems] = useState<RecallMediaItem[]>([]);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [gridColumns, setGridColumns] = useState<GridColumns>(() => readGridColumns());
+  const [modeTransition, setModeTransition] = useState<ModeTransition>({
+    from: "home",
+    to: "home",
+    direction: "neutral",
+    reason: "initial",
+    key: 0,
+  });
+  const prefersReducedMotion = useReducedMotion();
 
   const searchAbortRef = useRef<AbortController | null>(null);
   const loadMoreAbortRef = useRef<AbortController | null>(null);
   const topBarInputRef = useRef<HTMLInputElement>(null);
   const prevModeRef = useRef<PhoneMode>("home");
+  const modeRef = useRef<PhoneMode>("home");
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
   const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const searchGridRef = useRef<HTMLDivElement>(null);
+  const favoritesGridRef = useRef<HTMLDivElement>(null);
   const prefetchAbortRef = useRef<AbortController | null>(null);
   const hasPrefetchedRef = useRef(false);
   const detailReturnModeRef = useRef<Exclude<PhoneMode, "detail">>("results");
+  const gridColumnsRef = useRef<GridColumns>(gridColumns);
+  const pendingGridSnapshotRef = useRef<GridItemSnapshot | null>(null);
+  const gridFlipAnimationsRef = useRef<Animation[]>([]);
+  const activeTouchPointersRef = useRef<Map<number, GridPoint>>(new Map());
+  const pinchGestureRef = useRef<PinchGesture | null>(null);
+  const suppressSelectionUntilRef = useRef(0);
   const liveRef = useRef({ hasMore: false, submittedQuery: "", query: "", visibleCount: SEARCH_BATCH_SIZE, prefetchedResults: null as RecallMediaItem[] | null });
   const [prefetchedResults, setPrefetchedResults] = useState<RecallMediaItem[] | null>(null);
   const [overscrollProgress, setOverscrollProgress] = useState(0);
+
+  const transitionToMode = useCallback((nextMode: PhoneMode, reason: ModeTransitionReason = "initial") => {
+    const fromMode = modeRef.current;
+    if (fromMode === nextMode) return;
+
+    modeRef.current = nextMode;
+    setModeTransition((previous) => ({
+      from: fromMode,
+      to: nextMode,
+      direction: modeDirection(fromMode, nextMode),
+      reason,
+      key: previous.key + 1,
+    }));
+    setMode(nextMode);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -480,14 +776,18 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       if (longPressTimerRef.current !== null) {
         clearTimeout(longPressTimerRef.current);
       }
+      gridFlipAnimationsRef.current.forEach((animation) => animation.cancel());
+      activeTouchPointersRef.current.clear();
     };
   }, []);
 
   useEffect(() => {
     setDetailItem(null);
     setSelectedItems([]);
-    setMode((existingMode) => (existingMode === "detail" ? "home" : existingMode));
-  }, [currentTarget?.id]);
+    if (modeRef.current === "detail") {
+      transitionToMode("home", "target-reset");
+    }
+  }, [currentTarget?.id, transitionToMode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -560,7 +860,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   useEffect(() => {
     const q = query.trim();
     if (!q || mode !== "typing") return;
-
     const timer = window.setTimeout(() => {
       void runSearch(q, SEARCH_BATCH_SIZE, { intent: "preview" });
     }, 500);
@@ -575,7 +874,199 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       topBarInputRef.current?.focus();
     }
     prevModeRef.current = mode;
+    modeRef.current = mode;
   }, [mode]);
+
+  const gridDensityStyle = useMemo(() => ({
+    "--phone-grid-columns": String(gridColumns),
+    "--phone-grid-gap": GRID_GAP_BY_COLUMNS[gridColumns],
+    "--phone-grid-radius": GRID_RADIUS_BY_COLUMNS[gridColumns],
+  }) as React.CSSProperties, [gridColumns]);
+
+  useEffect(() => {
+    gridColumnsRef.current = gridColumns;
+  }, [gridColumns]);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pointerDownPosRef.current = null;
+  }, []);
+
+  const suppressTileSelectionBriefly = useCallback(() => {
+    const now = typeof window !== "undefined" ? window.performance.now() : Date.now();
+    suppressSelectionUntilRef.current = now + 450;
+  }, []);
+
+  const isTileSelectionSuppressed = useCallback(() => {
+    const now = typeof window !== "undefined" ? window.performance.now() : Date.now();
+    return now < suppressSelectionUntilRef.current;
+  }, []);
+
+  const captureGridSnapshot = useCallback((): GridItemSnapshot => {
+    const snapshot: GridItemSnapshot = new Map();
+    const grids = [favoritesGridRef.current, searchGridRef.current];
+
+    for (const grid of grids) {
+      if (!grid) continue;
+
+      const scope = grid.dataset.phoneGridScope ?? "grid";
+      grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
+        const id = element.dataset.phoneGridItem;
+        if (!id) return;
+        snapshot.set(`${scope}:${id}`, element.getBoundingClientRect());
+      });
+    }
+
+    return snapshot;
+  }, []);
+
+  const updateGridColumns = useCallback((nextColumns: GridColumns) => {
+    const currentColumns = gridColumnsRef.current;
+    if (nextColumns === currentColumns) return;
+
+    pendingGridSnapshotRef.current = captureGridSnapshot();
+    gridColumnsRef.current = nextColumns;
+    writeGridColumns(nextColumns);
+    setGridColumns(nextColumns);
+  }, [captureGridSnapshot]);
+
+  useLayoutEffect(() => {
+    const snapshot = pendingGridSnapshotRef.current;
+    if (!snapshot) return;
+
+    pendingGridSnapshotRef.current = null;
+    gridFlipAnimationsRef.current.forEach((animation) => animation.cancel());
+    gridFlipAnimationsRef.current = [];
+
+    if (snapshot.size === 0 || reduceMotionEnabled()) return;
+
+    const animations: Animation[] = [];
+    const grids = [favoritesGridRef.current, searchGridRef.current];
+
+    for (const grid of grids) {
+      if (!grid) continue;
+
+      const scope = grid.dataset.phoneGridScope ?? "grid";
+      grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
+        const id = element.dataset.phoneGridItem;
+        if (!id) return;
+
+        const first = snapshot.get(`${scope}:${id}`);
+        if (!first) return;
+
+        const last = element.getBoundingClientRect();
+        const deltaX = first.left - last.left;
+        const deltaY = first.top - last.top;
+        const scaleX = first.width / Math.max(last.width, 1);
+        const scaleY = first.height / Math.max(last.height, 1);
+        const moved = Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5;
+        const scaled = Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01;
+
+        if (!moved && !scaled) return;
+
+        const animation = element.animate(
+          [
+            {
+              transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`,
+              transformOrigin: "center",
+            },
+            {
+              transform: "translate(0, 0) scale(1, 1)",
+              transformOrigin: "center",
+            },
+          ],
+          {
+            duration: 260,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          },
+        );
+
+        animations.push(animation);
+        animation.finished
+          .catch(() => undefined)
+          .finally(() => {
+            gridFlipAnimationsRef.current = gridFlipAnimationsRef.current.filter((existing) => existing !== animation);
+          });
+      });
+    }
+
+    gridFlipAnimationsRef.current = animations;
+  }, [favoriteItems, gridColumns, isLoading, isLoadingFavorites, isLoadingMore, mode, results]);
+
+  const zoomGridIn = useCallback(() => {
+    const index = GRID_COLUMN_OPTIONS.indexOf(gridColumnsRef.current);
+    if (index <= 0) return;
+    updateGridColumns(GRID_COLUMN_OPTIONS[index - 1]);
+  }, [updateGridColumns]);
+
+  const zoomGridOut = useCallback(() => {
+    const index = GRID_COLUMN_OPTIONS.indexOf(gridColumnsRef.current);
+    if (index >= GRID_COLUMN_OPTIONS.length - 1) return;
+    updateGridColumns(GRID_COLUMN_OPTIONS[index + 1]);
+  }, [updateGridColumns]);
+
+  const handleGridPointerDownCapture = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "touch") return;
+
+    activeTouchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (activeTouchPointersRef.current.size < 2) return;
+
+    const [first, second] = Array.from(activeTouchPointersRef.current.values());
+    const startDistance = pointerDistance(first, second);
+    if (startDistance <= 0) return;
+
+    cancelLongPress();
+    suppressTileSelectionBriefly();
+    pinchGestureRef.current = {
+      startColumns: gridColumnsRef.current,
+      startDistance,
+      midpoint: pointerMidpoint(first, second),
+    };
+  }, [cancelLongPress, suppressTileSelectionBriefly]);
+
+  const handleGridPointerMoveCapture = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "touch" || !activeTouchPointersRef.current.has(event.pointerId)) return;
+
+    activeTouchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const pinch = pinchGestureRef.current;
+    if (!pinch || activeTouchPointersRef.current.size < 2) return;
+
+    const [first, second] = Array.from(activeTouchPointersRef.current.values());
+    const distance = pointerDistance(first, second);
+    if (distance <= 0) return;
+
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+
+    pinch.midpoint = pointerMidpoint(first, second);
+    suppressTileSelectionBriefly();
+
+    const ratio = distance / pinch.startDistance;
+    const nextColumns = nearestGridColumns(pinch.startColumns / ratio);
+    updateGridColumns(nextColumns);
+  }, [suppressTileSelectionBriefly, updateGridColumns]);
+
+  const endGridPointer = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "touch") return;
+
+    activeTouchPointersRef.current.delete(event.pointerId);
+    if (activeTouchPointersRef.current.size < 2 && pinchGestureRef.current) {
+      pinchGestureRef.current = null;
+      suppressTileSelectionBriefly();
+    }
+  }, [suppressTileSelectionBriefly]);
+
+  const gridGestureHandlers = useMemo(() => ({
+    onPointerDownCapture: handleGridPointerDownCapture,
+    onPointerMoveCapture: handleGridPointerMoveCapture,
+    onPointerUpCapture: endGridPointer,
+    onPointerCancelCapture: endGridPointer,
+  }), [endGridPointer, handleGridPointerDownCapture, handleGridPointerMoveCapture]);
 
   const runSearch = useCallback(async (
     rawQuery: string,
@@ -594,7 +1085,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         setIsLoading(false);
         setSubmittedQuery("");
         setResults([]);
-        setMode("home");
+        transitionToMode("home", "search-clear");
       }
       return;
     }
@@ -612,7 +1103,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setVisibleCount(count);
 
     if (!isPreview) {
-      setMode("results");
+      transitionToMode("results", "search-commit");
       setSubmittedQuery(q);
     }
 
@@ -646,7 +1137,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [transitionToMode]);
 
   const runSimilarSearch = useCallback(async (item: RecallMediaItem) => {
     searchAbortRef.current?.abort();
@@ -656,8 +1147,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setIsLoading(true);
     setErrorMessage(null);
     setResults([]);
-    setMode("results");
     setDetailItem(null);
+    transitionToMode("results", "similar-search");
     setSubmittedQuery("similar items");
     setQuery("");
 
@@ -674,21 +1165,23 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [transitionToMode]);
 
   const openDetail = useCallback((item: RecallMediaItem) => {
-    if (mode !== "detail") {
-      detailReturnModeRef.current = mode;
+    const currentMode = modeRef.current;
+    if (currentMode !== "detail") {
+      detailReturnModeRef.current = currentMode;
     }
     setDetailItem(item);
-    setMode("detail");
+    transitionToMode("detail", "detail-open");
     onSelectCandidate?.(item.id);
-  }, [mode, onSelectCandidate]);
+  }, [onSelectCandidate, transitionToMode]);
 
   const closeDetail = useCallback(() => {
+    const returnMode = detailReturnModeRef.current;
+    transitionToMode(returnMode, "detail-close");
     setDetailItem(null);
-    setMode(detailReturnModeRef.current);
-  }, []);
+  }, [transitionToMode]);
 
   const toggleSelected = useCallback((item: RecallMediaItem) => {
     setSelectedItems((existing) => {
@@ -703,15 +1196,15 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const date = itemDateLabel(item);
     if (!date) {
       setErrorMessage("This item has no date metadata yet.");
-      setMode("results");
       setDetailItem(null);
+      transitionToMode("results", "search-commit");
       return;
     }
 
     setQuery(date);
     void runSearch(date, SEARCH_BATCH_SIZE);
     setDetailItem(null);
-  }, [runSearch]);
+  }, [runSearch, transitionToMode]);
 
   const sendSelection = useCallback((item?: RecallMediaItem) => {
     const nextSelection = item && !selectedItems.some((candidate) => candidate.id === item.id)
@@ -820,11 +1313,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const el = scrollContainerRef.current;
     if (!el || mode !== "typing") return;
     const handleScroll = () => {
-      if (el.scrollTop > 10) setMode("results");
+      if (el.scrollTop > 10) transitionToMode("results", "scroll-commit");
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
-  }, [mode]);
+  }, [mode, transitionToMode]);
 
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -888,6 +1381,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const handleItemPointerDown = useCallback((e: React.PointerEvent, item: RecallMediaItem) => {
     e.stopPropagation();
+    if (isTileSelectionSuppressed()) {
+      cancelLongPress();
+      return;
+    }
     longPressTriggeredRef.current = false;
     pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
     longPressTimerRef.current = setTimeout(() => {
@@ -895,18 +1392,15 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       longPressTimerRef.current = null;
       openDetail(item);
     }, 500);
-  }, [openDetail]);
+  }, [cancelLongPress, isTileSelectionSuppressed, openDetail]);
 
   const handleItemPointerUp = useCallback((_e: React.PointerEvent, item: RecallMediaItem) => {
-    if (longPressTimerRef.current !== null) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
+    cancelLongPress();
+    if (isTileSelectionSuppressed()) return;
     if (!longPressTriggeredRef.current) {
       toggleSelected(item);
     }
-    pointerDownPosRef.current = null;
-  }, [toggleSelected]);
+  }, [cancelLongPress, isTileSelectionSuppressed, toggleSelected]);
 
   const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
     if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
@@ -920,25 +1414,29 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, []);
 
   const handleItemPointerCancel = useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    pointerDownPosRef.current = null;
-  }, []);
+    cancelLongPress();
+  }, [cancelLongPress]);
 
   const refinements = useMemo(
     () => suggestions.filter((s) => s.toLowerCase() !== submittedQuery.toLowerCase()).slice(0, 4),
     [suggestions, submittedQuery],
   );
-  const hasMore = results.length >= visibleCount && mode === "results";
+  const contentMode = mode === "detail" ? detailReturnModeRef.current : mode;
+  const usesNaturalAspectGrid = gridColumns === 1;
+  const mediaGridClassName = `grid phone-media-grid${usesNaturalAspectGrid ? " phone-media-grid--natural" : ""}`;
+  const hasMore = results.length >= visibleCount && contentMode === "results";
   const showSelectionTray = selectedItems.length > 0 && mode !== "detail";
   const showFavoritesSection = isLoadingFavorites || favoriteItems.length > 0;
   liveRef.current = { hasMore, submittedQuery, query, visibleCount, prefetchedResults };
 
   return (
     <div className="phone-stage">
-      <div className={`phone-rect${showSelectionTray ? " phone-rect--has-selection" : ""}`} aria-label="Phone interface viewport">
+      <div
+        className={`phone-rect${showSelectionTray ? " phone-rect--has-selection" : ""}`}
+        style={gridDensityStyle}
+        data-reduced-motion={prefersReducedMotion ? "true" : undefined}
+        aria-label="Phone interface viewport"
+      >
         {mode === "results" && hasMore ? (
           <div
             className={`pull-indicator${overscrollProgress > 0 ? " pull-indicator--visible" : ""}${overscrollProgress >= 1 ? " pull-indicator--ready" : ""}`}
@@ -962,8 +1460,20 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           viewportRef={scrollContainerRef}
           viewportClassName="phone-rect-viewport"
         >
-          {mode === "home" ? (
-            <div className="phone-startpage">
+          <MotionConfig reducedMotion="user">
+            <LayoutGroup id="phone-ui">
+              <AnimatePresence initial={false} mode="popLayout" custom={modeTransition.direction}>
+                {contentMode === "home" ? (
+                  <motion.div
+                    key={`screen-${contentMode}`}
+                    className="phone-screen phone-screen--home"
+                    custom={modeTransition.direction}
+                    variants={screenMotionVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                  >
+                    <div className="phone-startpage">
               <div className="phone-startpage-header">
                 <div className="phone-startpage-brand">
                   <div className="phone-startpage-logo" aria-hidden>
@@ -1004,7 +1514,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       onChange={(event) => {
                         const nextQuery = event.target.value;
                         setQuery(nextQuery);
-                        if (nextQuery.trim()) setMode("typing");
+                        if (nextQuery.trim()) transitionToMode("typing", "search-focus");
                       }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") void runSearch(query);
@@ -1025,8 +1535,16 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                   </div>
                 </div>
 
-                {showHistory && history.length > 0 && (
-                  <div className="phone-history-section">
+                <AnimatePresence initial={false}>
+                  {showHistory && history.length > 0 && (
+                  <motion.div
+                    key="home-history"
+                    className="phone-history-section phone-panel-motion"
+                    variants={panelMotion}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                  >
                     <div className="phone-history-header">
                       <span className="phone-history-header-label">Recent</span>
                       <Button
@@ -1072,22 +1590,26 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                         ))}
                       </CardContent>
                     </Card>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
 
               {showFavoritesSection ? (
-                <section className="phone-favorites-section" aria-labelledby="phone-favorites-title">
+                <section className="phone-favorites-section phone-media-grid-zone" aria-labelledby="phone-favorites-title" {...gridGestureHandlers}>
                   <div className="phone-favorites-header">
                     <h2 id="phone-favorites-title" className="phone-favorites-title">Favorites</h2>
-                    {!isLoadingFavorites ? (
-                      <span className="phone-favorites-count">{favoriteItems.length} items</span>
-                    ) : null}
+                    <div className="phone-favorites-actions">
+                      {!isLoadingFavorites ? (
+                        <span className="phone-favorites-count">{favoriteItems.length} items</span>
+                      ) : null}
+                      <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
+                    </div>
                   </div>
-                  <div className="grid phone-favorites-grid">
+                  <div ref={favoritesGridRef} className={`${mediaGridClassName} phone-favorites-grid`} data-phone-grid-scope="favorites">
                     {isLoadingFavorites ? (
                       Array.from({ length: 9 }, (_, index) => (
-                        <Skeleton key={index} className="thumb-skeleton" aria-hidden="true" />
+                        <Skeleton key={index} className="thumb-skeleton" data-phone-grid-item={`favorite-skeleton-${index}`} aria-hidden="true" />
                       ))
                     ) : favoriteItems.map((result) => (
                       <ThumbCell
@@ -1095,6 +1617,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                         result={result}
                         selected={selectedItems.some((item) => item.id === result.id)}
                         selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
+                        naturalAspectRatio={usesNaturalAspectGrid}
                         onPointerDown={handleItemPointerDown}
                         onPointerUp={handleItemPointerUp}
                         onPointerMove={handleItemPointerMove}
@@ -1106,9 +1629,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 </section>
               ) : null}
 
-            </div>
-          ) : mode !== "detail" ? (
-            <div className="mobile-top">
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={`screen-${contentMode}`}
+                    className="phone-screen phone-screen--search"
+                    custom={modeTransition.direction}
+                    variants={screenMotionVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                  >
+                    <div className="mobile-top">
               <div className="search-bar search-bar--semantic">
                 <Button
                   className={`history-btn${showHistory ? " history-btn--active" : ""}`}
@@ -1133,9 +1666,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     const nextQuery = event.target.value;
                     setQuery(nextQuery);
                     setShowHistory(false);
-                    setMode(nextQuery.trim() ? "typing" : "home");
+                    transitionToMode(nextQuery.trim() ? "typing" : "home", nextQuery.trim() ? "search-focus" : "search-clear");
                   }}
-                  onFocus={() => setMode(query.trim() ? "typing" : "home")}
+                  onFocus={() => transitionToMode(query.trim() ? "typing" : "home", "search-focus")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       void runSearch(query);
@@ -1152,7 +1685,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                       abortActiveSearch();
                       setQuery("");
                       setSubmittedQuery("");
-                      setMode("home");
+                      transitionToMode("home", "search-clear");
                     }}
                     aria-label="Clear search"
                   >
@@ -1162,7 +1695,16 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               </div>
 
               {/* History overlay — Separator replaces CSS border-bottom */}
+              <AnimatePresence initial={false} mode="wait">
               {showHistory && history.length > 0 ? (
+                <motion.div
+                  key="search-history"
+                  className="phone-panel-motion"
+                  variants={panelMotion}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
                 <Card className="suggestions" size="sm">
                   <CardContent className="p-0">
                     {history.map((item, idx) => (
@@ -1193,8 +1735,17 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     ))}
                   </CardContent>
                 </Card>
-              ) : mode === "typing" && suggestions.length > 0 ? (
+                </motion.div>
+              ) : contentMode === "typing" && suggestions.length > 0 ? (
                 /* Suggestions list — Separator between rows */
+                <motion.div
+                  key="search-suggestions"
+                  className="phone-panel-motion"
+                  variants={panelMotion}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
                 <Card className="suggestions" size="sm">
                   <CardContent className="p-0">
                     {suggestions.map((suggestion, idx) => {
@@ -1222,17 +1773,21 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     })}
                   </CardContent>
                 </Card>
+                </motion.div>
               ) : null}
-            </div>
-          ) : null}
+              </AnimatePresence>
+                    </div>
 
-          {(mode === "results" || mode === "typing") && (
-            <div className="grid-wrap">
-              {submittedQuery && mode === "results" ? (
-                <div className="result-context">
-                  <strong>{submittedQuery}</strong>
-                </div>
-              ) : null}
+                    {(contentMode === "results" || contentMode === "typing") && (
+            <div className="grid-wrap phone-media-grid-zone" {...gridGestureHandlers}>
+              <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
+                {submittedQuery && contentMode === "results" ? (
+                  <div className="result-context">
+                    <strong>{submittedQuery}</strong>
+                  </div>
+                ) : null}
+                <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
+              </div>
               {errorMessage ? (
                 <Alert variant="destructive" className="search-notice">
                   <InfoIcon />
@@ -1240,12 +1795,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 </Alert>
               ) : null}
 
-              <div className="grid">
+              <div ref={searchGridRef} className={mediaGridClassName} data-phone-grid-scope="search">
                 {isLoading && results.length === 0 ? (
                   Array.from({ length: 51 }, (_, i) => (
-                    <Skeleton key={i} className="thumb-skeleton" aria-hidden="true" />
+                    <Skeleton key={i} className="thumb-skeleton" data-phone-grid-item={`loading-${i}`} aria-hidden="true" />
                   ))
-                ) : results.length === 0 && mode === "results" ? (
+                ) : results.length === 0 && contentMode === "results" ? (
                   <Empty className="search-empty">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
@@ -1261,6 +1816,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     result={result}
                     selected={selectedItems.some((item) => item.id === result.id)}
                     selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
+                    naturalAspectRatio={usesNaturalAspectGrid}
                     onPointerDown={handleItemPointerDown}
                     onPointerUp={handleItemPointerUp}
                     onPointerMove={handleItemPointerMove}
@@ -1270,12 +1826,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 ))}
                 {isLoadingMore ? (
                   Array.from({ length: 9 }, (_, i) => (
-                    <Skeleton key={`more-${i}`} className="thumb-skeleton" aria-hidden="true" />
+                    <Skeleton key={`more-${i}`} className="thumb-skeleton" data-phone-grid-item={`more-${i}`} aria-hidden="true" />
                   ))
                 ) : null}
               </div>
 
-              {mode === "results" && !isLoading ? (
+              {contentMode === "results" && !isLoading ? (
                 <Card className="results-footer-card" size="sm">
                   <CardContent className="results-footer-content p-0">
                     {hasMore ? (
@@ -1315,22 +1871,39 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               ) : null}
             </div>
           )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-          {mode === "detail" && detailItem && (
+              <AnimatePresence initial={false}>
+                {mode === "detail" && detailItem && (
             isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
               <VideoDetailView
+                key={detailItem.id}
                 item={detailItem}
                 onBack={closeDetail}
                 onSearchSameDate={searchSameDate}
                 onRunSimilarSearch={(item) => void runSimilarSearch(item)}
                 onConfirmAnswer={onConfirmAnswer}
                 onSendSelection={sendSelection}
+                layoutId={mediaLayoutId(detailItem.id)}
               />
             ) : (
-              <div className="detail-screen">
-                <div className="detail-media-fill">
+              <motion.div
+                key={detailItem.id}
+                className="detail-screen phone-detail-motion"
+                variants={detailBackdropMotion}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+              >
+                <motion.div
+                  className="detail-media-fill phone-detail-media-motion"
+                  layoutId={mediaLayoutId(detailItem.id)}
+                  transition={{ duration: PHONE_MOTION.detailMs / 1000, ease: MOTION_EASE.gentle }}
+                >
                   <img src={resolvedMediaUrl(detailItem) ?? detailItem.links?.media ?? detailItem.links?.thumbnail} alt={itemTitle(detailItem)} onContextMenu={(e) => e.preventDefault()} />
-                </div>
+                </motion.div>
 
                 <div className="detail-float-top">
                   <Button
@@ -1389,56 +1962,70 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     </Button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             )
           )}
+              </AnimatePresence>
+            </LayoutGroup>
+          </MotionConfig>
 
         </ScrollArea>
 
         {/* Selection tray — floats above the scroll area */}
-        {showSelectionTray && (
-          <Card className="selection-tray" aria-live="polite" size="sm">
-            <CardContent className="selection-tray-content p-0">
-              <div className="selection-thumbs" aria-label="Selected items">
-                {selectedItems.map((item) => (
-                  <Button
-                    key={item.id}
-                    type="button"
-                    variant="ghost"
-                    className="selection-thumb-btn h-auto"
-                    onClick={() => toggleSelected(item)}
-                    aria-label={`Remove ${itemTitle(item)} from selection`}
-                  >
-                    <span className="selection-thumb-x" aria-hidden>
-                      <XIcon />
-                    </span>
-                    <img src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" loading="lazy" decoding="async" />
-                  </Button>
-                ))}
-              </div>
-              <div className="selection-tray-actions">
-                <Badge variant="secondary" className="selection-count">{selectedItems.length} selected</Badge>
-                <Button
-                  className="send-btn h-auto"
-                  type="button"
-                  onClick={() => {
-                    if (onConfirmAnswer && selectedItems.length > 0) {
-                      onConfirmAnswer(selectedItems[0].id);
-                    }
-                    setSelectedItems([]);
-                  }}
-                >
-                  {onConfirmAnswer ? (
-                    <CheckIcon data-icon="inline-start" />
-                  ) : (
-                    <SendIcon data-icon="inline-start" />
-                  )}
-                  {onConfirmAnswer ? "Confirm" : "Send"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <MotionConfig reducedMotion="user">
+          <AnimatePresence initial={false}>
+            {showSelectionTray && (
+              <motion.div
+                className="selection-tray"
+                aria-live="polite"
+                initial={{ opacity: 0, y: 22, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.985 }}
+                transition={{ duration: 0.22, ease: MOTION_EASE.gentle }}
+              >
+                <div className="selection-tray-content">
+                  <div className="selection-thumbs" aria-label="Selected items">
+                    {selectedItems.map((item) => (
+                      <Button
+                        key={item.id}
+                        type="button"
+                        variant="ghost"
+                        className="selection-thumb-btn h-auto"
+                        onClick={() => toggleSelected(item)}
+                        aria-label={`Remove ${itemTitle(item)} from selection`}
+                      >
+                        <span className="selection-thumb-x" aria-hidden>
+                          <XIcon />
+                        </span>
+                        <img src={resolvedThumbnailUrl(item) ?? item.links?.thumbnail ?? item.links?.media} alt="" loading="lazy" decoding="async" />
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="selection-tray-actions">
+                    <Badge variant="secondary" className="selection-count">{selectedItems.length} selected</Badge>
+                    <Button
+                      className="send-btn h-auto"
+                      type="button"
+                      onClick={() => {
+                        if (onConfirmAnswer && selectedItems.length > 0) {
+                          onConfirmAnswer(selectedItems[0].id);
+                        }
+                        setSelectedItems([]);
+                      }}
+                    >
+                      {onConfirmAnswer ? (
+                        <CheckIcon data-icon="inline-start" />
+                      ) : (
+                        <SendIcon data-icon="inline-start" />
+                      )}
+                      {onConfirmAnswer ? "Confirm" : "Send"}
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </MotionConfig>
       </div>
     </div>
   );
