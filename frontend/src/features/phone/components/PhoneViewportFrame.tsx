@@ -860,6 +860,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   useEffect(() => {
     const q = query.trim();
     if (!q || mode !== "typing") return;
+    if (q === liveRef.current.submittedQuery) return;
     const timer = window.setTimeout(() => {
       void runSearch(q, SEARCH_BATCH_SIZE, { intent: "preview" });
     }, 500);
@@ -1099,7 +1100,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setIsLoadingMore(false);
     setIsLoading(true);
     setErrorMessage(null);
-    setResults([]);
     setVisibleCount(count);
 
     if (!isPreview) {
@@ -1668,7 +1668,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     setShowHistory(false);
                     transitionToMode(nextQuery.trim() ? "typing" : "home", nextQuery.trim() ? "search-focus" : "search-clear");
                   }}
-                  onFocus={() => transitionToMode(query.trim() ? "typing" : "home", "search-focus")}
+                  onFocus={() => { if (modeRef.current !== "results") transitionToMode(query.trim() ? "typing" : "home", "search-focus"); }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       void runSearch(query);
