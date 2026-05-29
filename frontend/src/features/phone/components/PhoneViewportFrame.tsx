@@ -878,6 +878,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     modeRef.current = mode;
   }, [mode]);
 
+  useEffect(() => {
+    if (modeTransition.reason === "search-clear") {
+      scrollContainerRef.current?.scrollTo({ top: 0 });
+    }
+  }, [modeTransition]);
+
   const gridDensityStyle = useMemo(() => ({
     "--phone-grid-columns": String(gridColumns),
     "--phone-grid-gap": GRID_GAP_BY_COLUMNS[gridColumns],
