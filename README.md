@@ -4,15 +4,20 @@ Personal-media semantic-search app. A pre-indexed media catalog is distributed t
 
 ## Prerequisites
 
-Install these before running Recall.
+Install the following before running Recall.
 
-| Dependency      | Install instructions                                                             | Notes                                                       |
-| --------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **uv**          | [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) | Required for backend dependency management                  |
-| **Python 3.14** | [Installing Python with uv](https://docs.astral.sh/uv/guides/install-python/)    | Install through `uv`                                        |
-| **Node.js**     | [Node.js download page](https://nodejs.org/en/download)                          | Required for the frontend. `npm` comes bundled with Node.js |
-| **ExifTool**    | [ExifTool installation guide](https://exiftool.org/install.html)                 | Maintainers only                                            |
-| **ffmpeg**      | [FFmpeg download page](https://ffmpeg.org/download.html)                         | Maintainers only                                            |
+| Dependency | Required for | Install instructions |
+|------------|--------------|----------------------|
+| **uv** | Backend dependency management and Python runtime setup | [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) |
+| **Python 3.14** | Backend runtime | [Python downloads](https://www.python.org/downloads/) or [install Python with uv](https://docs.astral.sh/uv/guides/install-python/) |
+| **Node.js** | Frontend development server | [Node.js downloads](https://nodejs.org/en/download)
+
+Maintainers also need the following tools for indexing media.
+
+| Dependency | Required for | Install instructions |
+|------------|--------------|----------------------|
+| **ExifTool** | Metadata extraction during indexing | [ExifTool installation guide](https://exiftool.org/install.html) |
+| **FFmpeg** | Video processing and thumbnail generation during indexing | [FFmpeg download page](https://ffmpeg.org/download.html) |
 
 ## Quick start
 
