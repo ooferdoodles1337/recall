@@ -305,12 +305,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const enterComposeMode = useCallback((opts: { showHistory?: boolean } = {}) => {
     if (modeRef.current !== "compose") dispatch({ type: "SEARCH_FOCUS", startQuery: query });
+    setShowComposePanel(true);
     if (typeof opts.showHistory === "boolean") setShowHistory(opts.showHistory);
   }, [query, dispatch]);
 
   const closeComposeMode = useCallback(() => {
     setQuery(modeState.composeStartQuery); setShowHistory(false); setHistory(readSearchHistory()); dispatch({ type: "COMPOSE_DISMISS" }); topBarInputRef.current?.blur();
   }, [modeState.composeStartQuery, dispatch]);
+
+  const handleConfirmAnswer = useCallback((id: string) => {
+    onConfirmAnswer?.(id);
+    setQuery(""); setSubmittedQuery(""); setResults([]); setSelectedItems([]); setShowHistory(false);
+    dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur();
+  }, [onConfirmAnswer, dispatch]);
 
   const prefetchNextBatch = useCallback(async () => {
     const { hasMore: live, submittedQuery: sq, visibleCount: vc } = liveRef.current;
@@ -513,12 +520,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           {mode === "detail" && detailItem && (
             isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
               <VideoDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
-                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
+                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={handleConfirmAnswer}
                 onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
                 onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
             ) : (
               <ImageDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
-                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
+                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={handleConfirmAnswer}
                 onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
                 onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
             )
@@ -543,7 +550,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       <MotionConfig reducedMotion="user">
         {showSelectionTray && (
           <SelectionTray selectedItems={selectedItems} toggleSelected={toggleSelected}
-            onConfirmAnswer={onConfirmAnswer} onClearSelection={() => setSelectedItems([])} />
+            onConfirmAnswer={handleConfirmAnswer} onClearSelection={() => setSelectedItems([])} />
         )}
       </MotionConfig>
     </div>

@@ -51,7 +51,6 @@ export function ResultsSection({
   isLoading,
   isLoadingMore,
   contentMode,
-  submittedQuery,
   errorMessage,
   hasMore,
   refinements,
@@ -82,12 +81,7 @@ export function ResultsSection({
 
   return (
     <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...gridGestureHandlers}>
-      <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
-        {submittedQuery && contentMode === "results" ? (
-          <div className="result-context">
-            <strong>{submittedQuery}</strong>
-          </div>
-        ) : null}
+      <div className="phone-grid-toolbar phone-grid-toolbar--controls-only">
         <GridZoomControls columns={gridColumns} onZoomIn={onZoomIn} onZoomOut={onZoomOut} />
       </div>
       {errorMessage ? (

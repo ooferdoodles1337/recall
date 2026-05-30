@@ -157,7 +157,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /Select Favorite 02/i }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
     await waitFor(() => {
       expect(screen.queryByRole("region", { name: "Selection tray" })).not.toBeInTheDocument();
     });
@@ -227,11 +227,12 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(screen.getByRole("button", { name: "Play video" }));
     expect(await screen.findByRole("button", { name: "Pause video" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("region", { name: "Selection tray" })).toHaveTextContent("1 selected");
+    // Confirm (send) resets to home — no selection tray, home heading visible
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Selection tray" })).not.toBeInTheDocument();
 
-    await openDetailFromButton(screen.getByRole("button", { name: /Deselect Favorite video clip/i }));
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite video clip/i }));
     await user.click(screen.getByRole("button", { name: /Similar/i }));
     expect(await screen.findByRole("button", { name: /Select Similar yellow umbrella/i })).toBeInTheDocument();
   });

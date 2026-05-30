@@ -89,6 +89,25 @@ and suggestions panel merge into a single unified glass card:
 - Suggestion rows are rendered as a flat list directly inside the panel — no nested card wrapper.
   The glass and border-radius come from the `.phone-compose-section` container, not from a child card.
 
+### CP-3 — Search bar tap always reveals populated content immediately
+
+Tapping the search bar must open the compose panel with content visible in the
+same animation frame — no blank intermediate state.
+
+**Content priority:**
+1. If query is empty → show history (if available).
+2. If query is non-empty and suggestions are cached → show suggestions.
+3. If query is non-empty but suggestions are not yet loaded → show history as
+   an immediate fallback; replace with suggestions once they arrive.
+
+**Re-expansion:** if the panel was previously collapsed by scroll (SR-1,
+`showComposePanel=false`), tapping the bar must re-expand it. `enterComposeMode`
+must always set `showComposePanel` to `true`, regardless of current mode.
+
+**Rationale:** an empty panel on tap breaks the mental model that the bar is
+always ready. History as a fallback provides instant value while the debounced
+suggestion fetch completes.
+
 ---
 
 ## Mode transitions
