@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { CheckIcon, SendIcon, XIcon } from "lucide-react";
+import { SendIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RecallMediaItem } from "@/shared/types/recall";
@@ -57,12 +57,8 @@ export function SelectionTray({ selectedItems, toggleSelected, onConfirmAnswer, 
                   onClearSelection?.();
                 }}
               >
-                {onConfirmAnswer ? (
-                  <CheckIcon data-icon="inline-start" />
-                ) : (
-                  <SendIcon data-icon="inline-start" />
-                )}
-                {onConfirmAnswer ? "Confirm" : "Send"}
+                <SendIcon data-icon="inline-start" />
+                Send
               </Button>
             </div>
           </div>

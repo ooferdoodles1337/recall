@@ -162,7 +162,7 @@ export function ImageDetailView({
             onClick={() => onConfirmAnswer(item.id)}
           >
             <CheckIcon data-icon="inline-start" />
-            <span>Confirm Answer</span>
+            <span>Send</span>
           </Button>
         ) : (
           <Button

@@ -8,10 +8,8 @@ import {
   ShieldAlertIcon,
   ShieldCheckIcon,
   VideoIcon,
-  XIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { RecallMediaItem } from "@/shared/types/recall";
 
 interface AboutSheetProps {
@@ -112,18 +110,11 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
             exit={{ opacity: 0, y: 30 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="about-sheet-header">
+            <div className="about-sheet-header" onClick={onClose}>
               <div className="about-sheet-handle" aria-hidden />
-              <Button
-                className="about-sheet-close"
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={onClose}
-                aria-label="Close"
-              >
-                <XIcon />
-              </Button>
+              <button className="about-sheet-done" type="button" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+                Done
+              </button>
             </div>
 
             <div className="about-sheet-scroll">
