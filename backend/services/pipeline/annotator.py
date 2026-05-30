@@ -125,6 +125,15 @@ def _load_item_file(item: dict) -> AnnotationMedia | None:
             return None
         return _write_temp_processed_media(item["id"], processed)
 
+    # Non-ASCII filenames cause HTTP header encoding errors in the upload API.
+    if not media_path.name.isascii():
+        suffix = _TEMP_SUFFIX_BY_MIME_TYPE.get(mime_type, media_path.suffix)
+        with tempfile.NamedTemporaryFile(
+            prefix=f"recall-annotation-{item['id']}-", suffix=suffix, delete=False
+        ) as f:
+            f.write(media_path.read_bytes())
+            return AnnotationMedia(file_id=item["id"], path=Path(f.name), mime_type=mime_type, temporary=True)
+
     return AnnotationMedia(file_id=item["id"], path=media_path, mime_type=mime_type)
 
 

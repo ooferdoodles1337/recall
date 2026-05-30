@@ -1,6 +1,8 @@
-# AGENTS.md / CLAUDE.md
+# CLAUDE.md
 
-This file provides guidance to coding agents when working with this repository. `AGENTS.md` is a root-level symlink to this file; do not create nested `AGENTS.md` files in `backend/` or `frontend/`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+`AGENTS.md` is a root-level symlink to this file; do not create nested `AGENTS.md` files in `backend/` or `frontend/`.
 
 ## Project overview
 
@@ -13,7 +15,25 @@ Recall is a personal-media semantic-search app built as a user-testing demo. A p
 
 ## Commands
 
-Backend commands run from `backend/`. Python 3.14, managed by `uv`.
+### Starting both servers together (recommended)
+
+From the repo root:
+
+```bash
+./start.sh
+```
+
+Syncs backend dependencies (`uv sync`) and frontend dependencies (`npm install`), then starts the backend on `:8000` and frontend on `:5173`, both bound to `0.0.0.0`. Prints a LAN URL (`http://<your-ip>:5173`) that phones and other local-network devices can open directly. Press Ctrl+C to stop both.
+
+### LAN / phone access
+
+`vite.config.ts` proxies all backend paths (`/search`, `/catalog`, `/media`, `/health`, `/trials`) from the Vite server to `localhost:8000`. Devices on the LAN only need to reach the Vite server — they never talk directly to the backend. No extra config is required as long as the machine running the servers is on the same network.
+
+`VITE_RECALL_API_BASE_URL` can still override the API origin (e.g. to point at a remote backend), but is not needed for normal LAN use.
+
+### Backend (run from `backend/`)
+
+Python 3.14, managed by `uv`.
 
 ```bash
 # Run all tests
@@ -22,8 +42,11 @@ uv run pytest -v
 # Run a single test file
 uv run pytest tests/test_metadata.py -v
 
-# Start dev server (http://localhost:8000, /docs for Swagger UI)
+# Start dev server — localhost only
 uv run uvicorn main:app --reload
+
+# Start dev server — accessible on LAN
+uv run uvicorn main:app --reload --host 0.0.0.0
 
 # Index media files into SQLite + ChromaDB (maintainer only)
 # Requires indexing dependencies: uv sync --group indexing
@@ -40,13 +63,15 @@ uv run python scripts/query.py "your query here"
 uv add <package>
 ```
 
-Frontend commands run from `frontend/`. React 19 and Vite are managed by npm.
+### Frontend (run from `frontend/`)
+
+React 19 and Vite are managed by npm.
 
 ```bash
 # Install dependencies
 npm install
 
-# Start dev server (http://localhost:5173)
+# Start dev server — localhost only
 npm run dev
 
 # Production build / typecheck
@@ -54,6 +79,18 @@ npm run build
 
 # Preview built app
 npm run preview
+
+# Run unit tests (Vitest + jsdom + Testing Library) — single pass
+npm run test:unit
+
+# Run unit tests in watch mode
+npm run test:unit:watch
+
+# Run a single unit test file
+npx vitest run tests/unit/phoneReducer.test.ts
+
+# Run all checks: build + unit
+npm run test
 ```
 
 `.env` lives at the **repo root** (not inside `backend/`). Required keys:
@@ -66,18 +103,90 @@ Frontend API configuration:
 
 | Variable | Required | Description |
 |---|---|---|
-| `VITE_RECALL_API_BASE_URL` | no | API base URL for the frontend (default: `http://localhost:8000`) |
+| `VITE_RECALL_API_BASE_URL` | no | Override API origin (default: `""` — relative URLs, proxied through Vite to `localhost:8000`) |
 
 ## Frontend product constraints
 
 - The guided user-testing program is a desktop fullscreen application, not a mobile-responsive website.
 - The app intentionally gates small windows: below 1280 x 720 px, it should show the fullscreen-size warning instead of trying to squeeze the task UI.
 - The primary route is `/` (or any non-`/phone` path), which renders `UserTestingWebUI`.
-- `/phone` renders the standalone phone tester shell. The phone UI is still a placeholder and should stay visually framed as the participant viewport until implemented.
+- `/phone` renders the standalone phone tester (`PhoneViewportFrame`) — a fully implemented iOS-style search UI with a home feed, search/compose/results/detail modes, favorites grid, selection tray, NSFW handling, and pinch-to-zoom grid density.
 - The current visual direction is a quiet photo-archive / usability-lab console. Keep typography and styling consistent with `frontend/src/styles/global.css`.
 - Fonts are self-hosted with Fontsource packages, imported in `frontend/src/main.tsx`. Do not reintroduce external Google Fonts CSS imports.
 - Radix primitives may be used for accessible unstyled UI behavior. Keep custom visual styling in CSS rather than adopting a large styled UI kit.
-- Playwright artifacts belong in `.playwright-mcp/`. Do not leave screenshots or generated inspection files in the repo root.
+
+### Phone UI UX spec
+
+`docs/ux-spec.md` is the authoritative UX specification for the `/phone` route.
+**Before modifying any phone UI file (`PhoneViewportFrame.tsx`, `phoneReducer.ts`,
+`SearchCommandLayer.tsx`, or CSS under `.phone-rect`), read `docs/ux-spec.md`
+and ensure the change does not regress any listed behavior.**
+
+## File map
+
+A quick index of where things live so you can open the right file immediately.
+
+### Root
+
+| Path | What it is |
+|---|---|
+| `start.sh` | One-command launcher for both servers (LAN-accessible) |
+| `.env` | `GEMINI_API_KEY` and other secrets — repo root, not inside `backend/` |
+| `CLAUDE.md` | This file. `AGENTS.md` is a symlink to it. |
+
+### Backend
+
+| Path | What it is |
+|---|---|
+| `backend/main.py` | FastAPI app, CORS config, router registration, lifespan hook |
+| `backend/config.py` | All path constants (`MEDIA_DIR`, `CATALOG_DB_PATH`, etc.) and upload limits |
+| `backend/routes/search.py` | `/search/semantic`, `/search/text`, `/search/suggest`, `/search/similar/{id}`, `POST /search/similar` |
+| `backend/routes/catalog.py` | `/catalog/items`, `/catalog/items/{uuid}`, `/catalog/items/batch`, `/catalog/facets`, `/catalog/stats` |
+| `backend/routes/media.py` | `/media/{uuid}`, `/media/{uuid}/thumbnail` |
+| `backend/services/catalog/db.py` | All SQLite reads/writes — the single source of truth for item metadata |
+| `backend/services/catalog/schema.py` | Pydantic models for catalog items and metadata |
+| `backend/services/catalog/extractor.py` | EXIF extraction, geocoding, `_sanitize_value` for ChromaDB-safe metadata |
+| `backend/services/catalog/refresh.py` | Incremental catalog refresh logic |
+| `backend/services/search/chroma.py` | ChromaDB client wrapper — vector upsert, top-k query, embedding fetch by ID |
+| `backend/services/search/text_index.py` | In-memory exact/prefix/fuzzy text index built from SQLite at startup |
+| `backend/services/pipeline/indexer.py` | Offline indexing CLI — dedup, transcode, embed, upsert |
+| `backend/services/pipeline/annotator.py` | Offline annotation pass — finds unannotated items, submits Gemini batch job |
+| `backend/services/pipeline/media.py` | Media transcoding, thumbnail generation, video truncation |
+| `backend/services/pipeline/nsfw.py` | NSFW classification helper used during indexing |
+| `backend/services/providers/gemini.py` | Embedding only (`embed_text`, `embed_content`, `embed_content_batch`) |
+| `backend/services/providers/gemini_annotation.py` | Annotation batch jobs (v1alpha API, separate client) |
+| `backend/services/utils.py` | `format_bytes`, `inline_schema` (flattens `$ref`/`$defs` for providers) |
+| `backend/tests/conftest.py` | Shared fixtures: dummy API key, ephemeral ChromaDB, temp SQLite |
+| `backend/data/` | Runtime data: `media/`, `thumbnails/`, `databases/` (SQLite + ChromaDB) |
+
+### Frontend
+
+| Path | What it is |
+|---|---|
+| `frontend/vite.config.ts` | Vite config — host binding, ports, proxy rules for all backend paths |
+| `frontend/src/main.tsx` | Entry point — font imports, router, app mount |
+| `frontend/src/app/App.tsx` | Root component — route split (`/phone` vs everything else), size gate |
+| `frontend/src/shared/api/client.ts` | `recallFetch` wrapper, `recallApiBaseUrl` (default `""` → proxied) |
+| `frontend/src/shared/types/recall.ts` | Core TypeScript types: `RecallMediaItem`, `RecallSearchResult`, metadata shapes |
+| `frontend/src/shared/media/mediaItem.ts` | Helpers: `isVideo`, `resolvedMediaUrl`, `resolvedThumbnailUrl` |
+| `frontend/src/styles/global.css` | All custom CSS — layout tokens, component classes, phone frame, animations |
+| `frontend/src/components/ui/` | Shared shadcn-style primitives (Alert, Badge, Button, Card, Input, etc.) |
+| `frontend/src/features/phone/` | Standalone phone tester route (`/phone`) |
+| `frontend/src/features/phone/PhoneTesterUI.tsx` | Route shell for the phone tester |
+| `frontend/src/features/phone/components/PhoneViewportFrame.tsx` | The full phone search UI (search bar, results grid, detail view, selection tray) |
+| `frontend/src/features/phone/api/searchApi.ts` | Phone feature's API calls (search, suggest, similar, recent) |
+| `frontend/src/features/user-testing/` | Desktop user-testing harness (primary `/` route) |
+| `frontend/src/features/user-testing/UserTestingWebUI.tsx` | Harness root — screen state machine (welcome → instructions → task → results) |
+| `frontend/src/features/user-testing/screens/` | `WelcomeScreen`, `InstructionsScreen`, `TaskScreen`, `ResultsScreen` |
+| `frontend/src/features/user-testing/components/TargetPhotoPanel.tsx` | Target photo display in the task screen |
+| `frontend/src/features/user-testing/api/trialsApi.ts` | Fetches trial targets from `/trials` |
+| `frontend/src/features/user-testing/api/resultsSink.ts` | Submits session results |
+| `frontend/src/features/user-testing/metrics/` | Session timing and event metrics (`sessionMetrics.ts`, `types.ts`) |
+| `frontend/src/features/user-testing/tasks/targets.ts` | Static target definitions |
+| `frontend/src/lib/utils.ts` | `cn()` class-name helper (clsx + tailwind-merge) |
+| `frontend/tests/unit/` | Vitest unit tests (jsdom + Testing Library); covers `PhoneViewportFrame`, `SearchCommandLayer`, `phoneReducer` |
+| `frontend/tests/setup/vitest.setup.ts` | Vitest global setup — imports `@testing-library/jest-dom` matchers |
+| `frontend/vitest.config.ts` | Vitest config — jsdom environment, `tests/unit/**` glob, CSS disabled |
 
 ## Architecture
 

@@ -19,7 +19,7 @@ def test_list_items_returns_count_and_results(monkeypatch):
     from routes.catalog import list_items
 
     items = [_item("a", "2024-03-18T10:00:00"), _item("b", "2024-03-17T10:00:00")]
-    monkeypatch.setattr("services.catalog.db.list_library_items", lambda media_type=None, order="desc": items)
+    monkeypatch.setattr("services.catalog.db.list_library_items", lambda media_type=None, favorite=None, order="desc", limit=None: items)
 
     body = list_items()
 
@@ -32,15 +32,15 @@ def test_list_items_passes_filters(monkeypatch):
 
     calls = []
 
-    def fake_list(media_type=None, order="desc"):
-        calls.append((media_type, order))
+    def fake_list(media_type=None, favorite=None, order="desc", limit=None):
+        calls.append((media_type, favorite, order, limit))
         return []
 
     monkeypatch.setattr("services.catalog.db.list_library_items", fake_list)
 
-    list_items(media_type="video", order="asc")
+    list_items(media_type="video", favorite=True, order="asc", limit=25)
 
-    assert calls == [("video", "asc")]
+    assert calls == [("video", True, "asc", 25)]
 
 
 def test_get_item_returns_item(monkeypatch):
@@ -96,3 +96,15 @@ def test_get_facets_delegates_to_catalog(monkeypatch):
 
     assert result["media_type"]["image"] == 10
     assert result["taken_year_month"]["2024-03"] == 5
+
+
+def test_trials_returns_random_target_summaries(monkeypatch):
+    from main import trials
+
+    monkeypatch.setattr("services.catalog.db.get_random_ids", lambda n: ["a", "b"])
+    monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: _item(id))
+
+    result = trials(n=2)
+
+    assert result["n"] == 2
+    assert [item["id"] for item in result["targets"]] == ["a", "b"]

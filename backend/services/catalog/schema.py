@@ -14,6 +14,7 @@ Scalar = str | int | float | bool
 _PROMOTED_METADATA_KEYS = {
     "content_hash",
     "thumbnail_path",
+    "animated_thumbnail_path",
     "description",
     "search_terms",
     "width",
@@ -128,11 +129,14 @@ def build_metadata(
     })
 
     thumbnail_path = extra.get("thumbnail_path")
+    animated_thumbnail_path = extra.get("animated_thumbnail_path")
     content_hash = extra.get("content_hash")
 
     asset_paths: dict[str, str] = {"original": path}
     if isinstance(thumbnail_path, str) and thumbnail_path:
         asset_paths["thumbnail"] = thumbnail_path
+    if isinstance(animated_thumbnail_path, str) and animated_thumbnail_path:
+        asset_paths["animated_thumbnail"] = animated_thumbnail_path
 
     asset: dict[str, Any] = {
         "filename": filename,
@@ -226,6 +230,10 @@ def _flat_extra_from_existing(metadata: dict[str, Any], *, include_raw: bool = T
     value = thumbnail_path(metadata)
     if value:
         extra["thumbnail_path"] = value
+
+    value = animated_thumbnail_path(metadata)
+    if value:
+        extra["animated_thumbnail_path"] = value
 
     asset = metadata.get("asset")
     if isinstance(asset, dict):
@@ -339,6 +347,8 @@ def response_links(file_id: str, metadata: dict[str, Any]) -> dict[str, str]:
     links = {"media": f"/media/{file_id}"}
     if thumbnail_path(metadata):
         links["thumbnail"] = f"/media/{file_id}/thumbnail"
+    if animated_thumbnail_path(metadata):
+        links["animated_thumbnail"] = f"/media/{file_id}/animated-thumbnail"
     return links
 
 
@@ -394,6 +404,14 @@ def thumbnail_path(metadata: dict[str, Any]) -> str | None:
     if isinstance(paths, dict) and isinstance(paths.get("thumbnail"), str):
         return paths["thumbnail"]
     value = metadata.get("thumbnail_path")
+    return value if isinstance(value, str) else None
+
+
+def animated_thumbnail_path(metadata: dict[str, Any]) -> str | None:
+    paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
+    if isinstance(paths, dict) and isinstance(paths.get("animated_thumbnail"), str):
+        return paths["animated_thumbnail"]
+    value = metadata.get("animated_thumbnail_path")
     return value if isinstance(value, str) else None
 
 

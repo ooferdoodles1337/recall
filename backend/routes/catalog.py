@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -10,10 +10,12 @@ router = APIRouter()
 
 @router.get("/items")
 def list_items(
-    media_type: Literal["image", "video"] | None = Query(None),
-    order: Literal["asc", "desc"] = Query("desc"),
+    media_type: Annotated[Literal["image", "video"] | None, Query()] = None,
+    favorite: Annotated[bool | None, Query()] = None,
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+    limit: Annotated[int | None, Query(ge=1, le=500)] = None,
 ):
-    results = catalog.list_library_items(media_type=media_type, order=order)
+    results = catalog.list_library_items(media_type=media_type, favorite=favorite, order=order, limit=limit)
     return {"count": len(results), "results": results}
 
 
@@ -23,6 +25,18 @@ def get_item(id: str):
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
+
+
+@router.patch("/items/{id}")
+def patch_item(id: str, body: dict[str, Any]):
+    item = catalog.get_item(id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        updated = catalog.patch_item(id, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return updated
 
 
 class BatchRequest(BaseModel):

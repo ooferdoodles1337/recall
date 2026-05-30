@@ -16,8 +16,10 @@ from services.providers import gemini
 from services.search import chroma
 from services.utils import format_bytes
 from services.pipeline.media import (
+    ANIMATED_IMAGE_EXTS,
     IMAGE_EXTENSIONS,
     classify_extension,
+    generate_animated_thumbnail,
     generate_thumbnail,
     process_image,
     process_video,
@@ -128,6 +130,16 @@ def _preprocess_file(
         thumbnail_abs.write_bytes(thumbnail_bytes)
         file_metadata["thumbnail_path"] = str(thumbnail_abs.relative_to(config.DATA_DIR))
 
+        if ext in ANIMATED_IMAGE_EXTS:
+            animated_bytes = generate_animated_thumbnail(path_str)
+            if animated_bytes is not None:
+                anim_abs = config.THUMBS_DIR / f"{file_id}_animated.webp"
+                anim_abs.write_bytes(animated_bytes)
+                file_metadata["animated_thumbnail_path"] = str(anim_abs.relative_to(config.DATA_DIR))
+                log.debug("animated thumbnail: %s (%s)", anim_abs.name, format_bytes(len(animated_bytes)))
+            else:
+                log.debug("animated thumbnail skipped (too large or not animated): %s", path.name)
+
         if seen_hashes is not None:
             seen_hashes.add(content_hash)
 
@@ -210,6 +222,162 @@ def _index_pending_batch(pending: list[_PendingItem]) -> int:
             log.error("failed upserting (%s): %s", type(exc).__name__, item.path)
 
     return indexed
+
+
+def regen_thumbnails(db_path: str | None = None) -> None:
+    """Regenerate every thumbnail on disk without touching embeddings or other catalog data."""
+    if db_path is not None:
+        chroma.configure(db_path)
+    catalog.configure()
+
+    records = catalog.get_all_asset_records()
+    total = len(records)
+    log.info("regen-thumbnails: %d items", total)
+    ok = failed = skipped = 0
+
+    for i, (item_id, media_type, rel_path, rel_thumb) in enumerate(records, 1):
+        if i == 1 or i % 50 == 0 or i == total:
+            log.info("progress %d/%d  ok=%d  failed=%d  skipped=%d", i, total, ok, failed, skipped)
+
+        if not rel_path:
+            log.warning("no asset_path, skipping: %s", item_id)
+            skipped += 1
+            continue
+
+        abs_path = config.DATA_DIR / rel_path
+        if not abs_path.exists():
+            log.warning("source file missing, skipping: %s", abs_path)
+            skipped += 1
+            continue
+
+        if rel_thumb:
+            thumb_abs = config.DATA_DIR / rel_thumb
+        else:
+            config.THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+            thumb_abs = config.THUMBS_DIR / f"{item_id}.webp"
+
+        try:
+            thumb_bytes = generate_thumbnail(str(abs_path), media_type)
+            thumb_abs.parent.mkdir(parents=True, exist_ok=True)
+            thumb_abs.write_bytes(thumb_bytes)
+            ok += 1
+            log.debug("ok: %s", abs_path.name)
+        except Exception as exc:
+            log.error("failed (%s): %s", type(exc).__name__, abs_path.name)
+            failed += 1
+
+    log.info("regen-thumbnails complete: ok=%d  failed=%d  skipped=%d", ok, failed, skipped)
+
+
+def regen_animated_thumbnails(db_path: str | None = None) -> None:
+    """Generate (or regenerate) animated WebP thumbnails for all qualifying GIF items."""
+    from services.pipeline.media import ANIMATED_THUMBNAIL_MAX_SOURCE_BYTES
+
+    if db_path is not None:
+        chroma.configure(db_path)
+    catalog.configure()
+
+    records = catalog.get_records_for_animated_regen()
+    total = len(records)
+    log.info("regen-animated-thumbnails: %d GIF items", total)
+    ok = failed = 0
+    skip_missing = skip_static = skip_toolarge = skip_nopath = 0
+
+    for i, (item_id, rel_path, existing_rel_anim) in enumerate(records, 1):
+        if i == 1 or i % 50 == 0 or i == total:
+            skipped = skip_missing + skip_static + skip_toolarge + skip_nopath
+            log.info(
+                "progress %d/%d  ok=%d  failed=%d  skipped=%d (static=%d too-large=%d missing=%d no-path=%d)",
+                i, total, ok, failed, skipped, skip_static, skip_toolarge, skip_missing, skip_nopath,
+            )
+
+        if not rel_path:
+            skip_nopath += 1
+            continue
+
+        abs_path = config.DATA_DIR / rel_path
+        if not abs_path.exists():
+            log.warning("source file missing, skipping: %s", abs_path)
+            skip_missing += 1
+            continue
+
+        try:
+            source_size = abs_path.stat().st_size
+            if source_size > ANIMATED_THUMBNAIL_MAX_SOURCE_BYTES:
+                log.debug("skipped (too large: %s): %s", format_bytes(source_size), abs_path.name)
+                skip_toolarge += 1
+                continue
+
+            animated_bytes = generate_animated_thumbnail(str(abs_path))
+            if animated_bytes is None:
+                log.debug("skipped (static or error): %s", abs_path.name)
+                skip_static += 1
+                continue
+
+            if existing_rel_anim:
+                anim_abs = config.DATA_DIR / existing_rel_anim
+            else:
+                config.THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+                anim_abs = config.THUMBS_DIR / f"{item_id}_animated.webp"
+
+            anim_abs.parent.mkdir(parents=True, exist_ok=True)
+            anim_abs.write_bytes(animated_bytes)
+            rel_anim = str(anim_abs.relative_to(config.DATA_DIR))
+            if rel_anim != existing_rel_anim:
+                catalog.update_animated_thumbnail_path(item_id, rel_anim)
+            ok += 1
+            log.debug("ok: %s", abs_path.name)
+        except Exception as exc:
+            log.error("failed (%s): %s", type(exc).__name__, abs_path.name)
+            failed += 1
+
+    skipped = skip_missing + skip_static + skip_toolarge + skip_nopath
+    log.info(
+        "regen-animated-thumbnails complete: ok=%d  failed=%d  skipped=%d (static=%d too-large=%d missing=%d no-path=%d)",
+        ok, failed, skipped, skip_static, skip_toolarge, skip_missing, skip_nopath,
+    )
+
+
+def prune_missing(db_path: str | None = None, dry_run: bool = False) -> None:
+    """Remove catalog + ChromaDB entries whose source files no longer exist on disk."""
+    if db_path is not None:
+        chroma.configure(db_path)
+    catalog.configure()
+
+    records = catalog.get_all_asset_records()
+    total = len(records)
+    log.info("prune-missing: scanning %d catalog entries", total)
+    pruned = skipped = 0
+
+    for item_id, _media_type, rel_path, rel_thumb in records:
+        if not rel_path:
+            log.warning("no asset_path for %s — skipping", item_id)
+            skipped += 1
+            continue
+
+        abs_path = config.DATA_DIR / rel_path
+        if abs_path.exists():
+            continue
+
+        log.info("%s %s  (%s)", "would remove" if dry_run else "removing", item_id, rel_path)
+        if not dry_run:
+            try:
+                catalog.delete_item(item_id)
+            except Exception as exc:
+                log.error("catalog delete failed (%s): %s", type(exc).__name__, item_id)
+                continue
+            try:
+                chroma.delete_content(item_id)
+            except Exception as exc:
+                log.warning("chroma delete failed (%s): %s — catalog entry already removed", type(exc).__name__, item_id)
+            if rel_thumb:
+                thumb_abs = config.DATA_DIR / rel_thumb
+                if thumb_abs.exists():
+                    thumb_abs.unlink(missing_ok=True)
+        pruned += 1
+
+    action = "would prune" if dry_run else "pruned"
+    log.info("prune-missing complete: %s=%d  skipped=%d  scanned=%d", action, pruned, skipped, total)
 
 
 def index_file(path: Path, force: bool) -> None:
@@ -382,6 +550,26 @@ if __name__ == "__main__":
         help=f"Path to media directory, must be inside DATA_DIR (default: {config.MEDIA_DIR})",
     )
     parser.add_argument(
+        "--regen-thumbnails",
+        action="store_true",
+        help="Regenerate all thumbnails in-place without touching embeddings or other catalog data, then exit",
+    )
+    parser.add_argument(
+        "--regen-animated-thumbnails",
+        action="store_true",
+        help="Generate/regenerate animated WebP thumbnails for qualifying GIF items, then exit",
+    )
+    parser.add_argument(
+        "--prune-missing",
+        action="store_true",
+        help="Remove catalog and ChromaDB entries whose source files are missing from disk, then exit",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --prune-missing: log what would be removed without actually deleting anything",
+    )
+    parser.add_argument(
         "--reset",
         action="store_true",
         help="Wipe the database and all thumbnails before indexing",
@@ -408,6 +596,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     _configure_log_level(args.log_level)
+    if args.regen_thumbnails:
+        regen_thumbnails(db_path=args.db_path)
+        raise SystemExit(0)
+    if args.regen_animated_thumbnails:
+        regen_animated_thumbnails(db_path=args.db_path)
+        raise SystemExit(0)
+    if args.prune_missing:
+        prune_missing(db_path=args.db_path, dry_run=args.dry_run)
+        raise SystemExit(0)
     run(
         force=args.force,
         annotate=args.annotate,

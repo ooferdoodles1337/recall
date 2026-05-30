@@ -102,6 +102,48 @@ def test_list_library_items_filters_and_sorts(catalog_db):
     assert "raw" not in items[0]["metadata"]
     assert "system" not in items[0]["metadata"]
 
+    limited_items = catalog_db.list_library_items(media_type="image", order="desc", limit=1)
+
+    assert [item["id"] for item in limited_items] == ["newer"]
+
+
+def test_list_library_items_filters_favorites(catalog_db):
+    catalog_db.upsert_item(
+        "favorite-image",
+        "media/favorite-image.jpg",
+        "favorite-image.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-favorite-image", "taken_sort": "2024-03-18T10:00:00"},
+    )
+    catalog_db.upsert_item(
+        "favorite-video",
+        "media/favorite-video.mp4",
+        "favorite-video.mp4",
+        "video/mp4",
+        "video",
+        extra_metadata={"content_hash": "hash-favorite-video", "taken_sort": "2024-03-19T10:00:00"},
+    )
+    catalog_db.upsert_item(
+        "plain-image",
+        "media/plain-image.jpg",
+        "plain-image.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-plain-image", "taken_sort": "2024-03-20T10:00:00"},
+    )
+
+    catalog_db.update_metadata("favorite-image", {"organization": {"favorite": True}})
+    catalog_db.update_metadata("favorite-video", {"organization": {"favorite": True}})
+
+    favorite_items = catalog_db.list_library_items(favorite=True, order="desc")
+    favorite_images = catalog_db.list_library_items(media_type="image", favorite=True, order="desc")
+    non_favorites = catalog_db.list_library_items(favorite=False, order="desc")
+
+    assert [item["id"] for item in favorite_items] == ["favorite-video", "favorite-image"]
+    assert [item["id"] for item in favorite_images] == ["favorite-image"]
+    assert [item["id"] for item in non_favorites] == ["plain-image"]
+
 
 def test_update_metadata_merges_patch(catalog_db):
     catalog_db.upsert_item(

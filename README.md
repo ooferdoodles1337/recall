@@ -29,24 +29,52 @@ Create `.env` at the **repo root** (not inside `backend/`):
 GEMINI_API_KEY=your_key_here
 ```
 
-### 2. Backend
+### 2. Start
+
+From the repo root:
 
 ```bash
-cd backend
-uv sync                           # runtime dependencies only
-uv sync --group indexing          # add if running the indexer (maintainers only)
-uv run uvicorn main:app --reload  # starts at http://localhost:8000
+./start.sh
 ```
 
-API docs are available at `http://localhost:8000/docs`.
+The script syncs backend dependencies (`uv sync`) and frontend dependencies (`npm install`) automatically, then starts both servers. No manual install step needed.
 
-### 3. Frontend
+Output:
+
+```
+Syncing dependencies...
+
+  Frontend: http://localhost:5173
+  On LAN:   http://192.168.x.x:5173  (phone / other devices)
+
+Press Ctrl+C to stop.
+```
+
+API docs: `http://localhost:8000/docs`
+
+**Starting servers separately** (if you need independent control):
 
 ```bash
+# Backend — terminal 1
+cd backend
+uv sync
+uv run uvicorn main:app --reload --host 0.0.0.0
+
+# Frontend — terminal 2
 cd frontend
 npm install
-npm run dev  # starts at http://localhost:5173
+npm run dev
 ```
+
+## Accessing from a phone or other device
+
+The frontend proxies all API requests through Vite, so any device on the same network only needs to reach port `5173` — no direct backend access required.
+
+1. Start the servers with `./start.sh` (or with `--host 0.0.0.0` manually, as shown above).
+2. Find your machine's local IP — `start.sh` prints it automatically, or run `ip route get 1.1.1.1 | awk '/src/{print $7}'` on Linux / `ipconfig getifaddr en0` on macOS.
+3. Open `http://<your-ip>:5173/phone` in the phone's browser.
+
+The `/phone` route is the standalone phone tester. The `/` route is the fullscreen desktop harness (designed for 1280×720 px or larger).
 
 ## Data layout
 
@@ -72,10 +100,10 @@ uv run pytest -v
 ## Indexing media (maintainers only)
 
 ```bash
-uv run python -m services.indexer            # index everything
-uv run python -m services.indexer --force    # re-index existing files
-uv run python -m services.indexer --annotate # generate descriptions
-uv run python -m services.indexer --reset    # wipe DB + thumbs, re-index
+uv run python -m services.pipeline.indexer            # index everything
+uv run python -m services.pipeline.indexer --force    # re-index existing files
+uv run python -m services.pipeline.indexer --annotate # generate descriptions
+uv run python -m services.pipeline.indexer --reset    # wipe DB + thumbs, re-index
 ```
 
 See `backend/README.md` for the full API reference and indexing documentation.
