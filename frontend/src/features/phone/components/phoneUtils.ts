@@ -193,3 +193,36 @@ export function durationLabel(seconds?: number) {
 export function playbackTimeLabel(seconds: number) {
   return durationLabel(seconds) ?? "0:00";
 }
+
+export type ModeTransitionReason =
+  | "initial" | "target-reset" | "search-focus" | "search-clear"
+  | "search-commit" | "autosearch-commit" | "compose-dismiss"
+  | "similar-search" | "detail-open" | "detail-close";
+
+export type MotionDirection = "forward" | "back" | "neutral";
+
+export interface ModeTransition {
+  from: string;
+  to: string;
+  direction: MotionDirection;
+  reason: ModeTransitionReason;
+  key: number;
+}
+
+export const screenMotionVariants = {
+  enter: ({ direction, reason }: ModeTransition) => ({
+    opacity: 0,
+    y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? -10 : 14,
+    scale: reason === "search-clear" || reason === "autosearch-commit" ? 1 : direction === "back" ? 1.012 : 0.988,
+  }),
+  center: { opacity: 1, y: 0, scale: 1, transition: { duration: PHONE_MOTION.screenMs / 1000, ease: MOTION_EASE.standard } },
+  exit: ({ direction, reason }: ModeTransition) => {
+    const ease = reason === "search-clear" ? [0.4, 0, 0.2, 1] as [number, number, number, number] : MOTION_EASE.exit;
+    return {
+      opacity: 0,
+      y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? 16 : -8,
+      scale: reason === "search-clear" ? 0.96 : reason === "autosearch-commit" ? 1 : direction === "back" ? 0.986 : 1.01,
+      transition: { duration: reason === "search-clear" ? 0.2 : PHONE_MOTION.exitMs / 1000, ease },
+    };
+  },
+};

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, LayoutGroup, MotionConfig, useReducedMotion } from "motion/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
@@ -7,29 +7,28 @@ import {
   SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD,
   makeMockItem, readSearchHistory, writeSearchHistory,
   rememberSearch, mergeResults, localSuggestions, mediaLayoutId,
-  PHONE_MOTION, MOTION_EASE,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
-import { PhoneHomeHeader } from "./PhoneHomeHeader";
 import { NsfwDialog } from "./NsfwDialog";
 import { ImageDetailView } from "./ImageDetailView";
 import { SelectionTray } from "./SelectionTray";
 import { VideoDetailView } from "./VideoDetailView";
-import { FavoritesSection } from "./FavoritesSection";
-import { ResultsSection } from "./ResultsSection";
 import {
   listFavoriteItems, listRecentItems,
   searchSemantic, searchSimilarById, searchText, suggestSearches,
 } from "../api/searchApi";
 import {
   initialPhoneModeState, phoneModeReducer,
-  type ModeTransition, type PhoneScreen,
+  type PhoneScreen,
 } from "../phoneReducer";
-import { PhoneSearchBar, SearchAssistPanel } from "./SearchCommandLayer";
+import { PhoneSearchBar } from "./SearchCommandLayer";
 import { useGridDensity } from "./useGridDensity";
 import { useNsfwReveal } from "./useNsfwReveal";
 import { usePhoneDetail } from "./usePhoneDetail";
 import { useSelectionTray } from "./useSelectionTray";
+import { PhoneSearchShell } from "./PhoneSearchShell";
+import { HomeLayer } from "./HomeLayer";
+import { ResultsLayer } from "./ResultsLayer";
 
 interface PhoneViewportFrameProps {
   currentTarget?: RecallMediaItem;
@@ -38,24 +37,6 @@ interface PhoneViewportFrameProps {
   onExit?: () => void;
 }
 type PhoneMode = PhoneScreen;
-
-const screenMotionVariants = {
-  enter: ({ direction, reason }: ModeTransition) => ({
-    opacity: 0,
-    y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? -10 : 14,
-    scale: reason === "search-clear" || reason === "autosearch-commit" ? 1 : direction === "back" ? 1.012 : 0.988,
-  }),
-  center: { opacity: 1, y: 0, scale: 1, transition: { duration: PHONE_MOTION.screenMs / 1000, ease: MOTION_EASE.standard } },
-  exit: ({ direction, reason }: ModeTransition) => ({
-    opacity: 0,
-    y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? 16 : -8,
-    scale: reason === "search-clear" ? 0.96 : reason === "autosearch-commit" ? 1 : direction === "back" ? 0.986 : 1.01,
-    transition: {
-      duration: reason === "search-clear" ? 0.2 : PHONE_MOTION.exitMs / 1000,
-      ease: reason === "search-clear" ? ([0.4, 0, 0.2, 1] as [number, number, number, number]) : MOTION_EASE.exit,
-    },
-  }),
-};
 
 export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer, onExit }: PhoneViewportFrameProps) {
   const [modeState, dispatch] = useReducer(phoneModeReducer, initialPhoneModeState);
@@ -378,7 +359,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const mediaGridClassName = `grid phone-media-grid${usesNaturalAspectGrid ? " phone-media-grid--natural" : ""}`;
   const hasMore = results.length >= visibleCount && contentMode === "results";
   const showSelectionTray = selectedItems.length > 0 && mode !== "detail" && mode !== "compose";
-  const showFavoritesSection = isLoadingFavorites || favoriteItems.length > 0;
   liveRef.current = { hasMore, submittedQuery, query, visibleCount, prefetchedResults };
 
   const handleAssistSearch = useCallback((nextQuery: string) => { setShowHistory(false); setQuery(nextQuery); void runSearch(nextQuery); }, [runSearch]);
@@ -451,96 +431,56 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       <MotionConfig reducedMotion="user">
       <LayoutGroup id="phone-ui">
 
-      {mode !== "home" && !(mode === "compose" && contentMode === "home") ? (
-        <div className="phone-persistent-section phone-persistent-search">
-          <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
-            {renderSearchBar()}
-            <AnimatePresence initial={false}>
-              {mode === "compose" ? (
-                <motion.div key="compose-results-inline" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-                  transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
-                  <div className="phone-compose-section">
-                    <SearchAssistPanel query={query} showHistory={showHistory} history={activeHistory} suggestions={composeSuggestions}
-                      knownHistory={visibleHistory} isSearching={isSearching}
-                      onRunSearch={handleAssistSearch} onClearHistory={clearHistory} onRemoveHistoryItem={removeHistoryItem} />
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </div>
-      ) : null}
+        <PhoneSearchShell
+          mode={mode} contentMode={contentMode} query={query}
+          showHistory={showHistory} activeHistory={activeHistory}
+          composeSuggestions={composeSuggestions} visibleHistory={visibleHistory}
+          isSearching={isSearching}
+          onAssistSearch={handleAssistSearch} onClearHistory={clearHistory}
+          onRemoveHistoryItem={removeHistoryItem} renderSearchBar={renderSearchBar}
+        />
 
-      <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport"
-        onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
-        <>
-          {contentMode === "home" ? (
-            <motion.div key="screen-home" className="phone-screen phone-screen--home" custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
-              <div className="phone-startpage">
-                <PhoneHomeHeader mode={mode} onExit={onExit} />
+        <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport"
+          onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
+          <>
+            <HomeLayer visible={contentMode === "home"} mode={mode} modeTransition={modeTransition} onExit={onExit}
+              favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} mediaGridClassName={mediaGridClassName}
+              pinchHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
+              usesNaturalAspectGrid={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
+              zoomGridIn={zoomGridIn} zoomGridOut={zoomGridOut}
+              handleItemPointerDown={handleItemPointerDown} handleItemPointerUp={handleItemPointerUp}
+              handleItemPointerMove={handleItemPointerMove} handleItemPointerCancel={handleItemPointerCancel}
+              toggleSelected={toggleSelected} />
+            <ResultsLayer visible={contentMode === "results"} mode={mode} contentMode={contentMode}
+              isLoading={isLoading} isLoadingMore={isLoadingMore} modeTransition={modeTransition}
+              results={results} searchGridRef={searchGridRef} mediaGridClassName={mediaGridClassName}
+              pinchHandlers={pinchHandlers} gridColumns={gridColumns}
+              submittedQuery={submittedQuery} errorMessage={errorMessage} hasMore={hasMore}
+              refinements={refinements} usesNaturalAspectGrid={usesNaturalAspectGrid}
+              selectedItems={selectedItems} isItemBlurred={isItemBlurred}
+              zoomGridIn={zoomGridIn} zoomGridOut={zoomGridOut}
+              handleItemPointerDown={handleItemPointerDown} handleItemPointerUp={handleItemPointerUp}
+              handleItemPointerMove={handleItemPointerMove} handleItemPointerCancel={handleItemPointerCancel}
+              toggleSelected={toggleSelected} loadMore={() => void loadMore()}
+              onRunRefinement={(refinement) => { setQuery(refinement); void runSearch(refinement); }} />
+          </>
+        </ScrollArea>
 
-                <div className="phone-startpage-search-sticky">
-                  <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
-                    {renderSearchBar(undefined, "Clear draft search")}
-                    <AnimatePresence initial={false}>
-                      {mode === "compose" ? (
-                        <motion.div key="compose-home-inline" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-                          transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
-                          <div className="phone-compose-section">
-                            <SearchAssistPanel query={query} showHistory={showHistory} history={activeHistory} suggestions={composeSuggestions}
-                              knownHistory={visibleHistory} isSearching={isSearching}
-                              onRunSearch={handleAssistSearch} onClearHistory={clearHistory} onRemoveHistoryItem={removeHistoryItem} />
-                          </div>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                {showFavoritesSection ? (
-                  <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} gridClassName={mediaGridClassName}
-                    gridGestureHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
-                    naturalAspectRatio={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
-                    onZoomIn={zoomGridIn} onZoomOut={zoomGridOut}
-                    onItemPointerDown={handleItemPointerDown} onItemPointerUp={handleItemPointerUp}
-                    onItemPointerMove={handleItemPointerMove} onItemPointerCancel={handleItemPointerCancel}
-                    toggleSelected={toggleSelected} />
-                ) : null}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div key="screen-search" className={`phone-screen phone-screen--search${mode === "compose" ? " phone-screen--dimmed" : ""}${isLoading && mode === "results" && contentMode === "results" ? " phone-screen--loading" : ""}`}
-              custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
-              <ResultsSection results={results} searchGridRef={searchGridRef} gridClassName={mediaGridClassName}
-                gridGestureHandlers={pinchHandlers} gridColumns={gridColumns} isLoading={isLoading} isLoadingMore={isLoadingMore}
-                contentMode={contentMode} submittedQuery={submittedQuery} errorMessage={errorMessage} hasMore={hasMore}
-                refinements={refinements} naturalAspectRatio={usesNaturalAspectGrid}
-                selectedItems={selectedItems} isItemBlurred={isItemBlurred}
-                onZoomIn={zoomGridIn} onZoomOut={zoomGridOut}
-                onItemPointerDown={handleItemPointerDown} onItemPointerUp={handleItemPointerUp}
-                onItemPointerMove={handleItemPointerMove} onItemPointerCancel={handleItemPointerCancel}
-                toggleSelected={toggleSelected} onLoadMore={() => void loadMore()}
-                onRunRefinement={(refinement) => { setQuery(refinement); void runSearch(refinement); }} />
-            </motion.div>
+        <AnimatePresence initial={false}>
+          {mode === "detail" && detailItem && (
+            isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
+              <VideoDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
+                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
+                onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
+                onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
+            ) : (
+              <ImageDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
+                onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
+                onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
+                onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
+            )
           )}
-        </>
-      </ScrollArea>
-
-      <AnimatePresence initial={false}>
-        {mode === "detail" && detailItem && (
-          isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
-            <VideoDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
-              onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
-              onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
-              onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
-          ) : (
-            <ImageDetailView key={detailItem.id} item={detailItem} onBack={closeDetail} onSearchSameDate={searchSameDate}
-              onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={onConfirmAnswer}
-              onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
-              onOpenAbout={setAboutSheetItem} layoutId={mediaLayoutId(detailItem.id)} />
-          )
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
 
       </LayoutGroup>
       </MotionConfig>
