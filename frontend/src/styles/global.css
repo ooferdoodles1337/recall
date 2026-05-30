@@ -2110,6 +2110,24 @@ html {
   color: var(--ut-muted-dark);
 }
 
+.trial-clear-btn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  color: var(--ut-muted-dark);
+  opacity: 0.55;
+}
+
+.trial-clear-btn:hover {
+  opacity: 1;
+  color: var(--destructive, #c0392b);
+}
+
+.trial-clear-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
 .trial-count-badge {
   background: var(--ut-amber-soft) !important;
   color: var(--ut-amber-text) !important;
