@@ -446,7 +446,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       <LayoutGroup id="phone-ui">
 
         <PhoneSearchShell
-          mode={mode} contentMode={contentMode} query={query}
+          mode={mode} query={query}
           showHistory={showHistory} activeHistory={activeHistory}
           composeSuggestions={composeSuggestions} visibleHistory={visibleHistory}
           isSearching={isSearching} showComposePanel={showComposePanel}
@@ -457,7 +457,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport"
           onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
           <>
-            <HomeLayer visible={contentMode === "home"} mode={mode} modeTransition={modeTransition} onExit={onExit}
+            <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition} onExit={onExit}
               favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} mediaGridClassName={mediaGridClassName}
               pinchHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
               usesNaturalAspectGrid={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}

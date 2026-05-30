@@ -62,7 +62,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
   ref,
 ) {
   return (
-    <motion.div layoutId="search-bar" className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
+    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
       <Button
         className={`history-btn${showHistory ? " history-btn--active" : ""}`}
         type="button"
@@ -100,7 +100,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
           <XIcon />
         </Button>
       ) : null}
-    </motion.div>
+    </div>
   );
 });
 

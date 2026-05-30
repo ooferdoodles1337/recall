@@ -2,12 +2,10 @@ import { motion } from "motion/react";
 import { PhoneHomeHeader } from "./PhoneHomeHeader";
 import { FavoritesSection } from "./FavoritesSection";
 import type { RecallMediaItem } from "@/shared/types/recall";
-import type { PhoneScreen } from "../phoneReducer";
 import { screenMotionVariants, type ModeTransition } from "./phoneUtils";
 
 interface HomeLayerProps {
   visible: boolean;
-  mode: PhoneScreen;
   modeTransition: ModeTransition;
   onExit?: () => void;
   favoriteItems: RecallMediaItem[];
@@ -28,7 +26,7 @@ interface HomeLayerProps {
   toggleSelected: (item: RecallMediaItem) => void;
 }
 
-export function HomeLayer({ visible, mode, modeTransition, onExit, favoriteItems, favoritesGridRef,
+export function HomeLayer({ visible, modeTransition, onExit, favoriteItems, favoritesGridRef,
   mediaGridClassName, pinchHandlers, gridColumns, isLoadingFavorites, usesNaturalAspectGrid,
   selectedItems, isItemBlurred, zoomGridIn, zoomGridOut,
   handleItemPointerDown, handleItemPointerUp, handleItemPointerMove, handleItemPointerCancel, toggleSelected }: HomeLayerProps) {
@@ -38,7 +36,7 @@ export function HomeLayer({ visible, mode, modeTransition, onExit, favoriteItems
     <motion.div key="screen-home" className="phone-screen phone-screen--home"
       custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
       <div className="phone-startpage">
-        <PhoneHomeHeader mode={mode} onExit={onExit} />
+        <PhoneHomeHeader onExit={onExit} />
         {showFavoritesSection ? (
           <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} gridClassName={mediaGridClassName}
             gridGestureHandlers={pinchHandlers as any} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}

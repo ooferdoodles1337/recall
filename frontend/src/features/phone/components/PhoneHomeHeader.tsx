@@ -2,25 +2,18 @@ import { motion } from "motion/react";
 import { SearchIcon, UserIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import type { PhoneScreen } from "../phoneReducer";
 import { MOTION_EASE } from "./phoneUtils";
 
 interface PhoneHomeHeaderProps {
-  mode: PhoneScreen;
   onExit?: () => void;
 }
 
-export function PhoneHomeHeader({ mode, onExit }: PhoneHomeHeaderProps) {
+export function PhoneHomeHeader({ onExit }: PhoneHomeHeaderProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
-      animate={{
-        height: mode === "compose" ? 0 : "auto",
-        opacity: mode === "compose" ? 0 : 1,
-        y: mode === "compose" ? -16 : 0,
-      }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.26, ease: MOTION_EASE.standard }}
-      style={{ overflow: "hidden" }}
     >
       <div className="phone-startpage-header">
         <div className="phone-startpage-brand">

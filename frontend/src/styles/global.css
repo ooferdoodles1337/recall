@@ -2340,14 +2340,6 @@ html {
   height: 15px;
 }
 
-.phone-startpage-search-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 25;
-  padding: var(--sp-4) 0 var(--sp-2);
-  background: transparent;
-}
-
 .phone-compose-section {
   width: 100%;
   pointer-events: auto;
