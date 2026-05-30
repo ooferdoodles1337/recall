@@ -10,6 +10,7 @@ interface PhoneSearchShellProps {
   composeSuggestions: string[];
   visibleHistory: string[];
   isSearching: boolean;
+  showComposePanel: boolean;
   renderSearchBar: (className?: string, clearLabel?: string) => React.ReactNode;
   onAssistSearch: (q: string) => void;
   onClearHistory: () => void;
@@ -18,7 +19,7 @@ interface PhoneSearchShellProps {
 
 export function PhoneSearchShell({
   mode, contentMode, query, showHistory, activeHistory,
-  composeSuggestions, visibleHistory, isSearching,
+  composeSuggestions, visibleHistory, isSearching, showComposePanel,
   onAssistSearch, onClearHistory, onRemoveHistoryItem, renderSearchBar,
 }: PhoneSearchShellProps) {
   const showPersistent = mode !== "home" && !(mode === "compose" && contentMode === "home");
@@ -30,7 +31,7 @@ export function PhoneSearchShell({
           <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
             {renderSearchBar()}
             <AnimatePresence initial={false}>
-              {mode === "compose" ? (
+              {mode === "compose" && showComposePanel ? (
                 <motion.div key="compose-results-inline" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
                   transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
                   <div className="phone-compose-section">
@@ -48,7 +49,7 @@ export function PhoneSearchShell({
           <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
             {renderSearchBar(undefined, "Clear draft search")}
             <AnimatePresence initial={false}>
-              {mode === "compose" ? (
+              {mode === "compose" && showComposePanel ? (
                 <motion.div key="compose-home-inline" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
                   transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
                   <div className="phone-compose-section">

@@ -78,6 +78,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const liveRef = useRef({ hasMore: false, submittedQuery: "", query: "", visibleCount: SEARCH_BATCH_SIZE, prefetchedResults: null as RecallMediaItem[] | null });
   const prevScrollTopRef = useRef(0);
   const [isAutoSearchPending, setIsAutoSearchPending] = useState(false);
+  const [showComposePanel, setShowComposePanel] = useState(true);
+
+  const HIDE_COMPOSE_THRESHOLD = 60;
 
   const { isItemBlurred, nsfwPendingItem, setNsfwPendingItem, revealOne, revealAll, revealSafe } = useNsfwReveal();
 
@@ -193,13 +196,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   useEffect(() => { if (mode === "results") { const el = scrollContainerRef.current; if (!el) return; return wheelHandler(el); } }, [mode, wheelHandler]);
 
-  // SR-1: dismiss compose on downward scroll
+  // SR-1: dismiss compose on downward scroll (home) or collapse panel (results)
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const handleScroll = () => {
+      if (modeRef.current !== "compose") return;
       const st = el.scrollTop;
-      if (st > prevScrollTopRef.current && modeRef.current === "compose") { dispatch({ type: "COMPOSE_DISMISS" }); topBarInputRef.current?.blur(); }
+      if (bgContentRef.current === "results") {
+        if (st > HIDE_COMPOSE_THRESHOLD) setShowComposePanel(false);
+        else if (st <= 0) setShowComposePanel(true);
+      } else {
+        if (st > prevScrollTopRef.current) { dispatch({ type: "COMPOSE_DISMISS" }); topBarInputRef.current?.blur(); }
+      }
       prevScrollTopRef.current = st;
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
@@ -372,6 +381,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur(); return;
     }
     setQuery(nextQuery); setShowHistory(false);
+    if (nextQuery) setShowComposePanel(true);
     if (modeRef.current !== "compose") enterComposeMode();
   }, [abortActiveSearch, cancelAutoSearch, enterComposeMode, dispatch]);
 
@@ -435,7 +445,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           mode={mode} contentMode={contentMode} query={query}
           showHistory={showHistory} activeHistory={activeHistory}
           composeSuggestions={composeSuggestions} visibleHistory={visibleHistory}
-          isSearching={isSearching}
+          isSearching={isSearching} showComposePanel={showComposePanel}
           onAssistSearch={handleAssistSearch} onClearHistory={clearHistory}
           onRemoveHistoryItem={removeHistoryItem} renderSearchBar={renderSearchBar}
         />

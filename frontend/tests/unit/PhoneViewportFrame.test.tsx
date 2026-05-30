@@ -236,34 +236,82 @@ describe("PhoneViewportFrame interactions", () => {
     expect(await screen.findByRole("button", { name: /Select Similar yellow umbrella/i })).toBeInTheDocument();
   });
 
-  it("dismisses compose and keeps search bar visible when viewport scrolls down (SR-1, SR-2)", async () => {
+  it("collapses compose panel on scroll down over results, re-expands on scroll up (SR-1)", async () => {
     const user = userEvent.setup();
     renderPhone();
 
-    // Reach results mode
     await commitSearch("sunset", user);
     await screen.findByRole("button", { name: /Select Sunset pier photo/i });
 
-    // Enter compose mode by clicking the bar
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+    expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
+    });
+    expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    expect(document.activeElement).toBe(currentSearchInput());
+
+    scrollTopSpy.mockReturnValue(0);
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+    });
+    scrollTopSpy.mockRestore();
+  });
+
+  it("re-expands compose panel on keystroke after scroll collapse (SR-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
     await user.click(currentSearchInput());
     await waitFor(() => {
       expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
     });
 
-    // Simulate a downward scroll: mock scrollTop > 0 so the handler sees st > prev
-    const viewport = document.querySelector(".phone-rect-viewport");
-    if (viewport instanceof HTMLElement) {
-      const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
-      fireEvent.scroll(viewport);
-      scrollTopSpy.mockRestore();
-    }
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
+    });
 
-    // Compose should have dismissed (SR-1)
+    await user.type(currentSearchInput(), "x");
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+    });
+    scrollTopSpy.mockRestore();
+  });
+
+  it("dismisses compose entirely on scroll down over home feed (SR-1 home)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+    scrollTopSpy.mockRestore();
+
     await waitFor(() => {
       expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
     });
-
-    // Search bar must still be in the DOM (SR-2)
     expect(currentSearchInput()).toBeInTheDocument();
   });
 

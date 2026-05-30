@@ -8,13 +8,24 @@ This document is the authoritative source of UX behavior for the `/phone` route.
 
 ## Scroll / swipe behavior
 
-### SR-1 — Compose panel dismisses on downward scroll
-When the user is in `compose` mode and scrolls down (any amount), the compose panel
-must close immediately (dispatch `COMPOSE_DISMISS`, blur the input). The query text
-in the bar is preserved so the user can resume typing if they scroll back up.
+### SR-1 — Compose panel collapses on downward scroll (results) or dismisses (home)
 
-**Rationale:** scrolling signals intent to browse results, not to type. Keeping the
-compose panel open while the grid scrolls underneath it is disorienting.
+When the user is in `compose` mode over the home feed (`bgContent=home`) and scrolls down,
+the compose panel must close immediately (dispatch `COMPOSE_DISMISS`, blur the input).
+The query text in the bar is preserved so the user can resume typing if they scroll back up.
+
+When the user is in `compose` mode over results (`bgContent=results`) and scrolls down
+past 60 px, the suggestions panel collapses with a height exit animation. The search bar
+stays visible and the input remains focused. Scrolling all the way back to the top
+(`scrollTop <= 0`) re-expands the panel. Typing any character while the panel is
+collapsed also re-expands it immediately.
+
+**Rationale over home:** scrolling signals intent to browse results, not to type.
+Keeping the compose panel open while the grid scrolls underneath it is disorienting.
+
+**Rationale over results:** the user is refining a query and may want to scroll through
+previewed results then scroll back up to continue typing. Dismissing compose entirely
+would lose keyboard focus, requiring an extra tap to resume.
 
 ### SR-2 — Persistent search bar is always visible
 The `.phone-persistent-section` (the search bar strip) is always pinned at the top
