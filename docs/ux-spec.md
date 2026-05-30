@@ -47,6 +47,26 @@ The `layoutId="search-bar"` Framer Motion attribute animates the bar between its
 home sticky position (inside the scroll content) and its persistent position (above
 the scroll area) during mode transitions.
 
+### SR-4 — Home header sits above the search bar at scroll top, then scrolls away
+
+On the home screen, the `.phone-startpage-header` (the "Recall" wordmark strip with the
+person and × icons) is positioned in the scroll flow **above** the persistent search bar.
+When the viewport is at scroll position 0 the header is fully visible, appearing above the
+search bar. As the user scrolls down, the header leaves the screen upward; the search bar
+stays visible at all times (SR-2).
+
+The header is **not sticky** — it does not pin itself at the top once it has scrolled
+off screen. After scrolling down, only the persistent search bar is visible above the
+content.
+
+If the user scrolls back up to `scrollTop === 0` after having scrolled away, the header
+reappears with its standard slide-in animation (HA-1).
+
+**Rationale:** The header conveys app identity and provides exit/account controls that
+are relevant when the user first arrives but do not need to occupy permanent real estate.
+Keeping it non-sticky reclaims screen space for the photo grid while ensuring the search
+bar (the primary action) is always reachable.
+
 ---
 
 ## Compose panel

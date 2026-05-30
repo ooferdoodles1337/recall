@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AnimatePresence, LayoutGroup, MotionConfig, useReducedMotion } from "motion/react";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
@@ -27,6 +27,7 @@ import { useNsfwReveal } from "./useNsfwReveal";
 import { usePhoneDetail } from "./usePhoneDetail";
 import { useSelectionTray } from "./useSelectionTray";
 import { PhoneSearchShell } from "./PhoneSearchShell";
+import { PhoneHomeHeader } from "./PhoneHomeHeader";
 import { HomeLayer } from "./HomeLayer";
 import { ResultsLayer } from "./ResultsLayer";
 
@@ -79,6 +80,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const prevScrollTopRef = useRef(0);
   const [isAutoSearchPending, setIsAutoSearchPending] = useState(false);
   const [showComposePanel, setShowComposePanel] = useState(true);
+  const [isAtScrollTop, setIsAtScrollTop] = useState(true);
 
   const HIDE_COMPOSE_THRESHOLD = 60;
 
@@ -194,11 +196,25 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     if (modeTransition.reason === "search-clear") scrollContainerRef.current?.scrollTo({ top: 0 });
   }, [modeTransition]);
 
+  // Reset header visibility when returning to home
+  useEffect(() => {
+    if (contentMode === "home") setIsAtScrollTop(true);
+  }, [contentMode]);
+
   useEffect(() => {
     const el = phoneRectRef.current;
     if (!el) return;
     return wheelHandler(el);
   }, [wheelHandler]);
+
+  // SR-4: home header hides on scroll, reappears at scroll top
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const handleScroll = () => { setIsAtScrollTop(el.scrollTop <= 4); };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // SR-1: dismiss compose on downward scroll (home) or collapse panel (results)
   useEffect(() => {
@@ -445,6 +461,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       <MotionConfig reducedMotion="user">
       <LayoutGroup id="phone-ui">
 
+        <AnimatePresence initial={false}>
+          {contentMode === "home" && isAtScrollTop && (
+            <motion.div key="home-header"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+              style={{ overflow: "hidden" }}>
+              <PhoneHomeHeader onExit={onExit} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <PhoneSearchShell
           mode={mode} query={query}
           showHistory={showHistory} activeHistory={activeHistory}
@@ -457,7 +486,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport"
           onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
           <>
-            <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition} onExit={onExit}
+            <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition}
               favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} mediaGridClassName={mediaGridClassName}
               pinchHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
               usesNaturalAspectGrid={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
