@@ -1868,36 +1868,35 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               </motion.div>
 
               <div className="phone-startpage-search-sticky">
-                {mode === "home" || (mode === "compose" && contentMode === "home") ? (
-                  <motion.div layout className="phone-startpage-search">
-                    {renderSearchBar("search-bar--hero", "Clear draft search")}
-                  </motion.div>
-                ) : null}
-                <AnimatePresence initial={false}>
-                  {mode === "compose" && contentMode === "home" ? (
-                    <motion.div
-                      key="inline-suggestions"
-                      className="phone-compose phone-compose--inline"
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <SearchAssistPanel
-                        query={query}
-                        showHistory={showHistory}
-                        history={activeHistory}
-                        suggestions={composeSuggestions}
-                        knownHistory={visibleHistory}
-                        isSearching={isSearching}
-                        onRunSearch={handleAssistSearch}
-                        onClearHistory={clearHistory}
-                        onRemoveHistoryItem={removeHistoryItem}
-                      />
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
+                  {renderSearchBar(undefined, "Clear draft search")}
+                  <AnimatePresence initial={false}>
+                    {mode === "compose" ? (
+                      <motion.div
+                        key="compose-home-inline"
+                        initial={{ height: 0 }}
+                        animate={{ height: "auto" }}
+                        exit={{ height: 0 }}
+                        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                        style={{ overflow: "hidden" }}
+                      >
+                        <div className="phone-compose-section">
+                          <SearchAssistPanel
+                            query={query}
+                            showHistory={showHistory}
+                            history={activeHistory}
+                            suggestions={composeSuggestions}
+                            knownHistory={visibleHistory}
+                            isSearching={isSearching}
+                            onRunSearch={handleAssistSearch}
+                            onClearHistory={clearHistory}
+                            onRemoveHistoryItem={removeHistoryItem}
+                          />
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
               </div>
 
 	              {showFavoritesSection ? (
