@@ -354,4 +354,85 @@ describe("PhoneViewportFrame interactions", () => {
       "--phone-grid-columns": "2",
     });
   });
+
+  it("shows at most 3 suggestions in compose mode (CP-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "sunset");
+
+    // Compose panel should be visible
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    // Count suggestion buttons inside the compose section
+    const composeSection = document.querySelector(".phone-compose-section");
+    expect(composeSection).toBeInTheDocument();
+    const suggestionBtns = composeSection?.querySelectorAll("button") ?? [];
+    expect(suggestionBtns.length).toBeLessThanOrEqual(3);
+  });
+
+  it("returns to home when search field is emptied over results (SC-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    expect(await screen.findByRole("button", { name: /Select Sunset pier photo/i })).toBeInTheDocument();
+
+    await user.click(currentSearchInput());
+    await user.clear(currentSearchInput());
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /Select Sunset pier photo/i })).not.toBeInTheDocument();
+    });
+    expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
+  });
+
+  it("restores previous query text on compose dismiss (FC-2 query preservation)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "beach day");
+    await user.keyboard("{Escape}");
+
+    // Query should revert to the pre-compose value (empty string, since no previous commit)
+    await waitFor(() => {
+      expect(currentSearchInput()).toHaveValue("");
+    });
+  });
+
+  it("cancels in-flight search and clears results on empty query over results (SC-1 abort)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    // Type something, then backspace to empty
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "x");
+    await user.clear(currentSearchInput());
+
+    // Should return home
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Recall" })).toBeInTheDocument();
+    });
+  });
+
+  it("does not return home when query emptied over home screen (SC-1 scope)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "x");
+    await user.clear(currentSearchInput());
+
+    // Still on home — compose may dismiss but heading stays
+    expect(screen.getByRole("heading", { name: "Recall" })).toBeInTheDocument();
+  });
 });
