@@ -61,6 +61,7 @@ import {
   initialPhoneModeState,
   phoneModeReducer,
   type ModeTransition,
+  type PhoneBgContent,
   type PhoneScreen,
 } from "../phoneReducer";
 import { PhoneSearchBar, SearchAssistPanel } from "./SearchCommandLayer";
@@ -405,6 +406,304 @@ const ThumbCell = React.memo(function ThumbCell({ result, isBlurred, selected, s
     </motion.div>
   );
 });
+
+type GridGestureHandlers = Pick<
+  React.HTMLAttributes<HTMLElement>,
+  "onPointerDownCapture" | "onPointerMoveCapture" | "onPointerUpCapture" | "onPointerCancelCapture"
+>;
+
+interface MediaGridProps {
+  items: RecallMediaItem[];
+  gridRef: React.Ref<HTMLDivElement>;
+  scope: string;
+  ariaLabel: string;
+  className: string;
+  naturalAspectRatio: boolean;
+  selectedItems: RecallMediaItem[];
+  isItemBlurred: (item: RecallMediaItem) => boolean;
+  onPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerCancel: () => void;
+  toggleSelected: (item: RecallMediaItem) => void;
+  isLoading?: boolean;
+  loadingCount?: number;
+  loadingKeyPrefix?: string;
+  emptyContent?: React.ReactNode;
+  trailingLoadingCount?: number;
+  trailingLoadingKeyPrefix?: string;
+}
+
+function MediaGrid({
+  items,
+  gridRef,
+  scope,
+  ariaLabel,
+  className,
+  naturalAspectRatio,
+  selectedItems,
+  isItemBlurred,
+  onPointerDown,
+  onPointerUp,
+  onPointerMove,
+  onPointerCancel,
+  toggleSelected,
+  isLoading = false,
+  loadingCount = 0,
+  loadingKeyPrefix = "loading",
+  emptyContent = null,
+  trailingLoadingCount = 0,
+  trailingLoadingKeyPrefix = "more",
+}: MediaGridProps) {
+  const showInitialLoading = isLoading && items.length === 0;
+
+  return (
+    <div ref={gridRef} className={className} data-phone-grid-scope={scope} role="group" aria-label={ariaLabel}>
+      {showInitialLoading ? (
+        Array.from({ length: loadingCount }, (_, index) => (
+          <Skeleton key={index} className="thumb-skeleton" data-phone-grid-item={`${loadingKeyPrefix}-${index}`} aria-hidden="true" />
+        ))
+      ) : items.length === 0 ? (
+        emptyContent
+      ) : items.map((result) => {
+        const selectionIndex = selectedItems.findIndex((item) => item.id === result.id);
+        return (
+          <ThumbCell
+            key={result.id}
+            result={result}
+            isBlurred={isItemBlurred(result)}
+            selected={selectionIndex >= 0}
+            selectionIndex={selectionIndex}
+            naturalAspectRatio={naturalAspectRatio}
+            onPointerDown={onPointerDown}
+            onPointerUp={onPointerUp}
+            onPointerMove={onPointerMove}
+            onPointerCancel={onPointerCancel}
+            toggleSelected={toggleSelected}
+          />
+        );
+      })}
+      {trailingLoadingCount > 0 ? (
+        Array.from({ length: trailingLoadingCount }, (_, index) => (
+          <Skeleton key={`${trailingLoadingKeyPrefix}-${index}`} className="thumb-skeleton" data-phone-grid-item={`${trailingLoadingKeyPrefix}-${index}`} aria-hidden="true" />
+        ))
+      ) : null}
+    </div>
+  );
+}
+
+interface FavoritesSectionProps {
+  favoriteItems: RecallMediaItem[];
+  favoritesGridRef: React.Ref<HTMLDivElement>;
+  gridClassName: string;
+  gridGestureHandlers: GridGestureHandlers;
+  gridColumns: GridColumns;
+  isLoadingFavorites: boolean;
+  naturalAspectRatio: boolean;
+  selectedItems: RecallMediaItem[];
+  isItemBlurred: (item: RecallMediaItem) => boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onItemPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onItemPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onItemPointerMove: (e: React.PointerEvent) => void;
+  onItemPointerCancel: () => void;
+  toggleSelected: (item: RecallMediaItem) => void;
+}
+
+function FavoritesSection({
+  favoriteItems,
+  favoritesGridRef,
+  gridClassName,
+  gridGestureHandlers,
+  gridColumns,
+  isLoadingFavorites,
+  naturalAspectRatio,
+  selectedItems,
+  isItemBlurred,
+  onZoomIn,
+  onZoomOut,
+  onItemPointerDown,
+  onItemPointerUp,
+  onItemPointerMove,
+  onItemPointerCancel,
+  toggleSelected,
+}: FavoritesSectionProps) {
+  return (
+    <section className="phone-favorites-section phone-media-grid-zone" data-testid="phone-favorites-grid-zone" aria-labelledby="phone-favorites-title" {...gridGestureHandlers}>
+      <div className="phone-favorites-header">
+        <h2 id="phone-favorites-title" className="phone-favorites-title">Favorites</h2>
+        <div className="phone-favorites-actions">
+          {!isLoadingFavorites ? (
+            <span className="phone-favorites-count">{favoriteItems.length} items</span>
+          ) : null}
+          <GridZoomControls columns={gridColumns} onZoomIn={onZoomIn} onZoomOut={onZoomOut} />
+        </div>
+      </div>
+      <MediaGrid
+        items={favoriteItems}
+        gridRef={favoritesGridRef}
+        scope="favorites"
+        ariaLabel="Favorite media grid"
+        className={`${gridClassName} phone-favorites-grid`}
+        naturalAspectRatio={naturalAspectRatio}
+        selectedItems={selectedItems}
+        isItemBlurred={isItemBlurred}
+        onPointerDown={onItemPointerDown}
+        onPointerUp={onItemPointerUp}
+        onPointerMove={onItemPointerMove}
+        onPointerCancel={onItemPointerCancel}
+        toggleSelected={toggleSelected}
+        isLoading={isLoadingFavorites}
+        loadingCount={9}
+        loadingKeyPrefix="favorite-skeleton"
+      />
+    </section>
+  );
+}
+
+interface ResultsSectionProps {
+  results: RecallMediaItem[];
+  searchGridRef: React.Ref<HTMLDivElement>;
+  gridClassName: string;
+  gridGestureHandlers: GridGestureHandlers;
+  gridColumns: GridColumns;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  contentMode: PhoneBgContent;
+  submittedQuery: string;
+  errorMessage: string | null;
+  hasMore: boolean;
+  refinements: string[];
+  naturalAspectRatio: boolean;
+  selectedItems: RecallMediaItem[];
+  isItemBlurred: (item: RecallMediaItem) => boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onItemPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onItemPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
+  onItemPointerMove: (e: React.PointerEvent) => void;
+  onItemPointerCancel: () => void;
+  toggleSelected: (item: RecallMediaItem) => void;
+  onLoadMore: () => void;
+  onRunRefinement: (refinement: string) => void;
+}
+
+function ResultsSection({
+  results,
+  searchGridRef,
+  gridClassName,
+  gridGestureHandlers,
+  gridColumns,
+  isLoading,
+  isLoadingMore,
+  contentMode,
+  submittedQuery,
+  errorMessage,
+  hasMore,
+  refinements,
+  naturalAspectRatio,
+  selectedItems,
+  isItemBlurred,
+  onZoomIn,
+  onZoomOut,
+  onItemPointerDown,
+  onItemPointerUp,
+  onItemPointerMove,
+  onItemPointerCancel,
+  toggleSelected,
+  onLoadMore,
+  onRunRefinement,
+}: ResultsSectionProps) {
+  const emptyContent = contentMode === "results" ? (
+    <Empty className="search-empty">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <ImageOffIcon />
+        </EmptyMedia>
+        <EmptyTitle>No results</EmptyTitle>
+        <EmptyDescription>Try another description.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  ) : null;
+
+  return (
+    <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...gridGestureHandlers}>
+      <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
+        {submittedQuery && contentMode === "results" ? (
+          <div className="result-context">
+            <strong>{submittedQuery}</strong>
+          </div>
+        ) : null}
+        <GridZoomControls columns={gridColumns} onZoomIn={onZoomIn} onZoomOut={onZoomOut} />
+      </div>
+      {errorMessage ? (
+        <Alert variant="destructive" className="search-notice">
+          <InfoIcon />
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <MediaGrid
+        items={results}
+        gridRef={searchGridRef}
+        scope="search"
+        ariaLabel="Search results"
+        className={gridClassName}
+        naturalAspectRatio={naturalAspectRatio}
+        selectedItems={selectedItems}
+        isItemBlurred={isItemBlurred}
+        onPointerDown={onItemPointerDown}
+        onPointerUp={onItemPointerUp}
+        onPointerMove={onItemPointerMove}
+        onPointerCancel={onItemPointerCancel}
+        toggleSelected={toggleSelected}
+        isLoading={isLoading}
+        loadingCount={SEARCH_BATCH_SIZE}
+        loadingKeyPrefix="loading"
+        emptyContent={emptyContent}
+        trailingLoadingCount={isLoadingMore ? 9 : 0}
+        trailingLoadingKeyPrefix="more"
+      />
+
+      {contentMode === "results" && !isLoading ? (
+        <Card className="results-footer-card" size="sm">
+          <CardContent className="results-footer-content p-0">
+            {hasMore ? (
+              <Button
+                className="footer-action h-auto"
+                type="button"
+                variant="outline"
+                disabled={isLoadingMore}
+                onClick={onLoadMore}
+              >
+                <SparklesIcon data-icon="inline-start" />
+                {isLoadingMore ? "Loading…" : "Show more results"}
+              </Button>
+            ) : null}
+            {hasMore && refinements.length > 0 ? <Separator className="results-footer-separator" /> : null}
+            {refinements.length > 0 ? (
+              <div className="refinement-row">
+                <span>Did you mean</span>
+                {refinements.map((refinement) => (
+                  <Button
+                    key={refinement}
+                    className="refinement-chip h-auto"
+                    type="button"
+                    variant="outline"
+                    onClick={() => onRunRefinement(refinement)}
+                  >
+                    {refinement}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
 
 interface NsfwDialogProps {
   item: RecallMediaItem;
@@ -1783,7 +2082,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
         {/* Persistent section — bar + accordion suggestions in normal flow */}
         {mode !== "home" && !(mode === "compose" && contentMode === "home") ? (
-          <div className="phone-persistent-section">
+          <div className="phone-persistent-section phone-persistent-search">
             <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
               {renderSearchBar()}
               <AnimatePresence initial={false}>
@@ -1907,38 +2206,24 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               </div>
 
 	              {showFavoritesSection ? (
-                <section className="phone-favorites-section phone-media-grid-zone" data-testid="phone-favorites-grid-zone" aria-labelledby="phone-favorites-title" {...gridGestureHandlers}>
-                  <div className="phone-favorites-header">
-                    <h2 id="phone-favorites-title" className="phone-favorites-title">Favorites</h2>
-                    <div className="phone-favorites-actions">
-                      {!isLoadingFavorites ? (
-                        <span className="phone-favorites-count">{favoriteItems.length} items</span>
-                      ) : null}
-                      <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
-                    </div>
-                  </div>
-                  <div ref={favoritesGridRef} className={`${mediaGridClassName} phone-favorites-grid`} data-phone-grid-scope="favorites" role="group" aria-label="Favorite media grid">
-                    {isLoadingFavorites ? (
-                      Array.from({ length: 9 }, (_, index) => (
-                        <Skeleton key={index} className="thumb-skeleton" data-phone-grid-item={`favorite-skeleton-${index}`} aria-hidden="true" />
-                      ))
-                    ) : favoriteItems.map((result) => (
-                      <ThumbCell
-                        key={result.id}
-                        result={result}
-                        isBlurred={isItemBlurred(result)}
-                        selected={selectedItems.some((item) => item.id === result.id)}
-                        selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
-                        naturalAspectRatio={usesNaturalAspectGrid}
-                        onPointerDown={handleItemPointerDown}
-                        onPointerUp={handleItemPointerUp}
-                        onPointerMove={handleItemPointerMove}
-                        onPointerCancel={handleItemPointerCancel}
-                        toggleSelected={toggleSelected}
-                      />
-                    ))}
-                  </div>
-                </section>
+                <FavoritesSection
+                  favoriteItems={favoriteItems}
+                  favoritesGridRef={favoritesGridRef}
+                  gridClassName={mediaGridClassName}
+                  gridGestureHandlers={gridGestureHandlers}
+                  gridColumns={gridColumns}
+                  isLoadingFavorites={isLoadingFavorites}
+                  naturalAspectRatio={usesNaturalAspectGrid}
+                  selectedItems={selectedItems}
+                  isItemBlurred={isItemBlurred}
+                  onZoomIn={zoomGridIn}
+                  onZoomOut={zoomGridOut}
+                  onItemPointerDown={handleItemPointerDown}
+                  onItemPointerUp={handleItemPointerUp}
+                  onItemPointerMove={handleItemPointerMove}
+                  onItemPointerCancel={handleItemPointerCancel}
+                  toggleSelected={toggleSelected}
+                />
               ) : null}
 
                     </div>
@@ -1953,98 +2238,35 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                     animate="center"
                     exit="exit"
                   >
-                    <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...gridGestureHandlers}>
-              <div className={`phone-grid-toolbar${submittedQuery && contentMode === "results" ? "" : " phone-grid-toolbar--controls-only"}`}>
-                {submittedQuery && contentMode === "results" ? (
-                  <div className="result-context">
-                    <strong>{submittedQuery}</strong>
-                  </div>
-                ) : null}
-                <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
-              </div>
-              {errorMessage ? (
-                <Alert variant="destructive" className="search-notice">
-                  <InfoIcon />
-                  <AlertDescription>{errorMessage}</AlertDescription>
-                </Alert>
-              ) : null}
-
-              <div ref={searchGridRef} className={mediaGridClassName} data-phone-grid-scope="search" role="group" aria-label="Search results">
-                {isLoading && results.length === 0 ? (
-                  Array.from({ length: SEARCH_BATCH_SIZE }, (_, i) => (
-                    <Skeleton key={i} className="thumb-skeleton" data-phone-grid-item={`loading-${i}`} aria-hidden="true" />
-                  ))
-                ) : results.length === 0 && contentMode === "results" ? (
-                  <Empty className="search-empty">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <ImageOffIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>No results</EmptyTitle>
-                      <EmptyDescription>Try another description.</EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                ) : results.map((result) => (
-                  <ThumbCell
-                    key={result.id}
-                    result={result}
-                    isBlurred={isItemBlurred(result)}
-                    selected={selectedItems.some((item) => item.id === result.id)}
-                    selectionIndex={selectedItems.findIndex((i) => i.id === result.id)}
-                    naturalAspectRatio={usesNaturalAspectGrid}
-                    onPointerDown={handleItemPointerDown}
-                    onPointerUp={handleItemPointerUp}
-                    onPointerMove={handleItemPointerMove}
-                    onPointerCancel={handleItemPointerCancel}
-                    toggleSelected={toggleSelected}
-                  />
-                ))}
-                {isLoadingMore ? (
-                  Array.from({ length: 9 }, (_, i) => (
-                    <Skeleton key={`more-${i}`} className="thumb-skeleton" data-phone-grid-item={`more-${i}`} aria-hidden="true" />
-                  ))
-                ) : null}
-              </div>
-
-              {contentMode === "results" && !isLoading ? (
-                <Card className="results-footer-card" size="sm">
-                  <CardContent className="results-footer-content p-0">
-                    {hasMore ? (
-                      <Button
-                        className="footer-action h-auto"
-                        type="button"
-                        variant="outline"
-                        disabled={isLoadingMore}
-                        onClick={() => void loadMore()}
-                      >
-                        <SparklesIcon data-icon="inline-start" />
-                        {isLoadingMore ? "Loading…" : "Show more results"}
-                      </Button>
-                    ) : null}
-                    {hasMore && refinements.length > 0 ? <Separator className="results-footer-separator" /> : null}
-                    {refinements.length > 0 ? (
-                      <div className="refinement-row">
-                        <span>Did you mean</span>
-                        {refinements.map((refinement) => (
-                          <Button
-                            key={refinement}
-                            className="refinement-chip h-auto"
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setQuery(refinement);
-                              void runSearch(refinement);
-                            }}
-                          >
-                            {refinement}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              ) : null}
-            </div>
+                    <ResultsSection
+                      results={results}
+                      searchGridRef={searchGridRef}
+                      gridClassName={mediaGridClassName}
+                      gridGestureHandlers={gridGestureHandlers}
+                      gridColumns={gridColumns}
+                      isLoading={isLoading}
+                      isLoadingMore={isLoadingMore}
+                      contentMode={contentMode}
+                      submittedQuery={submittedQuery}
+                      errorMessage={errorMessage}
+                      hasMore={hasMore}
+                      refinements={refinements}
+                      naturalAspectRatio={usesNaturalAspectGrid}
+                      selectedItems={selectedItems}
+                      isItemBlurred={isItemBlurred}
+                      onZoomIn={zoomGridIn}
+                      onZoomOut={zoomGridOut}
+                      onItemPointerDown={handleItemPointerDown}
+                      onItemPointerUp={handleItemPointerUp}
+                      onItemPointerMove={handleItemPointerMove}
+                      onItemPointerCancel={handleItemPointerCancel}
+                      toggleSelected={toggleSelected}
+                      onLoadMore={() => void loadMore()}
+                      onRunRefinement={(refinement) => {
+                        setQuery(refinement);
+                        void runSearch(refinement);
+                      }}
+                    />
                   </motion.div>
                 )}
           </>

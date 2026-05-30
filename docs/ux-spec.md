@@ -75,6 +75,49 @@ existing wheel handler.
 
 ---
 
+## Focus and input ownership
+
+### FC-1 — Autosearch never dismisses compose or steals focus
+When autosearch fires (the 400 ms idle timer submits a query automatically),
+the compose panel must remain open, suggestions must stay visible, and the
+search input must remain focused. Results load silently in the background;
+`bgContent` transitions to `"results"` via `AUTOSEARCH_COMMIT` while `screen`
+stays `"compose"`. The mode transitions to `results` only when the user
+explicitly commits a search (presses Enter or taps a suggestion).
+
+**Rationale:** autosearch is a preview, not a navigation event. Dismissing the
+keyboard mid-typing interrupts the user's flow and is a common annoyance in iOS
+search UIs.
+
+### FC-2 — Input focus is never stolen while the user is composing
+While `mode === "compose"`, nothing in the UI may blur the search input or
+dismiss the compose panel except:
+- The user pressing Enter or tapping a suggestion (explicit commit).
+- The user tapping outside the compose panel.
+- The user swiping down (SR-1).
+- The user emptying the field over results (SC-1 — returns home).
+- An explicit Escape key press.
+
+All internal events — autosearch results arriving, background content
+transitions — must leave input focus untouched.
+
+---
+
+## Home screen animations
+
+### HA-1 — Header slides in from the top when home state activates
+When the home screen mounts (initial load or return from results), the
+`.phone-startpage-header` animates in from above: `y: -20 → 0, opacity: 0 → 1`.
+Duration 260 ms, standard easing (cubic-bezier(0.22, 1, 0.36, 1)).
+
+### HA-2 — Header slides up when compose mode activates
+When the user activates compose on the home screen, the header animates out
+upward — `y: 0 → -16, opacity: 1 → 0` — while simultaneously collapsing its
+height to 0 so the search bar slides smoothly into the vacated space. When
+compose dismisses and the user returns to home, the reverse plays (HA-1).
+
+---
+
 ## Search clearing
 
 ### SC-1 — Emptying the search field returns to home when results are visible
