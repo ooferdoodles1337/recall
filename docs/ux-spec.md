@@ -75,6 +75,33 @@ existing wheel handler.
 
 ---
 
+## Search clearing
+
+### SC-1 — Emptying the search field returns to home when results are visible
+
+When the user intentionally empties the search bar — either by backspacing to an
+empty string **or** by tapping the × clear button — while a results set is in the
+background (`bgContent === "results"`), the UI must return fully to the home state.
+
+**Behavior:**
+- `query` and `submittedQuery` are both cleared to `""`.
+- Any in-flight search is aborted.
+- Mode transitions to `home` via `SEARCH_CLEAR` (uses the `search-clear` animation:
+  fade-scale, no directional slide).
+- The search input is blurred.
+
+**Scope:** fires whenever `bgContent === "results"` and the field becomes empty —
+whether the user is in `compose` mode (typing over results) or `results` mode
+(tapping the × button in the persistent bar).
+Does **not** fire when `bgContent === "home"` — composing a fresh query over the
+home feed can be abandoned by backspacing without triggering any navigation.
+
+**Rationale:** an empty search field over a results screen is a stranded, no-meaning
+state. The user's intent is unambiguous: they want to start fresh. The home feed is
+the correct destination.
+
+---
+
 ## Selection tray
 
 *(Existing behavior — do not regress.)*

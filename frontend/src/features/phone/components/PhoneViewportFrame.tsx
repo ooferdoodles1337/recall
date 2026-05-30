@@ -1653,12 +1653,23 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, [enterComposeMode]);
 
   const handleSearchChange = useCallback((nextQuery: string) => {
+    if (nextQuery === "" && bgContentRef.current === "results") {
+      cancelAutoSearch();
+      abortActiveSearch();
+      setQuery("");
+      setSubmittedQuery("");
+      setShowHistory(false);
+      setHistory(readSearchHistory());
+      dispatch({ type: "SEARCH_CLEAR" });
+      topBarInputRef.current?.blur();
+      return;
+    }
     setQuery(nextQuery);
     setShowHistory(false);
     if (modeRef.current !== "compose") {
       enterComposeMode();
     }
-  }, [enterComposeMode]);
+  }, [abortActiveSearch, cancelAutoSearch, enterComposeMode]);
 
   const cancelAutoSearch = useCallback(() => {
     if (autoSearchTimerRef.current !== null) {
@@ -1676,7 +1687,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const handleSearchClear = useCallback(() => {
     cancelAutoSearch();
     abortActiveSearch();
-    if (modeRef.current === "compose") {
+    if (modeRef.current === "compose" && bgContentRef.current !== "results") {
       setQuery("");
       setShowHistory(true);
       return;
