@@ -53,6 +53,11 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
     setResults([]);
   }, []);
 
+  const handleAbandon = useCallback(() => {
+    startMsRef.current = null;
+    setPhase("idle");
+  }, []);
+
   const handleConfirm = useCallback((selectedId: string) => {
     const elapsed = startMsRef.current !== null ? Date.now() - startMsRef.current : 0;
     setResults((prev) => {
@@ -75,9 +80,9 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
 
   if (phase === "active") {
     return (
-      <div className="task-phone-only">
-        <PhoneViewportFrame onConfirmAnswer={handleConfirm} />
-      </div>
+      <main className="app-shell--phone">
+        <PhoneViewportFrame onConfirmAnswer={handleConfirm} onExit={handleAbandon} />
+      </main>
     );
   }
 

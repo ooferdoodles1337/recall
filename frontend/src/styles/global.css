@@ -498,12 +498,6 @@ a {
     var(--ut-paper-deep);
 }
 
-/* Full-screen phone-only active trial (no target panel) */
-.task-phone-only {
-  height: 100dvh;
-  overflow: hidden;
-}
-
 /* --- Target Photo Panel --- */
 
 .target-panel {
