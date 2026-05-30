@@ -835,16 +835,10 @@ a {
   border-bottom: 0.5px solid rgba(60, 60, 67, 0.12);
   border-bottom-left-radius: var(--r-3);
   border-bottom-right-radius: var(--r-3);
-  padding: var(--sp-2) var(--sp-3) var(--sp-2);
+  padding: var(--sp-2) 0;
   overflow: hidden;
 }
 
-/* Suggestion/history card — transparent so panel glass shows through */
-.search-panel--expanded .suggestions {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
 
 .phone-compose-layer {
   position: absolute;
@@ -937,7 +931,8 @@ a {
 .phone-history-footer {
   display: flex;
   justify-content: flex-end;
-  padding-top: 4px;
+  padding: var(--sp-1) var(--sp-3);
+  border-top: 1px solid var(--ios-separator);
 }
 
 .phone-panel-motion {
@@ -1356,34 +1351,6 @@ a {
 .suggestion-icon svg {
   width: 15px;
   height: 15px;
-}
-
-/* iOS inset grouped list — suggestions and history */
-.suggestions {
-  position: relative;
-  padding: 0;
-  border: none;
-  border-radius: var(--r-3);
-  background: rgba(242, 242, 247, 0.97);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.08),
-    0 4px 20px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-}
-
-.suggestions::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--glass-edge-top);
-  z-index: 1;
-  pointer-events: none;
 }
 
 /* Each suggestion row — HIG min touch target 44pt */
@@ -2377,24 +2344,8 @@ html {
   position: sticky;
   top: 0;
   z-index: 25;
-  padding: var(--sp-4) var(--sp-4) var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-2);
   background: transparent;
-}
-
-.phone-compose--inline {
-  pointer-events: auto;
-  padding-bottom: var(--sp-4);
-}
-
-.phone-startpage-search {
-  width: 100%;
-}
-
-.phone-compose {
-  width: 100%;
-  min-height: 100%;
-  padding: var(--sp-3) var(--sp-4) var(--sp-8);
-  pointer-events: none;
 }
 
 .phone-compose-section {
@@ -2405,13 +2356,6 @@ html {
 .phone-compose-empty {
   margin-top: var(--sp-2);
   background: transparent;
-}
-
-/* Hero search bar — same pill, slightly taller on home screen */
-.search-bar--hero {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 46px;
-  border-radius: var(--r-3);
 }
 
 /* Favorites section */
@@ -2456,76 +2400,6 @@ html {
 /* Tight iOS Photos grid */
 .phone-favorites-grid {
   width: 100%;
-}
-
-/* History section */
-.phone-history-section {
-  width: 100%;
-  margin-bottom: var(--sp-3);
-  padding: 0 var(--sp-4);
-}
-
-.phone-history-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--sp-1) var(--sp-2);
-}
-
-.phone-history-header-label {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ios-label);
-}
-
-.phone-history-clear-btn {
-  font-size: 0.84rem;
-  font-weight: 500;
-  color: var(--ios-label-secondary);
-}
-
-.phone-history-clear-btn:hover {
-  color: var(--ios-label);
-  background: rgba(60, 60, 67, 0.06);
-}
-
-/* iOS inset grouped list */
-.phone-history-list {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  gap: 0;
-  border: none;
-  border-radius: var(--r-3);
-  background: rgba(242, 242, 247, 0.97);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.08),
-    0 4px 20px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-}
-
-/* Override shadcn's group-data-[size=sm]/card:px-3 which leaks 12px horizontal padding
-   even when CardContent gets className="p-0" — tailwind-merge doesn't catch the conflict */
-.phone-history-list [data-slot="card-content"],
-.suggestions [data-slot="card-content"] {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.phone-history-list::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--glass-edge-top);
-  z-index: 1;
-  pointer-events: none;
 }
 
 /* Row: flex, no bottom border (Separator handles it) */
