@@ -21,8 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { RecallMediaItem } from "@/shared/types/recall";
-import { resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
-import { itemTitle, itemDateLabel, mediaLayoutId, PHONE_MOTION, MOTION_EASE } from "./phoneUtils";
+import { resolvedMediaUrl } from "@/shared/media/mediaItem";
+import { itemTitle, itemDateLabel, PHONE_MOTION, MOTION_EASE } from "./phoneUtils";
 
 interface ImageDetailViewProps {
   item: RecallMediaItem;

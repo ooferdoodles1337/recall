@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "motion/react";
 import { SearchIcon, UserIcon, XIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
