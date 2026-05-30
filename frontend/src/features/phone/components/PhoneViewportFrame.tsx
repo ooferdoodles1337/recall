@@ -48,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { RecallMediaItem, RecallSearchResult } from "@/shared/types/recall";
 import { isAnimatedImage, isVideo, resolvedAnimatedThumbnailUrl, resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
 import { AboutSheet } from "./AboutSheet";
+import { PhoneHomeHeader } from "./PhoneHomeHeader";
 import {
   listFavoriteItems,
   listRecentItems,
@@ -2134,44 +2135,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
                 exit="exit"
               >
                 <div className="phone-startpage">
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{
-                  height: mode === "compose" ? 0 : "auto",
-                  opacity: mode === "compose" ? 0 : 1,
-                  y: mode === "compose" ? -16 : 0,
-                }}
-                transition={{ duration: 0.26, ease: MOTION_EASE.standard }}
-                style={{ overflow: "hidden" }}
-              >
-                <div className="phone-startpage-header">
-                  <div className="phone-startpage-brand">
-                    <div className="phone-startpage-logo" aria-hidden>
-                      <SearchIcon />
-                    </div>
-                    <h1 className="phone-startpage-title">Recall</h1>
-                  </div>
-                  <div className="phone-startpage-actions">
-                    <Avatar className="phone-avatar" aria-label="Profile">
-                      <AvatarFallback>
-                        <UserIcon className="size-3.5" />
-                      </AvatarFallback>
-                    </Avatar>
-                    {onExit ? (
-                      <Button
-                        className="phone-exit-btn"
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={onExit}
-                        aria-label="Exit phone tester"
-                      >
-                        <XIcon />
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </motion.div>
+              <PhoneHomeHeader mode={mode} onExit={onExit} />
 
               <div className="phone-startpage-search-sticky">
                 <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
