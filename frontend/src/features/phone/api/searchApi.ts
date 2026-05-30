@@ -1,21 +1,21 @@
 import { recallFetch } from "@/shared/api/client";
 import type { RecallMediaItem, RecallSearchResult } from "@/shared/types/recall";
 
-export interface RecallSearchResponse {
+interface RecallSearchResponse {
   query: string;
   results: RecallSearchResult[];
 }
 
-export interface RecallSuggestionsResponse {
+interface RecallSuggestionsResponse {
   suggestions: string[];
 }
 
-export interface RecallCatalogItemsResponse {
+interface RecallCatalogItemsResponse {
   count: number;
   results: RecallMediaItem[];
 }
 
-export interface RecallSimilarResponse {
+interface RecallSimilarResponse {
   query_id: string;
   results: RecallSearchResult[];
 }
