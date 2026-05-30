@@ -26,10 +26,15 @@ scrolling deep into results.
 form factor the bar is the primary navigation control and must stay reachable at all
 times.
 
-### SR-3 — No hide behavior on the home hero search bar
-The `.phone-startpage-search-sticky` hero search (inside the scrollable content in
-`home` mode) is unaffected by this spec. It is part of the scroll content, not the
-persistent section, and must remain visible at all times in home mode.
+### SR-3 — Search bar is visually identical in all contexts
+The same `PhoneSearchBar` component and `.search-bar--semantic` class are used in
+both the home sticky section and the persistent section above results. There is no
+separate "hero" variant. The bar's size (44px), glass treatment, and button layout
+are identical regardless of which screen it appears on.
+
+The `layoutId="search-bar"` Framer Motion attribute animates the bar between its
+home sticky position (inside the scroll content) and its persistent position (above
+the scroll area) during mode transitions.
 
 ---
 
@@ -41,19 +46,17 @@ The `SearchAssistPanel` receives at most **3** items in its `suggestions` prop
 compact enough to stay above the software keyboard on mobile without obscuring the
 results grid entirely.
 
-### CP-2 — Unified glass card when compose is active over results
-When compose mode is open over results (`mode === "compose"` with `bgContent === "results"`),
-the search bar and suggestions panel merge into a single unified glass card:
+### CP-2 — Unified glass card in all compose contexts
+Whenever compose mode is active (whether over the home feed or over results), the search bar
+and suggestions panel merge into a single unified glass card:
 
 - The `.search-panel` container wraps both and carries the combined drop shadow.
 - The `.search-panel--expanded` class is applied on the container.
 - The bar's bottom corners animate to 0 (220ms, standard easing) so the bar connects flush to the panel below.
 - The suggestions panel (`.phone-compose-section`) has matching glass background, left/right/bottom
   borders, and rounded bottom corners — forming the lower half of the card.
-- Suggestions have horizontal padding inside the card so text does not run edge-to-edge.
-- The `Card.suggestions` element inside the panel is rendered transparent (glass comes from the panel).
-
-This visual change does NOT apply to the home-screen inline compose (hero bar context).
+- Suggestion rows are rendered as a flat list directly inside the panel — no nested card wrapper.
+  The glass and border-radius come from the `.phone-compose-section` container, not from a child card.
 
 ---
 
