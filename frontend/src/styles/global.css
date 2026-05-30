@@ -783,14 +783,10 @@ a {
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
 }
 
-/* Persistent search header — transparent wrapper; glass lives on the pill itself */
-.phone-persistent-search {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
+/* Persistent header section — bar + accordion suggestions, normal flow */
+.phone-persistent-section {
   flex-shrink: 0;
+  background: transparent;
 }
 
 /* Dimmed overlay — captures pointer events to dismiss to home */
@@ -807,6 +803,47 @@ a {
 
 .phone-persistent-bar-wrap {
   padding: 0 var(--sp-4);
+}
+
+/* Unified search + suggestions panel — morphs from pill to card on compose */
+.search-panel {
+  margin: 0 var(--sp-4);
+  border-radius: var(--r-3);
+  transition: box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.search-panel--expanded {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Bar squares off at bottom when connected to suggestions panel */
+.search-panel--expanded .search-bar--semantic {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none;
+}
+
+/* Suggestions panel — matching glass connected below the bar */
+.search-panel--expanded .phone-compose-section {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-left: 0.5px solid rgba(60, 60, 67, 0.12);
+  border-right: 0.5px solid rgba(60, 60, 67, 0.12);
+  border-bottom: 0.5px solid rgba(60, 60, 67, 0.12);
+  border-bottom-left-radius: var(--r-3);
+  border-bottom-right-radius: var(--r-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2);
+  overflow: hidden;
+}
+
+/* Suggestion/history card — transparent so panel glass shows through */
+.search-panel--expanded .suggestions {
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .phone-compose-layer {
@@ -835,7 +872,7 @@ a {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--bar-height, 60px) 0 var(--sp-8);
+  padding: 0 0 var(--sp-8);
   scrollbar-width: none;
 }
 
@@ -896,10 +933,6 @@ a {
   transition: opacity 0.12s ease-out;
 }
 
-.phone-compose-inline {
-  flex-shrink: 0;
-  background: var(--phone-bg, #0a0a0a);
-}
 
 .phone-history-footer {
   display: flex;
@@ -1237,6 +1270,9 @@ a {
     0 8px 32px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .search-bar--semantic::before {
@@ -2803,7 +2839,7 @@ html {
    env() resolves to 0 on desktop, non-zero on notched mobile. */
 .phone-rect-viewport {
   padding:
-    var(--bar-height, 60px)
+    0
     env(safe-area-inset-right, 0px)
     max(24px, env(safe-area-inset-bottom))
     env(safe-area-inset-left, 0px);
@@ -2813,7 +2849,7 @@ html {
   padding-top: 0;
 }
 
-.phone-persistent-search {
+.phone-persistent-section {
   padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
 }
 

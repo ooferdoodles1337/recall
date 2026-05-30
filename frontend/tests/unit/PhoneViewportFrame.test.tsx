@@ -214,6 +214,78 @@ describe("PhoneViewportFrame interactions", () => {
     expect(await screen.findByRole("button", { name: /Select Similar yellow umbrella/i })).toBeInTheDocument();
   });
 
+  it("dismisses compose and keeps search bar visible when viewport scrolls down (SR-1, SR-2)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    // Reach results mode
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    // Enter compose mode by clicking the bar
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    // Simulate a downward scroll: mock scrollTop > 0 so the handler sees st > prev
+    const viewport = document.querySelector(".phone-rect-viewport");
+    if (viewport instanceof HTMLElement) {
+      const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+      fireEvent.scroll(viewport);
+      scrollTopSpy.mockRestore();
+    }
+
+    // Compose should have dismissed (SR-1)
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
+    });
+
+    // Search bar must still be in the DOM (SR-2)
+    expect(currentSearchInput()).toBeInTheDocument();
+  });
+
+  it("does not hide the search bar element when scrolling in results mode (SR-2)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    const viewport = document.querySelector(".phone-rect-viewport");
+    if (viewport instanceof HTMLElement) {
+      const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(400);
+      fireEvent.scroll(viewport);
+      scrollTopSpy.mockRestore();
+    }
+
+    // Bar is always present regardless of scroll position
+    expect(screen.getByLabelText("Search your media")).toBeInTheDocument();
+  });
+
+  it("applies search-panel--expanded and collapses it on dismiss (CP-2 structure)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    // In results mode — no expanded panel
+    expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
+
+    // Click bar — enters compose mode — panel expands
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    // Press Escape or clear to dismiss compose
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
+    });
+  });
+
   it("persists grid density from zoom controls and touch pinch gestures", async () => {
     const user = userEvent.setup();
     const { unmount } = renderPhone();

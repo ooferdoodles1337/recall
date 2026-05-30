@@ -1,6 +1,8 @@
-# AGENTS.md / CLAUDE.md
+# CLAUDE.md
 
-This file provides guidance to coding agents when working with this repository. `AGENTS.md` is a root-level symlink to this file; do not create nested `AGENTS.md` files in `backend/` or `frontend/`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+`AGENTS.md` is a root-level symlink to this file; do not create nested `AGENTS.md` files in `backend/` or `frontend/`.
 
 ## Project overview
 
@@ -77,6 +79,21 @@ npm run build
 
 # Preview built app
 npm run preview
+
+# Run unit tests (Vitest + jsdom + Testing Library) — single pass
+npm run test:unit
+
+# Run unit tests in watch mode
+npm run test:unit:watch
+
+# Run a single unit test file
+npx vitest run tests/unit/phoneReducer.test.ts
+
+# Run e2e tests (Playwright — auto-starts Vite on port 5174)
+npm run test:e2e
+
+# Run all checks: build + unit + e2e
+npm run test
 ```
 
 `.env` lives at the **repo root** (not inside `backend/`). Required keys:
@@ -96,11 +113,18 @@ Frontend API configuration:
 - The guided user-testing program is a desktop fullscreen application, not a mobile-responsive website.
 - The app intentionally gates small windows: below 1280 x 720 px, it should show the fullscreen-size warning instead of trying to squeeze the task UI.
 - The primary route is `/` (or any non-`/phone` path), which renders `UserTestingWebUI`.
-- `/phone` renders the standalone phone tester shell. The phone UI is still a placeholder and should stay visually framed as the participant viewport until implemented.
+- `/phone` renders the standalone phone tester (`PhoneViewportFrame`) — a fully implemented iOS-style search UI with a home feed, search/compose/results/detail modes, favorites grid, selection tray, NSFW handling, and pinch-to-zoom grid density.
 - The current visual direction is a quiet photo-archive / usability-lab console. Keep typography and styling consistent with `frontend/src/styles/global.css`.
 - Fonts are self-hosted with Fontsource packages, imported in `frontend/src/main.tsx`. Do not reintroduce external Google Fonts CSS imports.
 - Radix primitives may be used for accessible unstyled UI behavior. Keep custom visual styling in CSS rather than adopting a large styled UI kit.
 - Playwright artifacts belong in `.playwright-mcp/`. Do not leave screenshots or generated inspection files in the repo root.
+
+### Phone UI UX spec
+
+`docs/ux-spec.md` is the authoritative UX specification for the `/phone` route.
+**Before modifying any phone UI file (`PhoneViewportFrame.tsx`, `phoneReducer.ts`,
+`SearchCommandLayer.tsx`, or CSS under `.phone-rect`), read `docs/ux-spec.md`
+and ensure the change does not regress any listed behavior.**
 
 ## File map
 
@@ -164,6 +188,11 @@ A quick index of where things live so you can open the right file immediately.
 | `frontend/src/features/user-testing/metrics/` | Session timing and event metrics (`sessionMetrics.ts`, `types.ts`) |
 | `frontend/src/features/user-testing/tasks/targets.ts` | Static target definitions |
 | `frontend/src/lib/utils.ts` | `cn()` class-name helper (clsx + tailwind-merge) |
+| `frontend/tests/unit/` | Vitest unit tests (jsdom + Testing Library); covers `PhoneViewportFrame`, `SearchCommandLayer`, `phoneReducer` |
+| `frontend/tests/e2e/` | Playwright e2e tests; runs against a real Vite dev server on port 5174 |
+| `frontend/tests/setup/vitest.setup.ts` | Vitest global setup — imports `@testing-library/jest-dom` matchers |
+| `frontend/vitest.config.ts` | Vitest config — jsdom environment, `tests/unit/**` glob, CSS disabled |
+| `frontend/playwright.config.ts` | Playwright config — Chromium only, 1280×900 viewport, output to `.playwright-mcp/` |
 
 ## Architecture
 

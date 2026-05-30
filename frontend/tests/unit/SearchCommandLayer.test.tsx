@@ -214,6 +214,16 @@ describe("SearchAssistPanel", () => {
     expect(onClearHistory).toHaveBeenCalledOnce();
   });
 
+  it("renders exactly the suggestions it receives — no internal cap (CP-1 enforced upstream)", () => {
+    // CP-1: PhoneViewportFrame slices composeSuggestions to 3 before passing here.
+    // This test confirms SearchAssistPanel itself imposes no additional cap.
+    const fiveSuggestions = ["alpha", "beta", "gamma", "delta", "epsilon"];
+    render(<SearchAssistPanel {...defaultProps} query="test" suggestions={fiveSuggestions} />);
+    for (const s of fiveSuggestions) {
+      expect(screen.getByRole("button", { name: s })).toBeInTheDocument();
+    }
+  });
+
   it("marks a suggestion as a history item when it appears in knownHistory", () => {
     render(
       <SearchAssistPanel

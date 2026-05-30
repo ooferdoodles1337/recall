@@ -830,7 +830,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const prefersReducedMotion = useReducedMotion();
 
   const phoneRectRef = useRef<HTMLDivElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const loadMoreAbortRef = useRef<AbortController | null>(null);
   const topBarInputRef = useRef<HTMLInputElement>(null);
@@ -857,6 +856,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const liveRef = useRef({ hasMore: false, submittedQuery: "", query: "", visibleCount: SEARCH_BATCH_SIZE, prefetchedResults: null as RecallMediaItem[] | null });
   const [prefetchedResults, setPrefetchedResults] = useState<RecallMediaItem[] | null>(null);
   const [overscrollProgress, setOverscrollProgress] = useState(0);
+  const prevScrollTopRef = useRef(0);
   const [nsfwRevealedIds, setNsfwRevealedIds] = useState<Set<string>>(new Set());
   const [nsfwRevealedAll, setNsfwRevealedAll] = useState(false);
   const [nsfwPendingItem, setNsfwPendingItem] = useState<RecallMediaItem | null>(null);
@@ -881,22 +881,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       activeTouchPointersRef.current.clear();
     };
   }, []);
-
-  useEffect(() => {
-    const bar = barRef.current;
-    const rect = phoneRectRef.current;
-    if (!rect) return;
-    if (mode === "home") {
-      rect.style.setProperty("--bar-height", "0px");
-      return;
-    }
-    if (!bar) return;
-    const ro = new ResizeObserver(([entry]) => {
-      rect.style.setProperty("--bar-height", `${entry.contentRect.height}px`);
-    });
-    ro.observe(bar);
-    return () => ro.disconnect();
-  }, [mode]);
 
   useEffect(() => {
     setDetailItem(null);
@@ -1543,6 +1527,27 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  // SR-1: dismiss compose on downward scroll
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const st = el.scrollTop;
+      const prev = prevScrollTopRef.current;
+
+      if (st > prev && modeRef.current === "compose") {
+        dispatch({ type: "COMPOSE_DISMISS" });
+        topBarInputRef.current?.blur();
+      }
+
+      prevScrollTopRef.current = st;
+    };
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [mode]);
+
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -1621,7 +1626,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const visibleHistory = history.length > 0 ? history : readSearchHistory();
   const activeHistory = showHistory ? readSearchHistory() : visibleHistory;
   const composeQuery = query.trim();
-  const composeSuggestions = composeQuery ? suggestions : [];
+  const composeSuggestions = composeQuery ? suggestions.slice(0, 3) : [];
   const usesNaturalAspectGrid = gridColumns === 1;
   const mediaGridClassName = `grid phone-media-grid${usesNaturalAspectGrid ? " phone-media-grid--natural" : ""}`;
   const hasMore = results.length >= visibleCount && contentMode === "results";
@@ -1770,43 +1775,40 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         <MotionConfig reducedMotion="user">
         <LayoutGroup id="phone-ui">
 
-        {/* Persistent search bar — non-home overlay only (not used in home-compose; sticky section serves as bar there) */}
+        {/* Persistent section — bar + accordion suggestions in normal flow */}
         {mode !== "home" && !(mode === "compose" && contentMode === "home") ? (
-          <div ref={barRef} className="phone-persistent-search">
-            <div className="phone-persistent-bar-wrap">
+          <div className="phone-persistent-section">
+            <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
               {renderSearchBar()}
+              <AnimatePresence initial={false}>
+                {mode === "compose" ? (
+                  <motion.div
+                    key="compose-results-inline"
+                    initial={{ height: 0 }}
+                    animate={{ height: "auto" }}
+                    exit={{ height: 0 }}
+                    transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div className="phone-compose-section">
+                      <SearchAssistPanel
+                        query={query}
+                        showHistory={showHistory}
+                        history={activeHistory}
+                        suggestions={composeSuggestions}
+                        knownHistory={visibleHistory}
+                        isSearching={isSearching}
+                        onRunSearch={handleAssistSearch}
+                        onClearHistory={clearHistory}
+                        onRemoveHistoryItem={removeHistoryItem}
+                      />
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </div>
           </div>
         ) : null}
-
-        {/* Inline compose panel for results mode (pushes results grid down) */}
-        <AnimatePresence initial={false}>
-          {mode === "compose" && contentMode !== "home" ? (
-            <motion.div
-              key="compose-results-inline"
-              className="phone-compose-inline"
-              initial={{ height: 0 }}
-              animate={{ height: "auto" }}
-              exit={{ height: 0 }}
-              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-              style={{ overflow: "hidden" }}
-            >
-              <div className="phone-compose-section">
-                <SearchAssistPanel
-                  query={query}
-                  showHistory={showHistory}
-                  history={activeHistory}
-                  suggestions={composeSuggestions}
-                  knownHistory={visibleHistory}
-                  isSearching={isSearching}
-                  onRunSearch={handleAssistSearch}
-                  onClearHistory={clearHistory}
-                  onRemoveHistoryItem={removeHistoryItem}
-                />
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
 
         {/* Main scrollable content */}
         <ScrollArea
