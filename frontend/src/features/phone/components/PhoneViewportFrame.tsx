@@ -1652,6 +1652,14 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     enterComposeMode();
   }, [enterComposeMode]);
 
+  const cancelAutoSearch = useCallback(() => {
+    if (autoSearchTimerRef.current !== null) {
+      window.clearTimeout(autoSearchTimerRef.current);
+      autoSearchTimerRef.current = null;
+    }
+    setIsAutoSearchPending(false);
+  }, []);
+
   const handleSearchChange = useCallback((nextQuery: string) => {
     if (nextQuery === "" && bgContentRef.current === "results") {
       cancelAutoSearch();
@@ -1670,14 +1678,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       enterComposeMode();
     }
   }, [abortActiveSearch, cancelAutoSearch, enterComposeMode]);
-
-  const cancelAutoSearch = useCallback(() => {
-    if (autoSearchTimerRef.current !== null) {
-      window.clearTimeout(autoSearchTimerRef.current);
-      autoSearchTimerRef.current = null;
-    }
-    setIsAutoSearchPending(false);
-  }, []);
 
   const handleSearchSubmit = useCallback(() => {
     cancelAutoSearch();
