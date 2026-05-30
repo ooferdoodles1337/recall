@@ -27,15 +27,15 @@ Keeping the compose panel open while the grid scrolls underneath it is disorient
 previewed results then scroll back up to continue typing. Dismissing compose entirely
 would lose keyboard focus, requiring an extra tap to resume.
 
-### SR-2 — Search bar is sticky inside the scroll viewport
-The `.search-bar--semantic` is positioned `sticky; top: 0` inside the
-`.phone-rect-viewport` scroll container. It always sits at the top of the visible
-area regardless of scroll position. The user can always re-tap the bar and reformulate
-their query even after scrolling deep into results.
+### SR-2 — Persistent search bar is always visible
+The `.phone-persistent-section` (the search bar strip) is always pinned at the top
+of the phone frame and never hides or slides away, regardless of scroll position.
+The user must always be able to re-tap the bar and reformulate their query even after
+scrolling deep into results.
 
-**Rationale:** the bar is the primary navigation control and must stay reachable at
-all times. Sticky positioning keeps content from clipping behind the bar — the first
-row of images always starts below the bar's natural height.
+**Rationale:** hiding the bar trades discoverability for screen real estate — on this
+form factor the bar is the primary navigation control and must stay reachable at all
+times.
 
 ### SR-3 — Search bar is visually identical in all contexts
 The same `PhoneSearchBar` component and `.search-bar--semantic` class are used in
@@ -57,11 +57,9 @@ The `SearchAssistPanel` receives at most **3** items in its `suggestions` prop
 compact enough to stay above the software keyboard on mobile without obscuring the
 results grid entirely.
 
-### CP-2 — Unified glass card, suggestions scroll away with content
-Whenever compose mode is active, the search bar and suggestions panel merge into a
-single unified glass card. The search bar is `position: sticky; top: 0` inside the
-scroll viewport. The suggestions panel sits below it in normal document flow — when
-the user scrolls down, the suggestions scroll away while the bar stays pinned.
+### CP-2 — Unified glass card in all compose contexts
+Whenever compose mode is active (whether over the home feed or over results), the search bar
+and suggestions panel merge into a single unified glass card:
 
 - The `.search-panel` container wraps both and carries the combined drop shadow.
 - The `.search-panel--expanded` class is applied on the container.
@@ -69,7 +67,7 @@ the user scrolls down, the suggestions scroll away while the bar stays pinned.
 - The suggestions panel (`.phone-compose-section`) has matching glass background, left/right/bottom
   borders, and rounded bottom corners — forming the lower half of the card.
 - Suggestion rows are rendered as a flat list directly inside the panel — no nested card wrapper.
-- When scrolled down, the suggestions panel scrolls away; the bar stays at top due to sticky positioning.
+  The glass and border-radius come from the `.phone-compose-section` container, not from a child card.
 
 ---
 

@@ -777,10 +777,22 @@ a {
   --sp-6:  calc(var(--r) * 2);          /* 24px */
   --sp-8:  calc(var(--r) * 8 / 3);      /* 32px */
 
+  /* Gap between the search bar (phone-persistent-section) and the scroll area below it.
+     Canonical location: margin-bottom on .phone-persistent-section. */
+  --phone-bar-gap: var(--sp-2);
+
   /* Glass morphism tokens */
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
   --glass-edge-left: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+/* Flex sibling above the scroll area — NOT sticky/absolute.
+   Gap between bar and scroll content lives here via margin-bottom (--phone-bar-gap). */
+.phone-persistent-section {
+  flex-shrink: 0;
+  background: transparent;
+  margin-bottom: var(--phone-bar-gap);
 }
 
 /* Dimmed overlay — captures pointer events to dismiss to home */
@@ -834,20 +846,6 @@ a {
 }
 
 
-.phone-compose-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 25;
-  overflow-y: auto;
-  padding-top: var(--bar-height, 60px);
-  pointer-events: none;
-  scrollbar-width: none;
-}
-
-.phone-compose-layer::-webkit-scrollbar {
-  display: none;
-}
-
 /* ScrollArea root — fills remaining flex height */
 .phone-rect-content {
   position: relative;
@@ -868,11 +866,6 @@ a {
   display: none;
 }
 
-/* Inner wrapper for search bar + content layers inside the scroll viewport */
-.phone-rect-scroll-inner {
-  min-height: 100%;
-}
-
 /* Mobile header inside the phone frame */
 .mobile-header {
   display: flex;
@@ -880,7 +873,8 @@ a {
   gap: 12px;
 }
 
-/* --- Mobile search UI --- */
+/* Sticky header INSIDE the scroll viewport (HomeLayer / FavoritesSection header).
+   Not the main search bar — that is .phone-persistent-section, a flex sibling above the scroll area. */
 .mobile-top {
   position: sticky;
   top: 0;
@@ -1243,10 +1237,7 @@ a {
 /* iOS-style capsule search bar — glass scoped to the pill itself.
    Fill: translucent white (reads over any photo background). */
 .search-bar--semantic {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
+  position: relative;
   overflow: hidden;
   min-height: 44px;
   display: grid;
@@ -2707,6 +2698,10 @@ html {
     env(safe-area-inset-right, 0px)
     max(24px, env(safe-area-inset-bottom))
     env(safe-area-inset-left, 0px);
+}
+
+.phone-persistent-section {
+  padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
 }
 
 .phone-startpage-header {
