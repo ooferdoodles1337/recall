@@ -194,7 +194,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     if (modeTransition.reason === "search-clear") scrollContainerRef.current?.scrollTo({ top: 0 });
   }, [modeTransition]);
 
-  useEffect(() => { if (mode === "results") { const el = scrollContainerRef.current; if (!el) return; return wheelHandler(el); } }, [mode, wheelHandler]);
+  useEffect(() => {
+    const el = phoneRectRef.current;
+    if (!el) return;
+    return wheelHandler(el);
+  }, [wheelHandler]);
 
   // SR-1: dismiss compose on downward scroll (home) or collapse panel (results)
   useEffect(() => {
