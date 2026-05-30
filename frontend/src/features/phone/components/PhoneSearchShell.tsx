@@ -22,22 +22,20 @@ export function PhoneSearchShell({
   onAssistSearch, onClearHistory, onRemoveHistoryItem, renderSearchBar,
 }: PhoneSearchShellProps) {
   return (
-    <div className="phone-persistent-section phone-persistent-search">
-      <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
-        {renderSearchBar()}
-        <AnimatePresence initial={false}>
-          {mode === "compose" && showComposePanel ? (
-            <motion.div key="compose-panel" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
-              <div className="phone-compose-section">
-                <SearchAssistPanel query={query} showHistory={showHistory} history={activeHistory} suggestions={composeSuggestions}
-                  knownHistory={visibleHistory} isSearching={isSearching}
-                  onRunSearch={onAssistSearch} onClearHistory={onClearHistory} onRemoveHistoryItem={onRemoveHistoryItem} />
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
+    <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
+      {renderSearchBar()}
+      <AnimatePresence initial={false}>
+        {mode === "compose" && showComposePanel ? (
+          <motion.div key="compose-panel" initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} style={{ overflow: "hidden" }}>
+            <div className="phone-compose-section">
+              <SearchAssistPanel query={query} showHistory={showHistory} history={activeHistory} suggestions={composeSuggestions}
+                knownHistory={visibleHistory} isSearching={isSearching}
+                onRunSearch={onAssistSearch} onClearHistory={onClearHistory} onRemoveHistoryItem={onRemoveHistoryItem} />
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

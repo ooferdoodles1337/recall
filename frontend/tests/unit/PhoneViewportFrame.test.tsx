@@ -484,36 +484,36 @@ describe("PhoneViewportFrame interactions", () => {
     expect(screen.getByRole("heading", { name: "Recall" })).toBeInTheDocument();
   });
 
-  it("renders a single persistent search bar above the scroll area in all modes (architectural)", async () => {
+  it("renders search bar inside the scroll viewport as a sticky element (architectural)", async () => {
     const user = userEvent.setup();
     renderPhone();
 
-    // In home mode, the search bar should live in .phone-persistent-section outside scroll area
+    // In home mode, the search bar should be inside the .phone-rect-viewport
     await waitForPhoneHome();
-    const persistentSections = document.querySelectorAll(".phone-persistent-section");
-    expect(persistentSections.length).toBe(1);
-    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+    const viewport = document.querySelector(".phone-rect-viewport");
+    const searchBars = viewport?.querySelectorAll(".search-bar--semantic");
+    expect(searchBars?.length).toBe(1);
+    expect(viewport?.contains(searchBars?.[0])).toBe(true);
 
-    // Enter compose mode — still a single persistent section, no sticky variant
+    // The scroll-inner wrapper exists inside the viewport
+    expect(document.querySelector(".phone-rect-scroll-inner")).toBeInTheDocument();
+
+    // Enter compose mode — search bar still inside viewport
     await user.click(currentSearchInput());
     await waitFor(() => {
       expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
     });
-    expect(document.querySelectorAll(".phone-persistent-section").length).toBe(1);
-    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+    expect(viewport?.contains(document.querySelector(".search-bar--semantic"))).toBe(true);
 
     // Commit search to reach results mode
     await user.type(currentSearchInput(), "sunset");
     await user.keyboard("{Enter}");
     await screen.findByRole("button", { name: /Select Sunset pier photo/i });
 
-    // In results mode — still a single persistent section
-    expect(document.querySelectorAll(".phone-persistent-section").length).toBe(1);
-    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+    // In results mode — search bar still inside viewport
+    expect(viewport?.contains(document.querySelector(".search-bar--semantic"))).toBe(true);
 
-    // The search bar must be above the scroll area, not inside it
-    const viewport = document.querySelector(".phone-rect-viewport");
-    expect(document.querySelector(".phone-persistent-section")).toBeInTheDocument();
-    expect(viewport?.contains(document.querySelector(".phone-persistent-section"))).toBe(false);
+    // No persistent-section wrapper outside the viewport
+    expect(document.querySelector(".phone-persistent-section")).not.toBeInTheDocument();
   });
 });

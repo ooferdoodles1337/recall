@@ -421,7 +421,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   return (
     <div ref={phoneRectRef}
-      className={`phone-rect${contentMode === "home" ? " phone-rect--home" : ""}${showSelectionTray ? " phone-rect--has-selection" : ""}`}
+      className={`phone-rect${showSelectionTray ? " phone-rect--has-selection" : ""}`}
       style={gridDensityStyle} data-reduced-motion={prefersReducedMotion ? "true" : undefined}
       aria-label="Phone interface viewport"
       onKeyDown={(event) => {
@@ -445,19 +445,19 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       <MotionConfig reducedMotion="user">
       <LayoutGroup id="phone-ui">
 
-        <PhoneSearchShell
-          mode={mode} query={query}
-          showHistory={showHistory} activeHistory={activeHistory}
-          composeSuggestions={composeSuggestions} visibleHistory={visibleHistory}
-          isSearching={isSearching} showComposePanel={showComposePanel}
-          onAssistSearch={handleAssistSearch} onClearHistory={clearHistory}
-          onRemoveHistoryItem={removeHistoryItem} renderSearchBar={renderSearchBar}
-        />
-
-        <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport"
-          onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
+        <ScrollArea className="phone-rect-content" viewportRef={scrollContainerRef} viewportClassName="phone-rect-viewport">
           <>
-            <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition} onExit={onExit}
+            <PhoneSearchShell
+              mode={mode} query={query}
+              showHistory={showHistory} activeHistory={activeHistory}
+              composeSuggestions={composeSuggestions} visibleHistory={visibleHistory}
+              isSearching={isSearching} showComposePanel={showComposePanel}
+              onAssistSearch={handleAssistSearch} onClearHistory={clearHistory}
+              onRemoveHistoryItem={removeHistoryItem} renderSearchBar={renderSearchBar}
+            />
+            <div className="phone-rect-scroll-inner"
+              onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
+              <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition} onExit={onExit}
               favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} mediaGridClassName={mediaGridClassName}
               pinchHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
               usesNaturalAspectGrid={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
@@ -477,6 +477,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               handleItemPointerMove={handleItemPointerMove} handleItemPointerCancel={handleItemPointerCancel}
               toggleSelected={toggleSelected} loadMore={() => void loadMore()}
               onRunRefinement={(refinement) => { setQuery(refinement); void runSearch(refinement); }} />
+            </div>
           </>
         </ScrollArea>
 

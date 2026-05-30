@@ -783,12 +783,6 @@ a {
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
 }
 
-/* Persistent header section — bar + accordion suggestions, normal flow */
-.phone-persistent-section {
-  flex-shrink: 0;
-  background: transparent;
-}
-
 /* Dimmed overlay — captures pointer events to dismiss to home */
 .phone-dismiss-overlay {
   position: absolute;
@@ -870,12 +864,13 @@ a {
   scrollbar-width: none;
 }
 
-.phone-rect--home .phone-rect-viewport {
-  padding-top: 0;
-}
-
 .phone-rect-viewport::-webkit-scrollbar {
   display: none;
+}
+
+/* Inner wrapper for search bar + content layers inside the scroll viewport */
+.phone-rect-scroll-inner {
+  min-height: 100%;
 }
 
 /* Mobile header inside the phone frame */
@@ -1248,7 +1243,10 @@ a {
 /* iOS-style capsule search bar — glass scoped to the pill itself.
    Fill: translucent white (reads over any photo background). */
 .search-bar--semantic {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
   overflow: hidden;
   min-height: 44px;
   display: grid;
@@ -2709,14 +2707,6 @@ html {
     env(safe-area-inset-right, 0px)
     max(24px, env(safe-area-inset-bottom))
     env(safe-area-inset-left, 0px);
-}
-
-.phone-rect--home .phone-rect-viewport {
-  padding-top: 0;
-}
-
-.phone-persistent-section {
-  padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
 }
 
 .phone-startpage-header {
