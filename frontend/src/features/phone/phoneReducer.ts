@@ -7,6 +7,7 @@ export type ModeTransitionReason =
   | "search-focus"
   | "search-clear"
   | "search-commit"
+  | "autosearch-commit"
   | "compose-dismiss"
   | "similar-search"
   | "detail-open"
@@ -32,6 +33,7 @@ export interface PhoneModeState {
 export type PhoneModeAction =
   | { type: "SEARCH_FOCUS"; startQuery: string }
   | { type: "SEARCH_COMMIT" }
+  | { type: "AUTOSEARCH_COMMIT" }
   | { type: "SEARCH_CLEAR" }
   | { type: "COMPOSE_DISMISS" }
   | { type: "SIMILAR_SEARCH" }
@@ -96,6 +98,10 @@ export function phoneModeReducer(state: PhoneModeState, action: PhoneModeAction)
 
     case "SEARCH_COMMIT":
       return to("results", "search-commit", { bgContent: "results" });
+
+    case "AUTOSEARCH_COMMIT":
+      if (state.screen !== "compose" || state.bgContent === "results") return state;
+      return to("compose", "autosearch-commit", { bgContent: "results" });
 
     case "SEARCH_CLEAR":
       return to("home", "search-clear", { bgContent: "home" });

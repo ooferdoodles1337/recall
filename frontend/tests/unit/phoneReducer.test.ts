@@ -65,6 +65,34 @@ describe("phoneModeReducer — SEARCH_COMMIT", () => {
   });
 });
 
+describe("phoneModeReducer — AUTOSEARCH_COMMIT", () => {
+  it("keeps compose open over home and switches background content to results", () => {
+    const state = {
+      ...stateIn("compose", "home"),
+      composeStartQuery: "draft",
+    };
+    const next = phoneModeReducer(state, { type: "AUTOSEARCH_COMMIT" });
+
+    expect(next.screen).toBe("compose");
+    expect(next.bgContent).toBe("results");
+    expect(next.composeStartQuery).toBe("draft");
+    expect(next.transition.reason).toBe("autosearch-commit");
+    expect(next.transition.from).toBe("compose");
+    expect(next.transition.to).toBe("compose");
+    expect(next.transition.direction).toBe("neutral");
+    expect(next.transition.key).toBe(state.transition.key + 1);
+  });
+
+  it("keeps compose open over existing results without adding another transition", () => {
+    const state = stateIn("compose", "results");
+    const next = phoneModeReducer(state, { type: "AUTOSEARCH_COMMIT" });
+
+    expect(next).toBe(state);
+    expect(next.screen).toBe("compose");
+    expect(next.bgContent).toBe("results");
+  });
+});
+
 describe("phoneModeReducer — SEARCH_CLEAR", () => {
   it("goes to home with bgContent=home and reason=search-clear", () => {
     const next = phoneModeReducer(stateIn("results", "results"), { type: "SEARCH_CLEAR" });

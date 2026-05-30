@@ -123,8 +123,8 @@ const MOTION_EASE = {
 const screenMotionVariants = {
   enter: ({ direction, reason }: ModeTransition) => ({
     opacity: 0,
-    y: reason === "search-clear" ? 0 : direction === "back" ? -10 : 14,
-    scale: reason === "search-clear" ? 1 : direction === "back" ? 1.012 : 0.988,
+    y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? -10 : 14,
+    scale: reason === "search-clear" || reason === "autosearch-commit" ? 1 : direction === "back" ? 1.012 : 0.988,
   }),
   center: {
     opacity: 1,
@@ -137,8 +137,8 @@ const screenMotionVariants = {
   },
   exit: ({ direction, reason }: ModeTransition) => ({
     opacity: 0,
-    y: reason === "search-clear" ? 0 : direction === "back" ? 16 : -8,
-    scale: reason === "search-clear" ? 0.96 : direction === "back" ? 0.986 : 1.01,
+    y: reason === "search-clear" || reason === "autosearch-commit" ? 0 : direction === "back" ? 16 : -8,
+    scale: reason === "search-clear" ? 0.96 : reason === "autosearch-commit" ? 1 : direction === "back" ? 0.986 : 1.01,
     transition: {
       duration: reason === "search-clear" ? 0.2 : PHONE_MOTION.exitMs / 1000,
       ease: reason === "search-clear" ? ([0.4, 0, 0.2, 1] as [number, number, number, number]) : MOTION_EASE.exit,
@@ -963,7 +963,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       topBarInputRef.current?.focus();
     }
     modeRef.current = mode;
-  }, [mode]);
+  }, [contentMode, mode]);
 
   useEffect(() => {
     if (modeTransition.reason === "search-clear") {
@@ -1165,11 +1165,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const runSearch = useCallback(async (
     rawQuery: string,
     count = SEARCH_BATCH_SIZE,
-    options: { remember?: boolean; fromAuto?: boolean; bgContent?: "home" | "results" } = {},
+    options: { remember?: boolean; fromAuto?: boolean } = {},
   ) => {
     const q = rawQuery.trim();
     const shouldRemember = options.remember ?? true;
-    const delayCommit = options.fromAuto === true && options.bgContent === "home";
+    const fromAuto = options.fromAuto === true;
 
     if (!q) {
       searchAbortRef.current?.abort();
@@ -1195,11 +1195,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
     setShowHistory(false);
     setSubmittedQuery(q);
-    if (!delayCommit) {
+    if (fromAuto) {
+      dispatch({ type: "AUTOSEARCH_COMMIT" });
+    } else {
       dispatch({ type: "SEARCH_COMMIT" });
       scrollContainerRef.current?.scrollTo({ top: 0 });
-    }
-    if (!options.fromAuto) {
       topBarInputRef.current?.blur();
     }
 
@@ -1214,11 +1214,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       const semanticResults = semanticResponse.status === "fulfilled" ? semanticResponse.value.results : [];
       const textResults = textResponse.status === "fulfilled" ? textResponse.value.results : [];
       const nextResults = mergeResults(semanticResults, textResults).slice(0, count);
-
-      if (delayCommit) {
-        dispatch({ type: "SEARCH_COMMIT" });
-        scrollContainerRef.current?.scrollTo({ top: 0 });
-      }
 
       if (nextResults.length > 0) {
         setResults(nextResults);
@@ -1714,7 +1709,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     autoSearchTimerRef.current = setTimeout(() => {
       autoSearchTimerRef.current = null;
       setIsAutoSearchPending(false);
-      void runSearch(q, SEARCH_BATCH_SIZE, { remember: false, fromAuto: true, bgContent: bgContentRef.current });
+      void runSearch(q, SEARCH_BATCH_SIZE, { remember: false, fromAuto: true });
     }, 400);
     return () => {
       if (autoSearchTimerRef.current !== null) {
@@ -1841,12 +1836,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               >
                 <div className="phone-startpage">
               <motion.div
-                initial={false}
+                initial={{ opacity: 0, y: -20 }}
                 animate={{
                   height: mode === "compose" ? 0 : "auto",
                   opacity: mode === "compose" ? 0 : 1,
+                  y: mode === "compose" ? -16 : 0,
                 }}
-                transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                transition={{ duration: 0.26, ease: MOTION_EASE.standard }}
                 style={{ overflow: "hidden" }}
               >
                 <div className="phone-startpage-header">

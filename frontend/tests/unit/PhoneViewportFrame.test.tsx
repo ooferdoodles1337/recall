@@ -63,7 +63,7 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(currentSearchInput());
     await user.type(currentSearchInput(), "sunset");
 
-    expect(await screen.findByRole("button", { name: /sunset picnic/i })).toBeInTheDocument();
+    expect((await screen.findAllByRole("button", { name: /sunset picnic/i })).length).toBeGreaterThan(0);
 
     await user.keyboard("{Enter}");
 
@@ -72,6 +72,28 @@ describe("PhoneViewportFrame interactions", () => {
     expect(screen.getAllByRole("button", { name: /Shared picnic blanket/i })).toHaveLength(1);
     expect(phoneMockState.requests.some((request) => request.includes("/search/semantic?q=sunset"))).toBe(true);
     expect(phoneMockState.requests.some((request) => request.includes("/search/text?q=sunset"))).toBe(true);
+  });
+
+  it("runs autosearch in the background without dismissing compose or saving history", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "su");
+
+    await waitFor(() => {
+      expect(phoneMockState.requests.some((request) => request.includes("/search/semantic?q=su"))).toBe(true);
+    });
+
+    expect(await screen.findByRole("button", { name: /Select Sunset pier photo/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /sunset picnic/i }).length).toBeGreaterThan(0);
+      expect(currentSearchInput()).toHaveValue("su");
+      expect(document.activeElement).toBe(currentSearchInput());
+    });
+    expect(JSON.parse(window.localStorage.getItem(SEARCH_HISTORY_KEY) ?? "[]")).toEqual([]);
   });
 
   it("renders empty results and backend fallback states", async () => {
