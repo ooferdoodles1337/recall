@@ -99,7 +99,7 @@ def test_get_facets_delegates_to_catalog(monkeypatch):
 
 
 def test_trials_returns_random_target_summaries(monkeypatch):
-    from main import trials
+    from routes.trials import trials
 
     monkeypatch.setattr("services.catalog.db.get_random_ids", lambda n: ["a", "b"])
     monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: _item(id))
