@@ -209,12 +209,12 @@ describe("PhoneViewportFrame interactions", () => {
     renderPhone();
 
     await user.click((await screen.findAllByRole("button", { name: /Sensitive content/i }))[0]);
-    const oneDialog = await screen.findByRole("dialog", { name: "Sensitive content warning" });
+    const oneDialog = await screen.findByRole("alertdialog", { name: "Sensitive content warning" });
     await user.click(within(oneDialog).getByRole("button", { name: "Reveal This One" }));
     expect(await screen.findByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: /Sensitive content/i })[0]);
-    const allDialog = await screen.findByRole("dialog", { name: "Sensitive content warning" });
+    const allDialog = await screen.findByRole("alertdialog", { name: "Sensitive content warning" });
     await user.click(within(allDialog).getByRole("button", { name: "Reveal for Session" }));
 
     expect(await screen.findByRole("button", { name: /Select Second sensitive favorite/i })).toBeInTheDocument();
