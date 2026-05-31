@@ -15,7 +15,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 
 const assistPanelMotion = {
   initial: { opacity: 0, y: -6, scale: 0.985 },
@@ -62,7 +61,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
   ref,
 ) {
   return (
-    <motion.div layoutId="search-bar" className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
+    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
       <Button
         className={`history-btn${showHistory ? " history-btn--active" : ""}`}
         type="button"
@@ -100,7 +99,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
           <XIcon />
         </Button>
       ) : null}
-    </motion.div>
+    </div>
   );
 });
 
@@ -128,7 +127,7 @@ export function SearchAssistPanel({
   onRemoveHistoryItem,
 }: SearchAssistPanelProps) {
   const trimmedQuery = query.trim();
-  const showHistoryPanel = (showHistory || !trimmedQuery) && history.length > 0;
+  const showHistoryPanel = (showHistory || !trimmedQuery || suggestions.length === 0) && history.length > 0;
 
   return (
     <AnimatePresence initial={false} mode="wait">
@@ -141,27 +140,25 @@ export function SearchAssistPanel({
           animate="animate"
           exit="exit"
         >
-          {history.map((item, idx) => (
-            <React.Fragment key={item}>
-              <div className="phone-history-row">
-                <Button className="suggestion-item h-auto justify-start" type="button" variant="ghost" onClick={() => onRunSearch(item)}>
-                  <span className="suggestion-icon" aria-hidden>
-                    <ClockIcon />
-                  </span>
-                  <span>{item}</span>
-                </Button>
-                <Button className="phone-history-remove" type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveHistoryItem(item)} aria-label={`Remove ${item}`}>
-                  <XIcon />
-                </Button>
-              </div>
-              {idx < history.length - 1 ? <Separator className="phone-list-separator" /> : null}
-            </React.Fragment>
-          ))}
-          <div className="phone-history-footer">
-            <Button className="h-auto" type="button" variant="ghost" size="xs" onClick={onClearHistory}>
+          <div className="phone-history-header">
+            <span className="phone-history-header-label">Recent</span>
+            <Button className="phone-history-clear-btn h-auto" type="button" variant="ghost" size="xs" onClick={onClearHistory}>
               Clear all
             </Button>
           </div>
+          {history.map((item) => (
+            <div key={item} className="phone-history-row">
+              <Button className="suggestion-item h-auto justify-start" type="button" variant="ghost" onClick={() => onRunSearch(item)}>
+                <span className="suggestion-icon" aria-hidden>
+                  <ClockIcon />
+                </span>
+                <span>{item}</span>
+              </Button>
+              <Button className="phone-history-remove" type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveHistoryItem(item)} aria-label={`Remove ${item}`}>
+                <XIcon />
+              </Button>
+            </div>
+          ))}
         </motion.div>
       ) : trimmedQuery && suggestions.length > 0 ? (
         <motion.div
@@ -172,16 +169,13 @@ export function SearchAssistPanel({
           animate="animate"
           exit="exit"
         >
-          {suggestions.map((suggestion, idx) => {
+          {suggestions.map((suggestion) => {
             const fromHistory = knownHistory.some((item) => item.toLowerCase() === suggestion.toLowerCase());
             return (
-              <React.Fragment key={suggestion}>
-                <Button className="suggestion-item h-auto justify-start w-full" type="button" variant="ghost" onClick={() => onRunSearch(suggestion)}>
-                  <span className="suggestion-icon" aria-hidden>{fromHistory ? <ClockIcon /> : <SearchIcon />}</span>
-                  <span>{suggestion}</span>
-                </Button>
-                {idx < suggestions.length - 1 ? <Separator className="phone-list-separator" /> : null}
-              </React.Fragment>
+              <Button key={suggestion} className="suggestion-item h-auto justify-start w-full" type="button" variant="ghost" onClick={() => onRunSearch(suggestion)}>
+                <span className="suggestion-icon" aria-hidden>{fromHistory ? <ClockIcon /> : <SearchIcon />}</span>
+                <span>{suggestion}</span>
+              </Button>
             );
           })}
         </motion.div>

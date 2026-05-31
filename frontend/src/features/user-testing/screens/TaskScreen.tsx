@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,16 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
     }
   }, []);
 
+  const handleClear = useCallback(() => {
+    localStorage.removeItem(RESULTS_KEY);
+    setResults([]);
+  }, []);
+
+  const handleAbandon = useCallback(() => {
+    startMsRef.current = null;
+    setPhase("idle");
+  }, []);
+
   const handleConfirm = useCallback((selectedId: string) => {
     const elapsed = startMsRef.current !== null ? Date.now() - startMsRef.current : 0;
     setResults((prev) => {
@@ -69,9 +80,9 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
 
   if (phase === "active") {
     return (
-      <div className="task-phone-only">
-        <PhoneViewportFrame onConfirmAnswer={handleConfirm} />
-      </div>
+      <main className="app-shell--phone">
+        <PhoneViewportFrame onConfirmAnswer={handleConfirm} onExit={handleAbandon} />
+      </main>
     );
   }
 
@@ -122,6 +133,17 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
                   <Badge variant="outline" className="trial-count-badge">
                     {results.length}
                   </Badge>
+                )}
+                {results.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="trial-clear-btn"
+                    onClick={handleClear}
+                    aria-label="Clear trial times"
+                  >
+                    <Trash2Icon />
+                  </Button>
                 )}
               </CardTitle>
             </CardHeader>

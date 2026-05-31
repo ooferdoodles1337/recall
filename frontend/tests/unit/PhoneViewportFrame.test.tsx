@@ -157,7 +157,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /Select Favorite 02/i }));
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
     await waitFor(() => {
       expect(screen.queryByRole("region", { name: "Selection tray" })).not.toBeInTheDocument();
     });
@@ -227,43 +227,92 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(screen.getByRole("button", { name: "Play video" }));
     expect(await screen.findByRole("button", { name: "Pause video" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("region", { name: "Selection tray" })).toHaveTextContent("1 selected");
+    // Confirm (send) resets to home — no selection tray, home heading visible
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Selection tray" })).not.toBeInTheDocument();
 
-    await openDetailFromButton(screen.getByRole("button", { name: /Deselect Favorite video clip/i }));
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite video clip/i }));
     await user.click(screen.getByRole("button", { name: /Similar/i }));
     expect(await screen.findByRole("button", { name: /Select Similar yellow umbrella/i })).toBeInTheDocument();
   });
 
-  it("dismisses compose and keeps search bar visible when viewport scrolls down (SR-1, SR-2)", async () => {
+  it("collapses compose panel on scroll down over results, re-expands on scroll up (SR-1)", async () => {
     const user = userEvent.setup();
     renderPhone();
 
-    // Reach results mode
     await commitSearch("sunset", user);
     await screen.findByRole("button", { name: /Select Sunset pier photo/i });
 
-    // Enter compose mode by clicking the bar
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+    expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
+    });
+    expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    expect(document.activeElement).toBe(currentSearchInput());
+
+    scrollTopSpy.mockReturnValue(0);
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+    });
+    scrollTopSpy.mockRestore();
+  });
+
+  it("re-expands compose panel on keystroke after scroll collapse (SR-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
     await user.click(currentSearchInput());
     await waitFor(() => {
       expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
     });
 
-    // Simulate a downward scroll: mock scrollTop > 0 so the handler sees st > prev
-    const viewport = document.querySelector(".phone-rect-viewport");
-    if (viewport instanceof HTMLElement) {
-      const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
-      fireEvent.scroll(viewport);
-      scrollTopSpy.mockRestore();
-    }
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
+    });
 
-    // Compose should have dismissed (SR-1)
+    await user.type(currentSearchInput(), "x");
+    await waitFor(() => {
+      expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
+    });
+    scrollTopSpy.mockRestore();
+  });
+
+  it("dismisses compose entirely on scroll down over home feed (SR-1 home)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
+    fireEvent.scroll(viewport);
+    scrollTopSpy.mockRestore();
+
     await waitFor(() => {
       expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
     });
-
-    // Search bar must still be in the DOM (SR-2)
     expect(currentSearchInput()).toBeInTheDocument();
   });
 
@@ -353,5 +402,119 @@ describe("PhoneViewportFrame interactions", () => {
     expect(await screen.findByLabelText("Phone interface viewport")).toHaveStyle({
       "--phone-grid-columns": "2",
     });
+  });
+
+  it("shows at most 3 suggestions in compose mode (CP-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "sunset");
+
+    // Compose panel should be visible
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+
+    // Count suggestion buttons inside the compose section
+    const composeSection = document.querySelector(".phone-compose-section");
+    expect(composeSection).toBeInTheDocument();
+    const suggestionBtns = composeSection?.querySelectorAll("button") ?? [];
+    expect(suggestionBtns.length).toBeLessThanOrEqual(3);
+  });
+
+  it("returns to home when search field is emptied over results (SC-1)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    expect(await screen.findByRole("button", { name: /Select Sunset pier photo/i })).toBeInTheDocument();
+
+    await user.click(currentSearchInput());
+    await user.clear(currentSearchInput());
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /Select Sunset pier photo/i })).not.toBeInTheDocument();
+    });
+    expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
+  });
+
+  it("restores previous query text on compose dismiss (FC-2 query preservation)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "beach day");
+    await user.keyboard("{Escape}");
+
+    // Query should revert to the pre-compose value (empty string, since no previous commit)
+    await waitFor(() => {
+      expect(currentSearchInput()).toHaveValue("");
+    });
+  });
+
+  it("cancels in-flight search and clears results on empty query over results (SC-1 abort)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    // Type something, then backspace to empty
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "x");
+    await user.clear(currentSearchInput());
+
+    // Should return home
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Recall" })).toBeInTheDocument();
+    });
+  });
+
+  it("does not return home when query emptied over home screen (SC-1 scope)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(currentSearchInput());
+    await user.type(currentSearchInput(), "x");
+    await user.clear(currentSearchInput());
+
+    // Still on home — compose may dismiss but heading stays
+    expect(screen.getByRole("heading", { name: "Recall" })).toBeInTheDocument();
+  });
+
+  it("renders a single persistent search bar above the scroll area in all modes (architectural)", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    // In home mode, the search bar should live in .phone-persistent-section outside scroll area
+    await waitForPhoneHome();
+    const persistentSections = document.querySelectorAll(".phone-persistent-section");
+    expect(persistentSections.length).toBe(1);
+    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+
+    // Enter compose mode — still a single persistent section, no sticky variant
+    await user.click(currentSearchInput());
+    await waitFor(() => {
+      expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    });
+    expect(document.querySelectorAll(".phone-persistent-section").length).toBe(1);
+    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+
+    // Commit search to reach results mode
+    await user.type(currentSearchInput(), "sunset");
+    await user.keyboard("{Enter}");
+    await screen.findByRole("button", { name: /Select Sunset pier photo/i });
+
+    // In results mode — still a single persistent section
+    expect(document.querySelectorAll(".phone-persistent-section").length).toBe(1);
+    expect(document.querySelector(".phone-startpage-search-sticky")).not.toBeInTheDocument();
+
+    // The search bar must be above the scroll area, not inside it
+    const viewport = document.querySelector(".phone-rect-viewport");
+    expect(document.querySelector(".phone-persistent-section")).toBeInTheDocument();
+    expect(viewport?.contains(document.querySelector(".phone-persistent-section"))).toBe(false);
   });
 });

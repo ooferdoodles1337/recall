@@ -8,13 +8,24 @@ This document is the authoritative source of UX behavior for the `/phone` route.
 
 ## Scroll / swipe behavior
 
-### SR-1 — Compose panel dismisses on downward scroll
-When the user is in `compose` mode and scrolls down (any amount), the compose panel
-must close immediately (dispatch `COMPOSE_DISMISS`, blur the input). The query text
-in the bar is preserved so the user can resume typing if they scroll back up.
+### SR-1 — Compose panel collapses on downward scroll (results) or dismisses (home)
 
-**Rationale:** scrolling signals intent to browse results, not to type. Keeping the
-compose panel open while the grid scrolls underneath it is disorienting.
+When the user is in `compose` mode over the home feed (`bgContent=home`) and scrolls down,
+the compose panel must close immediately (dispatch `COMPOSE_DISMISS`, blur the input).
+The query text in the bar is preserved so the user can resume typing if they scroll back up.
+
+When the user is in `compose` mode over results (`bgContent=results`) and scrolls down
+past 60 px, the suggestions panel collapses with a height exit animation. The search bar
+stays visible and the input remains focused. Scrolling all the way back to the top
+(`scrollTop <= 0`) re-expands the panel. Typing any character while the panel is
+collapsed also re-expands it immediately.
+
+**Rationale over home:** scrolling signals intent to browse results, not to type.
+Keeping the compose panel open while the grid scrolls underneath it is disorienting.
+
+**Rationale over results:** the user is refining a query and may want to scroll through
+previewed results then scroll back up to continue typing. Dismissing compose entirely
+would lose keyboard focus, requiring an extra tap to resume.
 
 ### SR-2 — Persistent search bar is always visible
 The `.phone-persistent-section` (the search bar strip) is always pinned at the top
@@ -35,6 +46,26 @@ are identical regardless of which screen it appears on.
 The `layoutId="search-bar"` Framer Motion attribute animates the bar between its
 home sticky position (inside the scroll content) and its persistent position (above
 the scroll area) during mode transitions.
+
+### SR-4 — Home header sits above the search bar at scroll top, then scrolls away
+
+On the home screen, the `.phone-startpage-header` (the "Recall" wordmark strip with the
+person and × icons) is positioned in the scroll flow **above** the persistent search bar.
+When the viewport is at scroll position 0 the header is fully visible, appearing above the
+search bar. As the user scrolls down, the header leaves the screen upward; the search bar
+stays visible at all times (SR-2).
+
+The header is **not sticky** — it does not pin itself at the top once it has scrolled
+off screen. After scrolling down, only the persistent search bar is visible above the
+content.
+
+If the user scrolls back up to `scrollTop === 0` after having scrolled away, the header
+reappears with its standard slide-in animation (HA-1).
+
+**Rationale:** The header conveys app identity and provides exit/account controls that
+are relevant when the user first arrives but do not need to occupy permanent real estate.
+Keeping it non-sticky reclaims screen space for the photo grid while ensuring the search
+bar (the primary action) is always reachable.
 
 ---
 
@@ -57,6 +88,25 @@ and suggestions panel merge into a single unified glass card:
   borders, and rounded bottom corners — forming the lower half of the card.
 - Suggestion rows are rendered as a flat list directly inside the panel — no nested card wrapper.
   The glass and border-radius come from the `.phone-compose-section` container, not from a child card.
+
+### CP-3 — Search bar tap always reveals populated content immediately
+
+Tapping the search bar must open the compose panel with content visible in the
+same animation frame — no blank intermediate state.
+
+**Content priority:**
+1. If query is empty → show history (if available).
+2. If query is non-empty and suggestions are cached → show suggestions.
+3. If query is non-empty but suggestions are not yet loaded → show history as
+   an immediate fallback; replace with suggestions once they arrive.
+
+**Re-expansion:** if the panel was previously collapsed by scroll (SR-1,
+`showComposePanel=false`), tapping the bar must re-expand it. `enterComposeMode`
+must always set `showComposePanel` to `true`, regardless of current mode.
+
+**Rationale:** an empty panel on tap breaks the mental model that the bar is
+always ready. History as a fallback provides instant value while the debounced
+suggestion fetch completes.
 
 ---
 
