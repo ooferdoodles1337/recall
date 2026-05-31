@@ -11,6 +11,7 @@ import { NsfwDialog } from "./NsfwDialog";
 import { ImageDetailView } from "./ImageDetailView";
 import { SelectionTray } from "./SelectionTray";
 import { VideoDetailView } from "./VideoDetailView";
+import { useQuery } from "@tanstack/react-query";
 import { listFavoriteItems } from "../api/searchApi";
 import {
   initialPhoneModeState, phoneModeReducer,
@@ -42,8 +43,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const contentMode = modeState.bgContent;
   const modeTransition = modeState.transition;
 
+  const favoritesQuery = useQuery({
+    queryKey: ["catalog", "favorites", FAVORITES_COUNT],
+    queryFn: () => listFavoriteItems(FAVORITES_COUNT),
+  });
   const [favoriteItems, setFavoriteItems] = useState<RecallMediaItem[]>([]);
-  const [isLoadingFavorites, setIsLoadingFavorites] = useState(true);
+  const isLoadingFavorites = favoritesQuery.isPending;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
   const [overscrollProgress, setOverscrollProgress] = useState(0);
@@ -140,14 +145,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, [currentTarget?.id, dispatch, setDetailItem]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    setIsLoadingFavorites(true);
-    listFavoriteItems(FAVORITES_COUNT, { signal: controller.signal })
-      .then((response) => { if (!controller.signal.aborted) setFavoriteItems(response.results); })
-      .catch(() => { if (!controller.signal.aborted) setFavoriteItems([]); })
-      .finally(() => { if (!controller.signal.aborted) setIsLoadingFavorites(false); });
-    return () => controller.abort();
-  }, []);
+    if (favoritesQuery.data) setFavoriteItems(favoritesQuery.data.results);
+  }, [favoritesQuery.data]);
 
   useEffect(() => { if (mode === "compose") topBarInputRef.current?.focus(); modeRef.current = mode; }, [contentMode, mode]);
 
