@@ -8,7 +8,7 @@ echo ""
 
 echo "Syncing dependencies..."
 cd "$ROOT/backend" && uv sync --quiet
-cd "$ROOT/frontend" && npm install --silent
+cd "$ROOT/frontend" && pnpm install --silent
 echo ""
 
 cd "$ROOT/backend"
@@ -16,7 +16,7 @@ uv run uvicorn main:app --reload --host 0.0.0.0 &
 BACKEND_PID=$!
 
 cd "$ROOT/frontend"
-npm run dev &
+pnpm run dev &
 FRONTEND_PID=$!
 
 trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT INT TERM

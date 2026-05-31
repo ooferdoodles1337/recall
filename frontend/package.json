@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test": "npm run build && npm run test:unit"
+    "test": "pnpm run build && pnpm run test:unit"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "msw"]
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
