@@ -2,33 +2,16 @@ import { motion } from "motion/react";
 import { FavoritesSection } from "./FavoritesSection";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { screenMotionVariants, type ModeTransition } from "./phoneUtils";
-import type { GridGestureHandlers } from "./MediaGrid";
 
 interface HomeLayerProps {
   visible: boolean;
   modeTransition: ModeTransition;
   favoriteItems: RecallMediaItem[];
   favoritesGridRef: React.RefObject<HTMLDivElement | null>;
-  mediaGridClassName: string;
-  pinchHandlers: GridGestureHandlers;
-  gridColumns: number;
   isLoadingFavorites: boolean;
-  usesNaturalAspectGrid: boolean;
-  selectedItems: RecallMediaItem[];
-  isItemBlurred: (item: RecallMediaItem) => boolean;
-  zoomGridIn: () => void;
-  zoomGridOut: () => void;
-  handleItemPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  handleItemPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  handleItemPointerMove: (e: React.PointerEvent) => void;
-  handleItemPointerCancel: () => void;
-  toggleSelected: (item: RecallMediaItem) => void;
 }
 
-export function HomeLayer({ visible, modeTransition, favoriteItems, favoritesGridRef,
-  mediaGridClassName, pinchHandlers, gridColumns, isLoadingFavorites, usesNaturalAspectGrid,
-  selectedItems, isItemBlurred, zoomGridIn, zoomGridOut,
-  handleItemPointerDown, handleItemPointerUp, handleItemPointerMove, handleItemPointerCancel, toggleSelected }: HomeLayerProps) {
+export function HomeLayer({ visible, modeTransition, favoriteItems, favoritesGridRef, isLoadingFavorites }: HomeLayerProps) {
   const showFavoritesSection = isLoadingFavorites || favoriteItems.length > 0;
   if (!visible) return null;
   return (
@@ -36,13 +19,7 @@ export function HomeLayer({ visible, modeTransition, favoriteItems, favoritesGri
       custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
       <div className="phone-startpage">
         {showFavoritesSection ? (
-          <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} gridClassName={mediaGridClassName}
-            gridGestureHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
-            naturalAspectRatio={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
-            onZoomIn={zoomGridIn} onZoomOut={zoomGridOut}
-            onItemPointerDown={handleItemPointerDown} onItemPointerUp={handleItemPointerUp}
-            onItemPointerMove={handleItemPointerMove} onItemPointerCancel={handleItemPointerCancel}
-            toggleSelected={toggleSelected} />
+          <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} isLoadingFavorites={isLoadingFavorites} />
         ) : null}
       </div>
     </motion.div>

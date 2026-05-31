@@ -13,14 +13,12 @@ import { Separator } from "@/components/ui/separator";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import type { PhoneBgContent } from "../phoneReducer";
 import { SEARCH_BATCH_SIZE } from "./phoneUtils";
-import { MediaGrid, GridZoomControls, type GridGestureHandlers } from "./MediaGrid";
+import { MediaGrid, GridZoomControls } from "./MediaGrid";
+import { useGridHandlers } from "./GridHandlersContext";
 
 interface ResultsSectionProps {
   results: RecallMediaItem[];
   searchGridRef: React.Ref<HTMLDivElement>;
-  gridClassName: string;
-  gridGestureHandlers: GridGestureHandlers;
-  gridColumns: number;
   isLoading: boolean;
   isLoadingMore: boolean;
   contentMode: PhoneBgContent;
@@ -28,16 +26,6 @@ interface ResultsSectionProps {
   errorMessage: string | null;
   hasMore: boolean;
   refinements: string[];
-  naturalAspectRatio: boolean;
-  selectedItems: RecallMediaItem[];
-  isItemBlurred: (item: RecallMediaItem) => boolean;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onItemPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  onItemPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  onItemPointerMove: (e: React.PointerEvent) => void;
-  onItemPointerCancel: () => void;
-  toggleSelected: (item: RecallMediaItem) => void;
   onLoadMore: () => void;
   onRunRefinement: (refinement: string) => void;
 }
@@ -45,28 +33,16 @@ interface ResultsSectionProps {
 export function ResultsSection({
   results,
   searchGridRef,
-  gridClassName,
-  gridGestureHandlers,
-  gridColumns,
   isLoading,
   isLoadingMore,
   contentMode,
   errorMessage,
   hasMore,
   refinements,
-  naturalAspectRatio,
-  selectedItems,
-  isItemBlurred,
-  onZoomIn,
-  onZoomOut,
-  onItemPointerDown,
-  onItemPointerUp,
-  onItemPointerMove,
-  onItemPointerCancel,
-  toggleSelected,
   onLoadMore,
   onRunRefinement,
 }: ResultsSectionProps) {
+  const { pinchHandlers, gridColumns, zoomGridIn, zoomGridOut, mediaGridClassName } = useGridHandlers();
   const emptyContent = contentMode === "results" ? (
     <Empty className="search-empty">
       <EmptyHeader>
@@ -80,9 +56,9 @@ export function ResultsSection({
   ) : null;
 
   return (
-    <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...gridGestureHandlers}>
+    <div className="grid-wrap phone-media-grid-zone" data-testid="phone-search-grid-zone" {...pinchHandlers}>
       <div className="phone-grid-toolbar phone-grid-toolbar--controls-only">
-        <GridZoomControls columns={gridColumns} onZoomIn={onZoomIn} onZoomOut={onZoomOut} />
+        <GridZoomControls columns={gridColumns} onZoomIn={zoomGridIn} onZoomOut={zoomGridOut} />
       </div>
       {errorMessage ? (
         <Alert variant="destructive" className="search-notice">
@@ -96,15 +72,7 @@ export function ResultsSection({
         gridRef={searchGridRef}
         scope="search"
         ariaLabel="Search results"
-        className={gridClassName}
-        naturalAspectRatio={naturalAspectRatio}
-        selectedItems={selectedItems}
-        isItemBlurred={isItemBlurred}
-        onPointerDown={onItemPointerDown}
-        onPointerUp={onItemPointerUp}
-        onPointerMove={onItemPointerMove}
-        onPointerCancel={onItemPointerCancel}
-        toggleSelected={toggleSelected}
+        className={mediaGridClassName}
         isLoading={isLoading}
         loadingCount={SEARCH_BATCH_SIZE}
         loadingKeyPrefix="loading"

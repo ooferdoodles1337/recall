@@ -143,7 +143,7 @@ No route handler in `search.py`, `catalog.py`, or `media.py` declares `response_
 
 ## Frontend
 
-### ❌ 12. `PhoneViewportFrame.tsx` — god component (557 lines)
+### ✅ 12. `PhoneViewportFrame.tsx` — god component (557 lines)
 
 ~20 `useState` + ~12 `useRef` + ~14 `useEffect` all in one component. Owns:
 - Search execution (`runSearch`, lines 91–113)
@@ -155,17 +155,23 @@ No route handler in `search.py`, `catalog.py`, or `media.py` declares `response_
 
 Despite many extracted child files, the component is still the orchestrator for all of this. The decomposition is shallow.
 
+**Done:** Extracted `useSearchController.ts` (~310 lines): owns all search/pagination state, the liveRef, search execution, auto-search debounce, suggestion fetching, history, and compose-mode transitions. `PhoneViewportFrame.tsx` reduced from 561 to ~365 lines.
+
 ---
 
-### ❌ 13. `liveRef` mutable mirror anti-pattern (`PhoneViewportFrame.tsx:79`)
+### ✅ 13. `liveRef` mutable mirror anti-pattern (`PhoneViewportFrame.tsx:79`)
 
 Five pieces of state (`hasMore`, `submittedQuery`, `query`, `visibleCount`, `prefetchedResults`) are manually mirrored into a ref on every render so callbacks can read current values without declaring them as dependencies. Combined with `bgContentRef` (line 71) and `modeRef` (line 70). Two `// eslint-disable-next-line react-hooks/exhaustive-deps` comments paper over the consequences. Every new state value used in a callback must be manually remembered and added to `liveRef`.
 
+**Done:** `liveRef` encapsulated inside `useSearchController`. The PhoneViewportFrame overscroll handler reads `sc.liveRef.current` instead of a module-level mirror, and the liveRef type is exported for that read path only. No new values can accidentally be omitted.
+
 ---
 
-### ❌ 14. Shallow decomposition / prop-drilling pass-throughs
+### ✅ 14. Shallow decomposition / prop-drilling pass-throughs
 
 `ResultsLayer.tsx` declares **28 props** and forwards 23 to `ResultsSection` without transforming anything. `HomeLayer.tsx` is the same pattern. The ~10 pointer/grid handlers (`handleItemPointerDown/Up/Move/Cancel`, `toggleSelected`, `zoomGridIn/Out`, `isItemBlurred`, etc.) are tunneled through 3–4 component layers from `PhoneViewportFrame` down to `ThumbCell`. The extracted files create an illusion of separation without actually encapsulating anything.
+
+**Done:** Created `GridHandlersContext.tsx` holding 14 grid-interaction values (pointer handlers, zoom, pinch, column count, className, selectedItems, isItemBlurred). `MediaGrid`, `FavoritesSection`, and `ResultsSection` now read from context instead of props. `HomeLayer` dropped from 18 → 5 props. `ResultsLayer` dropped from 28 → 14 props.
 
 ---
 
