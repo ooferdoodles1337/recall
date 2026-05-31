@@ -1,9 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import catalog as catalog_router, media, search
+from routes import catalog as catalog_router, media, search, trials as trials_router
 from services.catalog import db as catalog
 from services.search import chroma, text_index
 
@@ -33,17 +33,9 @@ app.add_middleware(
 app.include_router(search.router, prefix="/search", tags=["search"])
 app.include_router(catalog_router.router, prefix="/catalog", tags=["catalog"])
 app.include_router(media.router, prefix="/media", tags=["media"])
+app.include_router(trials_router.router, prefix="/trials", tags=["trials"])
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
-@app.get("/trials")
-def trials(n: int = Query(5, ge=1)):
-    targets = [catalog.get_item_summary(item_id) for item_id in catalog.get_random_ids(n)]
-    return {
-        "n": n,
-        "targets": [target for target in targets if target is not None],
-    }

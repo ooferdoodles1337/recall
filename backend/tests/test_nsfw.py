@@ -113,9 +113,9 @@ def test_video_detection_uses_thumbnail(in_memory_catalog, monkeypatch):
 
 
 def test_safety_from_detection_simple_schema():
-    from services.catalog.schema import _safety_from_detection
+    from services.catalog.schema import safety_from_detection
 
-    result = _safety_from_detection({"model": "my-model", "nsfw_score": 0.42, "state": "safe"})
+    result = safety_from_detection({"model": "my-model", "nsfw_score": 0.42, "state": "safe"})
 
     assert result["state"] == "safe"
     assert result["score"] == 0.42
@@ -126,9 +126,9 @@ def test_safety_from_detection_simple_schema():
 
 
 def test_safety_from_detection_nsfw_threshold():
-    from services.catalog.schema import _safety_from_detection
+    from services.catalog.schema import safety_from_detection
 
-    result = _safety_from_detection({"model": "m", "nsfw_score": 0.97, "state": "nsfw"})
+    result = safety_from_detection({"model": "m", "nsfw_score": 0.97, "state": "nsfw"})
 
     assert result["state"] == "nsfw"
     assert result["score"] == 0.97

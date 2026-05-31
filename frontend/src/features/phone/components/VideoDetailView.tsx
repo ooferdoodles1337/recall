@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
-import { itemTitle, itemDateLabel, playbackTimeLabel, PHONE_MOTION, MOTION_EASE } from "./phoneUtils";
+import { itemTitle, itemDateLabel, playbackTimeLabel, PHONE_MOTION, MOTION_EASE, VIDEO_CHROME_HIDE_MS } from "./phoneUtils";
 
 interface VideoDetailViewProps {
   item: RecallMediaItem;
@@ -85,7 +85,7 @@ export function VideoDetailView({
     hideTimerRef.current = setTimeout(() => {
       setChromeVisible(false);
       hideTimerRef.current = null;
-    }, 2400);
+    }, VIDEO_CHROME_HIDE_MS);
   }, [clearChromeTimer, isPlaying, isScrubbing]);
 
   const revealChrome = useCallback(() => {

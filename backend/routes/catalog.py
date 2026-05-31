@@ -1,11 +1,30 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from services.catalog import db as catalog
+from services.search import text_index
 
 router = APIRouter()
+
+
+class _OrganizationPatch(BaseModel):
+    favorite: bool | None = None
+
+
+class _SafetyPatch(BaseModel):
+    state: Literal["safe", "nsfw", "unknown"] | None = None
+
+
+class _SearchPatch(BaseModel):
+    phrases: list[str] | None = None
+
+
+class CatalogItemPatch(BaseModel):
+    organization: _OrganizationPatch | None = None
+    safety: _SafetyPatch | None = None
+    search: _SearchPatch | None = None
 
 
 @router.get("/items")
@@ -28,14 +47,15 @@ def get_item(id: str):
 
 
 @router.patch("/items/{id}")
-def patch_item(id: str, body: dict[str, Any]):
+def patch_item(id: str, body: CatalogItemPatch):
     item = catalog.get_item(id)
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     try:
-        updated = catalog.patch_item(id, body)
+        updated = catalog.patch_item(id, body.model_dump(exclude_none=True))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    text_index.rebuild()
     return updated
 
 

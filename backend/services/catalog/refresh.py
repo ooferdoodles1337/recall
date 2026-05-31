@@ -5,14 +5,13 @@ import copy
 import logging
 import mimetypes
 from pathlib import Path
-from typing import Any
-
 from dotenv import load_dotenv
 
 import config
 from services.catalog import db as catalog
 from services.catalog import extractor as metadata_svc
 from services.catalog import schema as metadata_schema
+from services.utils.coerce import as_float as _as_float
 from services.pipeline.media import classify_extension, generate_thumbnail, is_animated
 
 load_dotenv()
@@ -56,19 +55,6 @@ def _refresh_thumbnail(file_id: str, path: Path, media_type: str) -> str:
     return str(thumbnail_abs.relative_to(config.DATA_DIR))
 
 
-def _as_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value.strip())
-        except ValueError:
-            return None
-    return None
-
-
 def _existing_coordinates(metadata: dict) -> tuple[float | None, float | None]:
     capture = metadata.get("capture")
     location = capture.get("location") if isinstance(capture, dict) else None
@@ -90,7 +76,7 @@ def _with_reverse_geocode(metadata: dict) -> tuple[dict, bool]:
     if lat is None or lon is None:
         return metadata, False
 
-    geo = metadata_svc._reverse_geocode(lat, lon)
+    geo = metadata_svc.reverse_geocode_coords(lat, lon)
     if not geo:
         return metadata, False
 

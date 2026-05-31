@@ -17,6 +17,7 @@ import {
   MIN_GRID_COLUMNS,
   MAX_GRID_COLUMNS,
 } from "./phoneUtils";
+import { useGridHandlers } from "./GridHandlersContext";
 
 interface ThumbCellProps {
   result: RecallMediaItem;
@@ -113,14 +114,6 @@ export interface MediaGridProps {
   scope: string;
   ariaLabel: string;
   className: string;
-  naturalAspectRatio: boolean;
-  selectedItems: RecallMediaItem[];
-  isItemBlurred: (item: RecallMediaItem) => boolean;
-  onPointerDown: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  onPointerUp: (e: React.PointerEvent, item: RecallMediaItem) => void;
-  onPointerMove: (e: React.PointerEvent) => void;
-  onPointerCancel: () => void;
-  toggleSelected: (item: RecallMediaItem) => void;
   isLoading?: boolean;
   loadingCount?: number;
   loadingKeyPrefix?: string;
@@ -135,14 +128,6 @@ export function MediaGrid({
   scope,
   ariaLabel,
   className,
-  naturalAspectRatio,
-  selectedItems,
-  isItemBlurred,
-  onPointerDown,
-  onPointerUp,
-  onPointerMove,
-  onPointerCancel,
-  toggleSelected,
   isLoading = false,
   loadingCount = 0,
   loadingKeyPrefix = "loading",
@@ -150,6 +135,7 @@ export function MediaGrid({
   trailingLoadingCount = 0,
   trailingLoadingKeyPrefix = "more",
 }: MediaGridProps) {
+  const { selectedItems, isItemBlurred, onPointerDown, onPointerUp, onPointerMove, onPointerCancel, toggleSelected, naturalAspectRatio } = useGridHandlers();
   const showInitialLoading = isLoading && items.length === 0;
 
   return (

@@ -4,6 +4,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 
 import config
+from routes._search_result import (
+    format_result,
+    SearchResponse,
+    SimilarByIdResponse,
+    SimilarUploadResponse,
+)
 from services.catalog import db as catalog
 from services.providers import gemini
 from services.search import chroma, text_index
@@ -15,7 +21,7 @@ _MIME_TO_EXT = config.MIME_TO_EXT
 _MAX_UPLOAD_BYTES = config.MAX_UPLOAD_BYTES
 
 
-@router.get("/semantic")
+@router.get("/semantic", response_model=SearchResponse)
 def search_semantic(q: str = Query(..., description="Search query text"), n: int = Query(5, ge=1)):
     embedding = gemini.embed_text(q)
     results = chroma.search(embedding, n_results=n)
@@ -24,12 +30,7 @@ def search_semantic(q: str = Query(..., description="Search query text"), n: int
     return {
         "query": q,
         "results": [
-            {
-                "id": doc_id,
-                "distance": dist,
-                "metadata": item["metadata"],
-                "links": item.get("links", {}),
-            }
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if (item := catalog.get_item_summary(doc_id)) is not None
         ],
@@ -45,7 +46,7 @@ def suggest(
     return {"suggestions": suggestions}
 
 
-@router.get("/text")
+@router.get("/text", response_model=SearchResponse)
 def search_text(
     q: str = Query(..., description="Search query text"),
     n: int = Query(10, ge=1),
@@ -60,19 +61,11 @@ def search_text(
 
     return {
         "query": q,
-        "results": [
-            {
-                "id": item["id"],
-                "distance": None,
-                "metadata": item["metadata"],
-                "links": item.get("links", {}),
-            }
-            for item in items
-        ],
+        "results": [format_result(item, None) for item in items],
     }
 
 
-@router.get("/similar/{id}")
+@router.get("/similar/{id}", response_model=SimilarByIdResponse)
 def search_similar_by_id(id: str, n: int = Query(5, ge=1)):
     embedding = chroma.get_embedding(id)
     if embedding is None:
@@ -83,14 +76,14 @@ def search_similar_by_id(id: str, n: int = Query(5, ge=1)):
     return {
         "query_id": id,
         "results": [
-            {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if doc_id != id and (item := catalog.get_item_summary(doc_id)) is not None
         ][:n],
     }
 
 
-@router.post("/similar")
+@router.post("/similar", response_model=SimilarUploadResponse)
 async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
     if file.content_type not in _ACCEPTED_IMAGE_MIMES:
         raise HTTPException(
@@ -121,7 +114,7 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
     return {
         "query_filename": file.filename,
         "results": [
-            {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if (item := catalog.get_item_summary(doc_id)) is not None
         ],

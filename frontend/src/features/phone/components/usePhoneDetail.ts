@@ -1,7 +1,9 @@
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { RecallMediaItem } from "@/shared/types/recall";
+import type { PhoneModeAction } from "../phoneReducer";
 import { patchCatalogItem } from "../api/searchApi";
-import { itemDateLabel } from "./phoneUtils";
+import { itemDateLabel, FAVORITES_COUNT } from "./phoneUtils";
 
 export type DetailApi = {
   detailItem: RecallMediaItem | null;
@@ -19,9 +21,7 @@ type Dependencies = {
   isItemBlurred: (item: RecallMediaItem) => boolean;
   onSelectCandidate?: (id: string) => void;
   modeRef: React.MutableRefObject<string>;
-  dispatch: (action: any) => void;
-  favoriteItems: RecallMediaItem[];
-  setFavoriteItems: React.Dispatch<React.SetStateAction<RecallMediaItem[]>>;
+  dispatch: (action: PhoneModeAction) => void;
   setQuery: (q: string) => void;
   runSearch: (q: string) => void;
   setErrorMessage: (msg: string | null) => void;
@@ -32,9 +32,9 @@ type Dependencies = {
 export function usePhoneDetail(deps: Dependencies): DetailApi {
   const {
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    favoriteItems, setFavoriteItems, setQuery, runSearch,
-    setErrorMessage, setNsfwPendingItem, revealSafe,
+    setQuery, runSearch, setErrorMessage, setNsfwPendingItem, revealSafe,
   } = deps;
+  const queryClient = useQueryClient();
 
   const [detailItem, setDetailItem] = useState<RecallMediaItem | null>(null);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
@@ -58,12 +58,22 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
     try {
       const updated = await patchCatalogItem(item.id, patch);
       setDetailItem((prev) => prev?.id === item.id ? updated : prev);
-      const exists = favoriteItems.some((f) => f.id === item.id);
-      if (exists && current) setFavoriteItems((prev) => prev.filter((f) => f.id !== item.id));
-      else if (!exists && !current) setFavoriteItems((prev) => [updated, ...prev]);
-      else setFavoriteItems((prev) => prev.map((f) => f.id === item.id ? updated : f));
-    } catch { /* no-op */ }
-  }, [favoriteItems, setFavoriteItems]);
+      queryClient.setQueryData(
+        ["catalog", "favorites", FAVORITES_COUNT],
+        (old: { count: number; results: RecallMediaItem[] } | undefined) => {
+          if (!old) return old;
+          const exists = old.results.some((f) => f.id === item.id);
+          let results: RecallMediaItem[];
+          if (exists && current) results = old.results.filter((f) => f.id !== item.id);
+          else if (!exists && !current) results = [updated, ...old.results];
+          else results = old.results.map((f) => f.id === item.id ? updated : f);
+          return { ...old, results };
+        },
+      );
+    } catch {
+      setErrorMessage("Couldn't update favorite — please try again.");
+    }
+  }, [queryClient, setErrorMessage]);
 
   const handleToggleSafety = useCallback(async (item: RecallMediaItem, state: "safe" | "nsfw") => {
     const patch = { safety: { state } };
@@ -71,8 +81,10 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
       const updated = await patchCatalogItem(item.id, patch);
       setDetailItem((prev) => prev?.id === item.id ? updated : prev);
       if (state === "safe") { revealSafe(item.id); setNsfwPendingItem(null); }
-    } catch { /* no-op */ }
-  }, [revealSafe, setNsfwPendingItem]);
+    } catch {
+      setErrorMessage("Couldn't update content rating — please try again.");
+    }
+  }, [revealSafe, setNsfwPendingItem, setErrorMessage]);
 
   const searchSameDate = useCallback((item: RecallMediaItem) => {
     const date = itemDateLabel(item);
