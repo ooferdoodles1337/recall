@@ -225,13 +225,15 @@ The `GridDensityApi.pinchHandlers` precise type is erased to `any` at layer boun
 
 ---
 
-### ❌ 20. `global.css` — 3,321-line monolith
+### ✅ 20. `global.css` — 3,321-line monolith
 
 All styles for the phone UI and user-testing UI live in one file, organized by comment banners rather than CSS Modules or colocated styles. Class names are global strings matched against `className` template literals in TSX (e.g. `ResultsLayer.tsx:45`) — renames are unsafe and there is no scoping.
 
+**Done:** Split into three `@import`-ed partials. `global.css` is now a 6-line entry file. `tokens.css` (317 lines) — font-faces, `:root` CSS variables, `@theme inline`, `.dark`, `@layer base`. `user-testing.css` (911 lines) — welcome, task, results, trial, and harness responsive styles. `phone.css` (2093 lines) — phone viewport frame, iOS home page, NSFW overlay, and trailing utilities. No class renames; all TSX class strings unchanged.
+
 ---
 
-### ❌ 21. Magic numbers inlined at use sites
+### ✅ 21. Magic numbers inlined at use sites
 
 Behavioral thresholds scattered through interaction code with no central constants file:
 
@@ -245,6 +247,8 @@ Behavioral thresholds scattered through interaction code with no central constan
 | `60` | Compose-hide scroll threshold | `PhoneViewportFrame.tsx:85` (`HIDE_COMPOSE_THRESHOLD`) |
 | `200` | Prefetch trigger (items remaining) | `PhoneViewportFrame.tsx:241` |
 | `2400` ms | Chrome-hide delay | `VideoDetailView.tsx:87` |
+
+**Done:** All eight constants extracted to `phoneUtils.ts` as `LONG_PRESS_MS`, `LONG_PRESS_CANCEL_DIST_SQ`, `SELECTION_SUPPRESS_MS`, `AUTOSEARCH_DEBOUNCE_MS`, `SUGGESTION_DEBOUNCE_MS`, `HIDE_COMPOSE_SCROLL_THRESHOLD`, `PREFETCH_TRIGGER_REMAINING`, `VIDEO_CHROME_HIDE_MS`. The inline `HIDE_COMPOSE_THRESHOLD` local variable in `PhoneViewportFrame` removed. All use sites updated to import from `phoneUtils`.
 
 ---
 
@@ -277,7 +281,7 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 | 10 | #17 — mock fallback in production path | ✅ | `makeMockItem` guarded behind `import.meta.env.DEV` |
 | 11 | #18 — `usePhoneDetail` overly coupled to parent state | ✅ | `queryClient.setQueryData` replaces `favoriteItems`/`setFavoriteItems` deps |
 | 12 | #8 — module-level mutable singletons | ❌ | Low-risk in single-process deployment; deferred |
-| 13 | #20 / #21 — CSS monolith + magic numbers | ❌ | Cosmetic debt; deferred |
+| 13 | #20 / #21 — CSS monolith + magic numbers | ✅ | Split into 3 partials; 8 constants extracted to `phoneUtils` |
 
 ---
 
@@ -322,7 +326,9 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 | Commit | Finding | Summary |
 |---|---|---|
-| *(pending)* | #18 | `favoriteItems`/`setFavoriteItems` removed from `usePhoneDetail` deps; hook calls `useQueryClient()` internally; `handleToggleFavorite` uses `queryClient.setQueryData`. Parallel `useState` + sync `useEffect` removed from `PhoneViewportFrame`; `favoriteItems` derived from `favoritesQuery.data` |
+| `0421b12` | #18 | `favoriteItems`/`setFavoriteItems` removed from `usePhoneDetail` deps; hook calls `useQueryClient()` internally; `handleToggleFavorite` uses `queryClient.setQueryData`. Parallel `useState` + sync `useEffect` removed from `PhoneViewportFrame`; `favoriteItems` derived from `favoritesQuery.data` |
+| *(pending)* | #20 | `global.css` split into `tokens.css` (317 lines), `user-testing.css` (911 lines), `phone.css` (2093 lines); `global.css` is now a 6-line entry file of `@import`s |
+| *(pending)* | #21 | 8 behavioral thresholds extracted to `phoneUtils.ts` as named constants; local `HIDE_COMPOSE_THRESHOLD` removed; `PhoneViewportFrame`, `useSearchController`, `VideoDetailView` updated |
 
 ---
 
@@ -332,5 +338,4 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 - **#3 / #22** — Dual-format metadata is the root cause of most remaining complexity. Legacy-flat fallback paths in every `schema.py` accessor can be removed once confirmed safe. Verification: `SELECT COUNT(*) FROM media_items WHERE metadata_json NOT LIKE '%"asset"%'` — requires a real distributed catalog DB, cannot run locally.
 - **#8** — Module-level mutable singletons (`configure()` pattern). Low-risk in single-process deployment; deferred.
 
-**Frontend:**
-- **#20 / #21** — CSS monolith (3321 lines) and magic numbers. Cosmetic debt; deferred.
+**Frontend:** All items resolved. Only backend #3/#8/#22 remain (require a real catalog DB or are low-risk singletons).
