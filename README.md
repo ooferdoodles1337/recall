@@ -62,8 +62,8 @@ uv run uvicorn main:app --reload --host 0.0.0.0
 
 # Frontend — terminal 2
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Accessing from a phone or other device
