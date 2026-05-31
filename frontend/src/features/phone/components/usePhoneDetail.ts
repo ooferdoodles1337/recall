@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import type { PhoneModeAction } from "../phoneReducer";
 import { patchCatalogItem } from "../api/searchApi";
-import { itemDateLabel, FAVORITES_COUNT } from "./phoneUtils";
+import { itemDateLabel } from "./phoneUtils";
 
 export type DetailApi = {
   detailItem: RecallMediaItem | null;
@@ -12,8 +12,8 @@ export type DetailApi = {
   setAboutSheetItem: (item: RecallMediaItem | null) => void;
   openDetail: (item: RecallMediaItem) => void;
   closeDetail: () => void;
-  handleToggleFavorite: (item: RecallMediaItem) => Promise<void>;
-  handleToggleSafety: (item: RecallMediaItem, state: "safe" | "nsfw") => Promise<void>;
+  handleToggleFavorite: (item: RecallMediaItem) => void;
+  handleToggleSafety: (item: RecallMediaItem, state: "safe" | "nsfw") => void;
   searchSameDate: (item: RecallMediaItem) => void;
 };
 
@@ -52,39 +52,33 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
     setDetailItem(null);
   }, [dispatch]);
 
-  const handleToggleFavorite = useCallback(async (item: RecallMediaItem) => {
-    const current = item.metadata.organization?.favorite ?? false;
-    const patch = { organization: { favorite: !current } };
-    try {
-      const updated = await patchCatalogItem(item.id, patch);
+  const { mutate: mutateFavorite } = useMutation({
+    mutationFn: ({ item, favorite }: { item: RecallMediaItem; favorite: boolean }) =>
+      patchCatalogItem(item.id, { organization: { favorite } }),
+    onSuccess: (updated, { item }) => {
       setDetailItem((prev) => prev?.id === item.id ? updated : prev);
-      queryClient.setQueryData(
-        ["catalog", "favorites", FAVORITES_COUNT],
-        (old: { count: number; results: RecallMediaItem[] } | undefined) => {
-          if (!old) return old;
-          const exists = old.results.some((f) => f.id === item.id);
-          let results: RecallMediaItem[];
-          if (exists && current) results = old.results.filter((f) => f.id !== item.id);
-          else if (!exists && !current) results = [updated, ...old.results];
-          else results = old.results.map((f) => f.id === item.id ? updated : f);
-          return { ...old, results };
-        },
-      );
-    } catch {
-      setErrorMessage("Couldn't update favorite — please try again.");
-    }
-  }, [queryClient, setErrorMessage]);
+      void queryClient.invalidateQueries({ queryKey: ["catalog", "favorites"] });
+    },
+    onError: () => setErrorMessage("Couldn't update favorite — please try again."),
+  });
 
-  const handleToggleSafety = useCallback(async (item: RecallMediaItem, state: "safe" | "nsfw") => {
-    const patch = { safety: { state } };
-    try {
-      const updated = await patchCatalogItem(item.id, patch);
+  const handleToggleFavorite = useCallback((item: RecallMediaItem) => {
+    mutateFavorite({ item, favorite: !(item.metadata.organization?.favorite ?? false) });
+  }, [mutateFavorite]);
+
+  const { mutate: mutateSafety } = useMutation({
+    mutationFn: ({ item, state }: { item: RecallMediaItem; state: "safe" | "nsfw" }) =>
+      patchCatalogItem(item.id, { safety: { state } }),
+    onSuccess: (updated, { item, state }) => {
       setDetailItem((prev) => prev?.id === item.id ? updated : prev);
       if (state === "safe") { revealSafe(item.id); setNsfwPendingItem(null); }
-    } catch {
-      setErrorMessage("Couldn't update content rating — please try again.");
-    }
-  }, [revealSafe, setNsfwPendingItem, setErrorMessage]);
+    },
+    onError: () => setErrorMessage("Couldn't update content rating — please try again."),
+  });
+
+  const handleToggleSafety = useCallback((item: RecallMediaItem, state: "safe" | "nsfw") => {
+    mutateSafety({ item, state });
+  }, [mutateSafety]);
 
   const searchSameDate = useCallback((item: RecallMediaItem) => {
     const date = itemDateLabel(item);

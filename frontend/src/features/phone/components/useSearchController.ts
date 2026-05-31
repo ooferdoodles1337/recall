@@ -234,15 +234,6 @@ export function useSearchController({
     enabled: !submittedQuery,
   });
 
-  useEffect(() => {
-    if (submittedQuery) return;
-    if (recentItemsQuery.data && recentItemsQuery.data.results.length > 0) {
-      setResults(recentItemsQuery.data.results);
-    } else if (recentItemsQuery.isError && import.meta.env.DEV) {
-      setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`)));
-    }
-  }, [recentItemsQuery.data, recentItemsQuery.isError, submittedQuery]);
-
   // Debounce query for suggestions
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), SUGGESTION_DEBOUNCE_MS);
@@ -303,9 +294,19 @@ export function useSearchController({
   const composeQuery = query.trim();
   const composeSuggestions = composeQuery ? suggestions.slice(0, 3) : [];
 
+  const effectiveResults = useMemo<RecallMediaItem[]>(() => {
+    if (submittedQuery) return results;
+    if (recentItemsQuery.data?.results.length) return recentItemsQuery.data.results;
+    if (recentItemsQuery.isError && import.meta.env.DEV)
+      return Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`));
+    return [];
+  }, [submittedQuery, results, recentItemsQuery.data, recentItemsQuery.isError]);
+
+  const effectiveIsLoading = isLoading || (!submittedQuery && recentItemsQuery.isPending);
+
   return {
-    query, setQuery, submittedQuery, setSubmittedQuery, results, setResults,
-    isLoading, setIsLoading, errorMessage, setErrorMessage,
+    query, setQuery, submittedQuery, setSubmittedQuery, results: effectiveResults, setResults,
+    isLoading: effectiveIsLoading, setIsLoading, errorMessage, setErrorMessage,
     visibleCount, setVisibleCount, isLoadingMore, isAutoSearchPending,
     showHistory, setShowHistory, history, setHistory, suggestions,
     showComposePanel, setShowComposePanel,
