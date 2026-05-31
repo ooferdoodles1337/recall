@@ -72,9 +72,7 @@ The frontend proxies all API requests through Vite, so any device on the same ne
 
 1. Start the servers with `./start.sh` (or with `--host 0.0.0.0` manually, as shown above).
 2. Find your machine's local IP — `start.sh` prints it automatically, or run `ip route get 1.1.1.1 | awk '/src/{print $7}'` on Linux / `ipconfig getifaddr en0` on macOS.
-3. Open `http://<your-ip>:5173/phone` in the phone's browser.
-
-The `/phone` route is the standalone phone tester. The `/` route is the fullscreen desktop harness (designed for 1280×720 px or larger).
+3. Open `http://<your-ip>:5173` in the phone's browser.
 
 ## Data layout
 
