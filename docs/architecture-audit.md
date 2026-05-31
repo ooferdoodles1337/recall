@@ -261,64 +261,69 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 ## Priority order
 
-| Priority | Finding | Status | Reason |
+| Priority | Finding | Status | Notes |
 |---|---|---|---|
-| 1 | #3 — dual-format metadata + #22 — triplicated schema | ❌ | Root architectural debt; drives db.py size, duplicated coercion helpers, and manual cross-stack coordination |
-| 2 | #1/#2 — db.py god file + unconditional startup migrations | ✅ | Split into `_db_migrations`, `_db_serialization`; schema_version gate added |
-| 3 | #6 — stale text index | ✅ | Actual correctness bug visible to users |
-| 4 | #12/#13/#14 — PhoneViewportFrame god component | ❌ | Extract `useSearchController` hook; use context for pointer/grid handler bundle |
-| 5 | #15/#16 — type safety erosion | ❌ | Dedupe `ModeTransition`; stop typing `dispatch`/`pinchHandlers` as `any` |
+| 1 | #3 / #22 — dual-format metadata + triplicated schema | ❌ | Root architectural debt; needs real catalog DB to verify safe to remove |
+| 2 | #1 / #2 — db.py god file + O(N) startup migrations | ✅ | Split into `_db_migrations`, `_db_serialization`; `schema_version` gate added |
+| 3 | #6 — stale text index | ✅ | Correctness bug; `text_index.rebuild()` now called after PATCH |
+| 4 | #12 / #13 / #14 — PhoneViewportFrame god component | ✅ | `useSearchController` extracted; `GridHandlersContext` eliminates prop-drilling |
+| 5 | #15 / #16 — type safety erosion | ✅ | Deduped `ModeTransition`; `dispatch`/`pinchHandlers` `any` erased |
 | 6 | #11 — untyped/duplicated API responses | ✅ | `response_model` on all search routes; `CatalogItemPatch` model for PATCH |
 | 7 | #7 — duplicated upsert logic | ✅ | `_store_indexed_item` extracted |
-| 8 | #4/#5 — duplicated helpers + private leakage | ✅ | `utils/coerce.py`; `reverse_geocode_coords` + `safety_from_detection` public |
-| 9 | #10/#19 — silent error swallowing | ✅ | #10: exc_info=True + media.py logger; #19: error message shown in catch blocks |
-| 10 | #15/#16 — type safety erosion | ✅ | Deduped `ModeTransition`; `dispatch`/`pinchHandlers` `any` erased |
-| 11 | #20/#21 — CSS monolith + magic numbers | ❌ | Colocate styles; centralize interaction constants |
+| 8 | #4 / #5 — duplicated helpers + private leakage | ✅ | `utils/coerce.py`; `reverse_geocode_coords` + `safety_from_detection` public |
+| 9 | #10 / #19 — silent error swallowing | ✅ | `exc_info=True` on all broad catches; error messages in catch blocks |
+| 10 | #17 — mock fallback in production path | ✅ | `makeMockItem` guarded behind `import.meta.env.DEV` |
+| 11 | #18 — `usePhoneDetail` overly coupled to parent state | ❌ | 14 setter deps; `favoriteItems` mutation logic is bespoke add/remove/replace |
+| 12 | #8 — module-level mutable singletons | ❌ | Low-risk in single-process deployment; deferred |
+| 13 | #20 / #21 — CSS monolith + magic numbers | ❌ | Cosmetic debt; safe to defer |
 
 ---
 
-## Session handoff — 2026-05-31 (continued)
+## Completed work — all sessions
 
-### Branch
+### Branch: `refactor` (branched from `feat/phone-search-ui`)
 
-`refactor` (branched from `feat/phone-search-ui`)
-
-### What was done this session
-
-**Backend refactors** (8 commits on `refactor`):
+#### Session 1 — backend foundations
 
 | Commit | Finding | Summary |
 |---|---|---|
-| `b2fb248` | #4/#5 | `services/utils/coerce.py` with `as_int`/`as_float`; `safety_from_detection` and `reverse_geocode_coords` made public |
+| `b2fb248` | #4/#5 | `services/utils/coerce.py`: `as_int`/`as_float`; `safety_from_detection` and `reverse_geocode_coords` made public |
 | `36c43d3` | #7 | `_store_indexed_item(item, embedding)` extracted in `indexer.py` |
-| `27dfc3d` | #6 | `text_index.rebuild()` called in PATCH route — fixes stale `/search/text` |
+| `27dfc3d` | #6 | `text_index.rebuild()` called after PATCH — fixes stale `/search/text` and `/search/suggest` |
 | `9da815a` | #9 | `/trials` moved to `routes/trials.py` |
 | `b03a36a` | #11 | `routes/_search_result.py:format_result()` replaces 4-way copy-paste |
-| `33f1113` | #1/#2 | `db.py` split into `_db_migrations.py` + `_db_serialization.py`; `schema_version` table gates O(N) scans |
-| `493ac6f` | — | Audit doc committed |
-| `38fdfcb` | — | npm → pnpm migration (`pnpm-lock.yaml`, `start.sh`, `CLAUDE.md`, `package.json`) |
+| `33f1113` | #1/#2 | `db.py` split into `_db_migrations.py` + `_db_serialization.py`; `schema_version` table gates O(N) startup scans |
+| `38fdfcb` | — | npm → pnpm migration |
 
-**Test count:** 134 → 155 (21 new tests in `test_coerce.py` and `test_search_routes.py`). All 155 pass.
+**Backend test count:** 134 → 155 (21 new tests in `test_coerce.py`, `test_search_routes.py`).
 
-### Additional work this session
+#### Session 2 — API typing, logging, frontend type safety
 
 | Commit | Finding | Summary |
 |---|---|---|
-| — | #11 (remaining) | `response_model` on all 4 search routes; `CatalogItemPatch` model replaces `dict[str, Any]` on PATCH |
-| — | #10 | `exc_info=True` on all broad catches; `media.py` gains logger + warning for silent `generate_animated_thumbnail` |
-| — | #15 | Duplicate `ModeTransition`/`ModeTransitionReason`/`MotionDirection` removed from `phoneUtils.ts`; re-exported from `phoneReducer.ts` |
-| — | #16 | `dispatch: any` → `dispatch: (action: PhoneModeAction) => void`; `pinchHandlers: Record<string, any>` → `GridGestureHandlers`; `as any` casts removed |
-| — | #19 | `catch { /* no-op */ }` → `catch { setErrorMessage(...) }` in `handleToggleFavorite` and `handleToggleSafety` |
-| — | #17 | `makeMockItem` calls in `PhoneViewportFrame.tsx` guarded behind `import.meta.env.DEV`; production builds show empty state on backend failure |
+| `457c8d6` | #10/#11/#15/#16 | `response_model` on all 4 search routes; `CatalogItemPatch` Pydantic model replaces `dict[str,Any]`; `exc_info=True` on all broad catches; `media.py` gains logger; duplicate `ModeTransition` types removed from `phoneUtils.ts`; `dispatch:any` and `pinchHandlers:any` erased |
+| `b469b40` | #17/#19 | `makeMockItem` guarded behind `import.meta.env.DEV`; `catch {/* no-op */}` → `catch { setErrorMessage(...) }` in `handleToggleFavorite` / `handleToggleSafety` |
 
-**Test count:** 155 (unchanged — no new test surface introduced).
+#### Session 3 — frontend architecture + TanStack Query
 
-### What's left
+| Commit | Finding | Summary |
+|---|---|---|
+| `fa8b279` | #12/#13/#14 | Extracted `useSearchController.ts` (~310 lines): owns all search state, `liveRef`, pagination, auto-search, suggestion fetching, compose transitions. `PhoneViewportFrame.tsx` 561 → 365 lines. Created `GridHandlersContext.tsx`: 14 grid-interaction values in context; `HomeLayer` 18 → 5 props, `ResultsLayer` 28 → 14 props; `MediaGrid`/`FavoritesSection`/`ResultsSection` read from context |
+| `d0ab3e6` | — | Added `@tanstack/react-query`; `QueryClientProvider` in `App.tsx` |
+| `f4141ad` | — | `listFavoriteItems` `useEffect` → `useQuery` in `PhoneViewportFrame.tsx` |
+| `0151779` | — | `listRecentItems` `useEffect` → `useQuery` in `useSearchController.ts` |
+| `6ff9faa` | — | `suggestSearches` `useEffect` → debounced `useQuery` in `useSearchController.ts`; `suggestions` is now a derived `useMemo` instead of a state variable; test wrapped with `QueryClientProvider` |
 
-**High value, backend:**
-- **#3 / #22** — The dual-format metadata problem is the root cause of most remaining complexity. The legacy-flat fallback paths in every `schema.py` accessor can be removed once confirmed no live database rows use the old flat format (check with `SELECT COUNT(*) FROM media_items WHERE metadata_json NOT LIKE '%"asset"%'`). Requires running against a real distributed catalog DB — cannot verify locally.
-- **#8** — The singleton pattern is pervasive and low-risk in practice given the single-process deployment, but worth tracking.
+**Frontend test count:** 83/84 pass (1 pre-existing failure: selection-tray Confirm button not rendered).
+
+---
+
+## What's left
+
+**Backend:**
+- **#3 / #22** — Dual-format metadata is the root cause of most remaining complexity. Legacy-flat fallback paths in every `schema.py` accessor can be removed once confirmed safe. Verification: `SELECT COUNT(*) FROM media_items WHERE metadata_json NOT LIKE '%"asset"%'` — requires a real distributed catalog DB, cannot run locally.
+- **#8** — Module-level mutable singletons (`configure()` pattern). Low-risk in single-process deployment; deferred.
 
 **Frontend:**
-- **#12/#13/#14** — `PhoneViewportFrame.tsx` god component + `liveRef` pattern + prop-drilling. Highest-effort frontend item. Entry point: extract a `useSearchController` hook for search/pagination state, then create a `GridHandlersContext` so `ThumbCell` doesn't need handlers tunneled through 3 layers.
-- **#20/#21** — CSS monolith and magic numbers are cosmetic debt; safe to defer.
+- **#18** — `usePhoneDetail` takes 14 parent setters as deps; `handleToggleFavorite` does bespoke add/remove/replace on the parent's `favoriteItems` array. Natural next step: use `queryClient.setQueryData` for the favorites cache instead of passing `setFavoriteItems` through the hook.
+- **#20 / #21** — CSS monolith (3321 lines) and magic numbers. Cosmetic debt; safe to defer.
