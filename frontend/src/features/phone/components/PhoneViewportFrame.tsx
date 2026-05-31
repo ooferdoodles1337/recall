@@ -47,7 +47,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     queryKey: ["catalog", "favorites", FAVORITES_COUNT],
     queryFn: () => listFavoriteItems(FAVORITES_COUNT),
   });
-  const [favoriteItems, setFavoriteItems] = useState<RecallMediaItem[]>([]);
+  const favoriteItems = favoritesQuery.data?.results ?? [];
   const isLoadingFavorites = favoritesQuery.isPending;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
@@ -71,7 +71,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const sc = useSearchController({ dispatch, scrollContainerRef, topBarInputRef, modeRef, bgContentRef, modeState, modeTransition });
 
   const { detailItem, setDetailItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate } = usePhoneDetail({
-    isItemBlurred, onSelectCandidate, modeRef, dispatch, favoriteItems, setFavoriteItems,
+    isItemBlurred, onSelectCandidate, modeRef, dispatch,
     setQuery: sc.setQuery, runSearch: sc.runSearch, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
   });
 
@@ -143,10 +143,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     setSelectedItems([]);
     if (modeRef.current === "detail") dispatch({ type: "TARGET_RESET" });
   }, [currentTarget?.id, dispatch, setDetailItem]);
-
-  useEffect(() => {
-    if (favoritesQuery.data) setFavoriteItems(favoritesQuery.data.results);
-  }, [favoritesQuery.data]);
 
   useEffect(() => { if (mode === "compose") topBarInputRef.current?.focus(); modeRef.current = mode; }, [contentMode, mode]);
 

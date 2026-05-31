@@ -209,9 +209,11 @@ The `GridDensityApi.pinchHandlers` precise type is erased to `any` at layer boun
 
 ---
 
-### ❌ 18. `usePhoneDetail` takes 14 parent setters as dependencies
+### ✅ 18. `usePhoneDetail` takes 14 parent setters as dependencies
 
 `usePhoneDetail.ts:18–30` is injected with: `setFavoriteItems`, `setQuery`, `runSearch`, `setErrorMessage`, `setNsfwPendingItem`, `dispatch`, `modeRef`, and more. It is not an encapsulation boundary — it's a function with the parent's entire state surface passed in. `handleToggleFavorite` (lines 55–66) directly mutates the parent's `favoriteItems` array with bespoke add/remove/replace branching.
+
+**Done:** `favoriteItems`/`setFavoriteItems` removed from `usePhoneDetail`'s `Dependencies` type. The hook now calls `useQueryClient()` internally and writes favorite mutations via `queryClient.setQueryData(["catalog", "favorites", FAVORITES_COUNT], ...)`. The parallel `useState` + sync `useEffect` in `PhoneViewportFrame` are removed; `favoriteItems` is now derived directly from `favoritesQuery.data?.results ?? []`.
 
 ---
 
@@ -273,9 +275,9 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 | 8 | #4 / #5 — duplicated helpers + private leakage | ✅ | `utils/coerce.py`; `reverse_geocode_coords` + `safety_from_detection` public |
 | 9 | #10 / #19 — silent error swallowing | ✅ | `exc_info=True` on all broad catches; error messages in catch blocks |
 | 10 | #17 — mock fallback in production path | ✅ | `makeMockItem` guarded behind `import.meta.env.DEV` |
-| 11 | #18 — `usePhoneDetail` overly coupled to parent state | ❌ | 14 setter deps; `favoriteItems` mutation logic is bespoke add/remove/replace |
+| 11 | #18 — `usePhoneDetail` overly coupled to parent state | ✅ | `queryClient.setQueryData` replaces `favoriteItems`/`setFavoriteItems` deps |
 | 12 | #8 — module-level mutable singletons | ❌ | Low-risk in single-process deployment; deferred |
-| 13 | #20 / #21 — CSS monolith + magic numbers | ❌ | Cosmetic debt; safe to defer |
+| 13 | #20 / #21 — CSS monolith + magic numbers | ❌ | Cosmetic debt; deferred |
 
 ---
 
@@ -316,6 +318,12 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 **Frontend test count:** 83/84 pass (1 pre-existing failure: selection-tray Confirm button not rendered).
 
+#### Session 4 — usePhoneDetail decoupling
+
+| Commit | Finding | Summary |
+|---|---|---|
+| *(pending)* | #18 | `favoriteItems`/`setFavoriteItems` removed from `usePhoneDetail` deps; hook calls `useQueryClient()` internally; `handleToggleFavorite` uses `queryClient.setQueryData`. Parallel `useState` + sync `useEffect` removed from `PhoneViewportFrame`; `favoriteItems` derived from `favoritesQuery.data` |
+
 ---
 
 ## What's left
@@ -325,5 +333,4 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 - **#8** — Module-level mutable singletons (`configure()` pattern). Low-risk in single-process deployment; deferred.
 
 **Frontend:**
-- **#18** — `usePhoneDetail` takes 14 parent setters as deps; `handleToggleFavorite` does bespoke add/remove/replace on the parent's `favoriteItems` array. Natural next step: use `queryClient.setQueryData` for the favorites cache instead of passing `setFavoriteItems` through the hook.
-- **#20 / #21** — CSS monolith (3321 lines) and magic numbers. Cosmetic debt; safe to defer.
+- **#20 / #21** — CSS monolith (3321 lines) and magic numbers. Cosmetic debt; deferred.
