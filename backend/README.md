@@ -39,8 +39,9 @@ uv run uvicorn main:app --reload
 The server starts at `http://localhost:8000`. Interactive API docs are at `/docs`.
 
 The React frontend runs separately from `frontend/` on `http://localhost:5173`.
-`main.py` allows CORS from both `http://localhost:5173` and
-`http://127.0.0.1:5173`, which are the expected Vite development origins.
+`main.py` allows CORS from localhost, `127.0.0.1`, and any LAN IP in the
+`192.168.x.x`, `10.x.x.x`, and `172.16–31.x.x` ranges — so mobile devices on
+the same network can reach the API directly.
 
 ## Testing
 
@@ -90,7 +91,12 @@ uv run python -m services.catalog.refresh --regenerate-thumbnails    # also rege
 Options:
 - `--force` — re-index files that are already indexed
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and internal search phrases for any unannotated items (requires `GEMINI_API_KEY`)
+- `--annotate-sample <N>` — annotate a random sample of N unannotated items (implies `--annotate`)
 - `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
+- `--regen-thumbnails` — regenerate all thumbnails in-place without touching embeddings or other catalog data, then exit
+- `--regen-animated-thumbnails` — generate/regenerate animated WebP thumbnails for qualifying GIF items, then exit
+- `--prune-missing` — remove catalog and ChromaDB entries whose source files are missing from disk, then exit
+- `--dry-run` — with `--prune-missing`: log what would be removed without actually deleting anything
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
 - `--media-dir <path>` — scan a different media directory (default: `backend/data/media`)
 - `--reset` — wipe the ChromaDB store, SQLite catalog, and thumbnails before indexing
@@ -335,7 +341,9 @@ Returns the compact metadata catalog from promoted SQLite columns. Does not serv
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `media_type` | `image` or `video` | optional | Restrict results by media type |
+| `favorite` | boolean | optional | Filter to favorited (`true`) or non-favorited (`false`) items |
 | `order` | `asc` or `desc` | `desc` | Sort by `metadata.capture.sort_key` |
+| `limit` | int 1–500 | optional | Maximum number of results to return |
 
 **Response**
 
@@ -411,6 +419,32 @@ Returns the full stored metadata document for a single item without serving the 
 ```
 
 Returns 404 if the UUID is not in the catalog.
+
+---
+
+### `PATCH /catalog/items/{id}`
+
+Updates mutable metadata fields for a single item. Only the fields provided in the request body are changed; omitted fields are left untouched. Rebuilds the in-memory text index after a successful write.
+
+**Request body** (all fields optional)
+
+```json
+{
+  "organization": { "favorite": true },
+  "safety":       { "state": "safe" },
+  "search":       { "phrases": ["sunset beach", "golden hour"] }
+}
+```
+
+| Field | Type | Allowed values |
+|-------|------|---------------|
+| `organization.favorite` | boolean | `true` / `false` |
+| `safety.state` | string | `"safe"`, `"nsfw"`, `"unknown"` |
+| `search.phrases` | string[] | replacement phrase list used by the text index |
+
+**Response:** the updated full item document (same shape as `GET /catalog/items/{id}`).
+
+Returns 404 if the UUID is not in the catalog; 400 for invalid field values.
 
 ---
 
