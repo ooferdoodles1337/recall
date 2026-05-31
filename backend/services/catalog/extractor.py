@@ -268,7 +268,7 @@ def extract(path: str, *, reverse_geocode: bool = True) -> dict[str, str | int |
             raw_list = et.get_metadata(path)
             raw = raw_list[0] if raw_list else {}
     except Exception as exc:
-        log.warning("exiftool extraction failed for %s: %s", path, exc)
+        log.warning("exiftool extraction failed for %s: %s", path, exc, exc_info=True)
         return {}
 
     result: dict[str, str | int | float | bool] = {}

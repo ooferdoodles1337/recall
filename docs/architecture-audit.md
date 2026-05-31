@@ -117,7 +117,7 @@ The `/trials` endpoint is defined directly in `main.py` instead of in a router u
 
 ---
 
-### ❌ 10. Broad `except Exception` swallowing
+### ✅ 10. Broad `except Exception` swallowing
 
 Failures are silently discarded at:
 - `extractor.py:269–271`
@@ -127,13 +127,17 @@ Failures are silently discarded at:
 
 Makes partial-index states hard to diagnose.
 
+**Done:** All four sites now log tracebacks (`exc_info=True`) on unexpected exceptions. `media.py` `generate_animated_thumbnail` was fully silent — added `log = logging.getLogger(__name__)` and a `log.warning` with `exc_info=True`. The catch-and-continue strategy is kept (batch CLI; per-item errors must not abort the run), but programming errors are now distinguishable from expected transient failures in logs.
+
 ---
 
-### ⚠️ 11. Untyped FastAPI responses, 4× duplicated result-shaping
+### ✅ 11. Untyped FastAPI responses, 4× duplicated result-shaping
 
 No route handler in `search.py`, `catalog.py`, or `media.py` declares `response_model`. The `{"id", "distance", "metadata", "links"}` dict comprehension is copy-pasted across `search_text`, `search_semantic`, `search_similar_by_id`, and `search_similar_upload` — four near-identical copies. `PATCH /catalog/items/{id}` accepts `body: dict[str, Any]` and deep-merges it with no validation.
 
-**Partial:** `routes/_search_result.py` extracts `format_result()` used by all four search endpoints — the duplication is gone. `response_model` declarations and PATCH validation are still missing.
+**Done:**
+- `routes/_search_result.py` adds `SearchResponse`, `SimilarByIdResponse`, `SimilarUploadResponse` Pydantic models. All four search endpoints now declare `response_model`.
+- `PATCH /catalog/items/{id}` now accepts `CatalogItemPatch` (structured Pydantic model with `organization`, `safety`, `search` sub-fields) instead of raw `dict[str, Any]`. Invalid keys rejected at the FastAPI layer before reaching `catalog.patch_item`.
 
 ---
 
@@ -165,7 +169,7 @@ Five pieces of state (`hasMore`, `submittedQuery`, `query`, `visibleCount`, `pre
 
 ---
 
-### ❌ 15. `ModeTransition` / `ModeTransitionReason` / `MotionDirection` defined twice
+### ✅ 15. `ModeTransition` / `ModeTransitionReason` / `MotionDirection` defined twice
 
 Defined in both:
 - `phoneReducer.ts:1–22` — `from/to` typed as `PhoneScreen`
@@ -173,15 +177,21 @@ Defined in both:
 
 Consumers import the utils copy. Two competing definitions that can silently drift.
 
+**Done:** Removed the three duplicate definitions from `phoneUtils.ts`. `phoneUtils.ts` now imports them from `phoneReducer.ts` and re-exports them, so all consumers get the canonical (`PhoneScreen`-typed) versions with no import-path changes required.
+
 ---
 
-### ❌ 16. `dispatch: (action: any)` defeats the typed reducer
+### ✅ 16. `dispatch: (action: any)` defeats the typed reducer
 
 `usePhoneDetail.ts:22` types `dispatch` as `(action: any) => void`, erasing the discriminated-union safety of `PhoneModeAction`. Same erasure at:
 - `ResultsLayer.tsx:17,48` — `pinchHandlers as any`
 - `HomeLayer.tsx:12,39` — `pinchHandlers: Record<string, (e: any) => void>`
 
 The `GridDensityApi.pinchHandlers` precise type is erased to `any` at layer boundaries.
+
+**Done:**
+- `usePhoneDetail.ts` `dispatch` typed as `(action: PhoneModeAction) => void`.
+- `ResultsLayer.tsx` and `HomeLayer.tsx` `pinchHandlers` typed as `GridGestureHandlers` (imported from `MediaGrid.tsx`). `as any` casts removed — `GridGestureHandlers` and `GridDensityApi["pinchHandlers"]` are identical `Pick<React.HTMLAttributes<HTMLElement>, ...>` types.
 
 ---
 
@@ -248,15 +258,16 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 | 3 | #6 — stale text index | ✅ | Actual correctness bug visible to users |
 | 4 | #12/#13/#14 — PhoneViewportFrame god component | ❌ | Extract `useSearchController` hook; use context for pointer/grid handler bundle |
 | 5 | #15/#16 — type safety erosion | ❌ | Dedupe `ModeTransition`; stop typing `dispatch`/`pinchHandlers` as `any` |
-| 6 | #11 — untyped/duplicated API responses | ⚠️ | `format_result()` extracted; `response_model` + PATCH validation still missing |
+| 6 | #11 — untyped/duplicated API responses | ✅ | `response_model` on all search routes; `CatalogItemPatch` model for PATCH |
 | 7 | #7 — duplicated upsert logic | ✅ | `_store_indexed_item` extracted |
 | 8 | #4/#5 — duplicated helpers + private leakage | ✅ | `utils/coerce.py`; `reverse_geocode_coords` + `safety_from_detection` public |
-| 9 | #10/#19 — silent error swallowing | ❌ | Add error feedback / revert for optimistic updates |
-| 10 | #20/#21 — CSS monolith + magic numbers | ❌ | Colocate styles; centralize interaction constants |
+| 9 | #10/#19 — silent error swallowing | ⚠️ | #10 done (exc_info=True + media.py logger); #19 (optimistic-update revert) still missing |
+| 10 | #15/#16 — type safety erosion | ✅ | Deduped `ModeTransition`; `dispatch`/`pinchHandlers` `any` erased |
+| 11 | #20/#21 — CSS monolith + magic numbers | ❌ | Colocate styles; centralize interaction constants |
 
 ---
 
-## Session handoff — 2026-05-31
+## Session handoff — 2026-05-31 (continued)
 
 ### Branch
 
@@ -279,17 +290,25 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 **Test count:** 134 → 155 (21 new tests in `test_coerce.py` and `test_search_routes.py`). All 155 pass.
 
+### Additional work this session
+
+| Commit | Finding | Summary |
+|---|---|---|
+| — | #11 (remaining) | `response_model` on all 4 search routes; `CatalogItemPatch` model replaces `dict[str, Any]` on PATCH |
+| — | #10 | `exc_info=True` on all broad catches; `media.py` gains logger + warning for silent `generate_animated_thumbnail` |
+| — | #15 | Duplicate `ModeTransition`/`ModeTransitionReason`/`MotionDirection` removed from `phoneUtils.ts`; re-exported from `phoneReducer.ts` |
+| — | #16 | `dispatch: any` → `dispatch: (action: PhoneModeAction) => void`; `pinchHandlers: Record<string, any>` → `GridGestureHandlers`; `as any` casts removed |
+
+**Test count:** 155 (unchanged — no new test surface introduced).
+
 ### What's left
 
 **High value, backend:**
-- **#3 / #22** — The dual-format metadata problem is the root cause of most remaining complexity. The legacy-flat fallback paths in every `schema.py` accessor can be removed once confirmed no live database rows use the old flat format (check with `SELECT COUNT(*) FROM media_items WHERE metadata_json NOT LIKE '%"asset"%'`). After that, remove `_flat_extra_from_existing`, the flat branches in all accessors, and `_PROMOTED_METADATA_KEYS`.
-- **#11 (remaining)** — Add Pydantic `response_model` to search and catalog routes. Add structured validation to `PATCH /catalog/items/{id}` instead of accepting raw `dict[str, Any]`.
-- **#10** — Narrow `except Exception` in `extractor.py`, `media.py`, and `indexer.py`. Re-raise unexpected errors; only swallow known transient ones.
+- **#3 / #22** — The dual-format metadata problem is the root cause of most remaining complexity. The legacy-flat fallback paths in every `schema.py` accessor can be removed once confirmed no live database rows use the old flat format (check with `SELECT COUNT(*) FROM media_items WHERE metadata_json NOT LIKE '%"asset"%'`). Requires running against a real distributed catalog DB — cannot verify locally.
 - **#8** — The singleton pattern is pervasive and low-risk in practice given the single-process deployment, but worth tracking.
 
-**Frontend (untouched):**
+**Frontend:**
 - **#12/#13/#14** — `PhoneViewportFrame.tsx` god component + `liveRef` pattern + prop-drilling. Highest-effort frontend item. Entry point: extract a `useSearchController` hook for search/pagination state, then create a `GridHandlersContext` so `ThumbCell` doesn't need handlers tunneled through 3 layers.
-- **#15/#16** — Delete the duplicate `ModeTransition` types in `phoneUtils.ts`; import from `phoneReducer.ts` everywhere. Fix `dispatch: any` → `dispatch: (action: PhoneModeAction) => void` in `usePhoneDetail.ts`.
 - **#19** — Add error revert in `handleToggleFavorite` and `handleToggleSafety` (store pre-optimistic state, restore on catch, show an error toast).
 - **#17** — Move `makeMockItem` behind a dev-only flag or remove it; don't ship it in production builds.
 - **#20/#21** — CSS monolith and magic numbers are cosmetic debt; safe to defer.

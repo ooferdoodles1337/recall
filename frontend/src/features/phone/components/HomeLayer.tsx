@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { FavoritesSection } from "./FavoritesSection";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { screenMotionVariants, type ModeTransition } from "./phoneUtils";
+import type { GridGestureHandlers } from "./MediaGrid";
 
 interface HomeLayerProps {
   visible: boolean;
@@ -9,7 +10,7 @@ interface HomeLayerProps {
   favoriteItems: RecallMediaItem[];
   favoritesGridRef: React.RefObject<HTMLDivElement | null>;
   mediaGridClassName: string;
-  pinchHandlers: Record<string, (e: any) => void>;
+  pinchHandlers: GridGestureHandlers;
   gridColumns: number;
   isLoadingFavorites: boolean;
   usesNaturalAspectGrid: boolean;
@@ -36,7 +37,7 @@ export function HomeLayer({ visible, modeTransition, favoriteItems, favoritesGri
       <div className="phone-startpage">
         {showFavoritesSection ? (
           <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} gridClassName={mediaGridClassName}
-            gridGestureHandlers={pinchHandlers as any} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
+            gridGestureHandlers={pinchHandlers} gridColumns={gridColumns} isLoadingFavorites={isLoadingFavorites}
             naturalAspectRatio={usesNaturalAspectGrid} selectedItems={selectedItems} isItemBlurred={isItemBlurred}
             onZoomIn={zoomGridIn} onZoomOut={zoomGridOut}
             onItemPointerDown={handleItemPointerDown} onItemPointerUp={handleItemPointerUp}

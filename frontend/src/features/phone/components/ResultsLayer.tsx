@@ -3,6 +3,7 @@ import { ResultsSection } from "./ResultsSection";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import type { PhoneBgContent } from "../phoneReducer";
 import { screenMotionVariants, type ModeTransition } from "./phoneUtils";
+import type { GridGestureHandlers } from "./MediaGrid";
 
 interface ResultsLayerProps {
   visible: boolean;
@@ -14,7 +15,7 @@ interface ResultsLayerProps {
   results: RecallMediaItem[];
   searchGridRef: React.RefObject<HTMLDivElement | null>;
   mediaGridClassName: string;
-  pinchHandlers: Record<string, (e: any) => void>;
+  pinchHandlers: GridGestureHandlers;
   gridColumns: number;
   submittedQuery: string;
   errorMessage: string | null;
@@ -45,7 +46,7 @@ export function ResultsLayer({ visible, mode, contentMode, isLoading, isLoadingM
       className={`phone-screen phone-screen--search${mode === "compose" ? " phone-screen--dimmed" : ""}${isLoading && mode === "results" && contentMode === "results" ? " phone-screen--loading" : ""}`}
       custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
       <ResultsSection results={results} searchGridRef={searchGridRef} gridClassName={mediaGridClassName}
-        gridGestureHandlers={pinchHandlers as any} gridColumns={gridColumns} isLoading={isLoading} isLoadingMore={isLoadingMore}
+        gridGestureHandlers={pinchHandlers} gridColumns={gridColumns} isLoading={isLoading} isLoadingMore={isLoadingMore}
         contentMode={contentMode} submittedQuery={submittedQuery} errorMessage={errorMessage} hasMore={hasMore}
         refinements={refinements} naturalAspectRatio={usesNaturalAspectGrid}
         selectedItems={selectedItems} isItemBlurred={isItemBlurred}

@@ -1,4 +1,6 @@
 import type { RecallMediaItem } from "@/shared/types/recall";
+import type { ModeTransition, ModeTransitionReason, MotionDirection } from "../phoneReducer";
+export type { ModeTransition, ModeTransitionReason, MotionDirection };
 
 export const SEARCH_BATCH_SIZE = 50;
 export const FAVORITES_COUNT = 34;
@@ -192,21 +194,6 @@ export function durationLabel(seconds?: number) {
 
 export function playbackTimeLabel(seconds: number) {
   return durationLabel(seconds) ?? "0:00";
-}
-
-export type ModeTransitionReason =
-  | "initial" | "target-reset" | "search-focus" | "search-clear"
-  | "search-commit" | "autosearch-commit" | "compose-dismiss"
-  | "similar-search" | "detail-open" | "detail-close";
-
-export type MotionDirection = "forward" | "back" | "neutral";
-
-export interface ModeTransition {
-  from: string;
-  to: string;
-  direction: MotionDirection;
-  reason: ModeTransitionReason;
-  key: number;
 }
 
 export const screenMotionVariants = {

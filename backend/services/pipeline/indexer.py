@@ -165,7 +165,7 @@ def _preprocess_file(
             file_metadata=file_metadata,
         )
     except Exception as exc:
-        log.error("failed preprocessing (%s): %s", type(exc).__name__, path)
+        log.error("failed preprocessing (%s): %s", type(exc).__name__, path, exc_info=True)
         return None
 
 
@@ -221,7 +221,7 @@ def _index_pending_batch(pending: list[_PendingItem]) -> int:
             indexed += 1
             log.info("indexed: %s", item.path)
         except Exception as exc:
-            log.error("failed upserting (%s): %s", type(exc).__name__, item.path)
+            log.error("failed upserting (%s): %s", type(exc).__name__, item.path, exc_info=True)
 
     return indexed
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import subprocess
 import tempfile
@@ -13,6 +14,8 @@ import imageio.v3 as iio
 from PIL import Image, ImageOps, ImageSequence
 
 import config
+
+log = logging.getLogger(__name__)
 
 MAX_VIDEO_SECONDS = config.MAX_VIDEO_SECONDS
 MAX_EMBED_VIDEO_BYTES = 48 * 1024 * 1024
@@ -197,7 +200,8 @@ def generate_animated_thumbnail(
                 quality=75,
             )
             return buf.getvalue()
-    except Exception:
+    except Exception as exc:
+        log.warning("animated thumbnail failed for %s: %s", path, exc, exc_info=True)
         return None
 
 

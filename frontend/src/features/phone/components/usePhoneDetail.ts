@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { RecallMediaItem } from "@/shared/types/recall";
+import type { PhoneModeAction } from "../phoneReducer";
 import { patchCatalogItem } from "../api/searchApi";
 import { itemDateLabel } from "./phoneUtils";
 
@@ -19,7 +20,7 @@ type Dependencies = {
   isItemBlurred: (item: RecallMediaItem) => boolean;
   onSelectCandidate?: (id: string) => void;
   modeRef: React.MutableRefObject<string>;
-  dispatch: (action: any) => void;
+  dispatch: (action: PhoneModeAction) => void;
   favoriteItems: RecallMediaItem[];
   setFavoriteItems: React.Dispatch<React.SetStateAction<RecallMediaItem[]>>;
   setQuery: (q: string) => void;
