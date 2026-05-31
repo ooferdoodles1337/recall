@@ -347,3 +347,73 @@ def test_configure_creates_parent_directory(tmp_path):
     catalog.configure(str(db_path))
 
     assert Path(db_path).is_file()
+
+
+def test_v3_migration_converts_flat_format_rows(tmp_path):
+    import services.catalog.db as catalog
+
+    db_path = tmp_path / "flat_catalog.sqlite"
+
+    flat_metadata = {
+        "path": "media/old_photo.jpg",
+        "filename": "old_photo.jpg",
+        "mime_type": "image/jpeg",
+        "media_type": "image",
+        "content_hash": "flat-hash-1",
+        "thumbnail_path": "thumbnails/flat-1.webp",
+        "taken_sort": "2023-06-01T12:00:00",
+        "taken_date": "2023-06-01",
+        "taken_year_month": "2023-06",
+        "description": "A flat photo",
+        "search_terms": ["beach", "sunset"],
+        "geo_city": "Lisbon",
+        "geo_country": "Portugal",
+    }
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE media_items (
+                id TEXT PRIMARY KEY,
+                media_type TEXT NOT NULL,
+                content_hash TEXT NOT NULL UNIQUE,
+                taken_sort TEXT,
+                taken_year_month TEXT,
+                metadata_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute(
+            "INSERT INTO media_items (id, media_type, content_hash, taken_sort, taken_year_month, metadata_json) VALUES (?, ?, ?, ?, ?, ?)",
+            ("flat-1", "image", "flat-hash-1", "2023-06-01T12:00:00", "2023-06", json.dumps(flat_metadata)),
+        )
+        conn.commit()
+
+    catalog.configure(str(db_path))
+
+    item = catalog.get_item("flat-1")
+    assert item is not None
+    metadata = item["metadata"]
+
+    assert "asset" in metadata
+    assert metadata["asset"]["filename"] == "old_photo.jpg"
+    assert metadata["asset"]["mime_type"] == "image/jpeg"
+    assert metadata["asset"]["paths"]["original"] == "media/old_photo.jpg"
+    assert metadata["asset"]["paths"]["thumbnail"] == "thumbnails/flat-1.webp"
+    assert "capture" in metadata
+    assert metadata["capture"]["sort_key"] == "2023-06-01T12:00:00"
+    assert metadata["capture"]["date"] == "2023-06-01"
+    assert metadata["capture"]["location"]["city"] == "Lisbon"
+    assert metadata["search"]["description"] == "A flat photo"
+    assert "beach" in metadata["search"]["phrases"]
+
+    summary = catalog.get_item_summary("flat-1")
+    assert summary["metadata"]["asset"]["filename"] == "old_photo.jpg"
+    assert summary["metadata"]["capture"]["location"]["city"] == "Lisbon"
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT asset_path, filename, mime_type FROM media_items WHERE id = ?", ("flat-1",)).fetchone()
+    assert row["asset_path"] == "media/old_photo.jpg"
+    assert row["filename"] == "old_photo.jpg"
+    assert row["mime_type"] == "image/jpeg"

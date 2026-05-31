@@ -377,109 +377,109 @@ def nsfw_patch(detection: dict[str, Any]) -> dict[str, Any]:
 
 def asset_path(metadata: dict[str, Any]) -> str | None:
     paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
-    if isinstance(paths, dict) and isinstance(paths.get("original"), str):
-        return paths["original"]
-    value = metadata.get("path")
+    if not isinstance(paths, dict):
+        return None
+    value = paths.get("original")
     return value if isinstance(value, str) else None
 
 
 def thumbnail_path(metadata: dict[str, Any]) -> str | None:
     paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
-    if isinstance(paths, dict) and isinstance(paths.get("thumbnail"), str):
-        return paths["thumbnail"]
-    value = metadata.get("thumbnail_path")
+    if not isinstance(paths, dict):
+        return None
+    value = paths.get("thumbnail")
     return value if isinstance(value, str) else None
 
 
 def animated_thumbnail_path(metadata: dict[str, Any]) -> str | None:
     paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
-    if isinstance(paths, dict) and isinstance(paths.get("animated_thumbnail"), str):
-        return paths["animated_thumbnail"]
-    value = metadata.get("animated_thumbnail_path")
+    if not isinstance(paths, dict):
+        return None
+    value = paths.get("animated_thumbnail")
     return value if isinstance(value, str) else None
 
 
 def filename(metadata: dict[str, Any]) -> str | None:
     asset = metadata.get("asset")
-    if isinstance(asset, dict) and isinstance(asset.get("filename"), str):
-        return asset["filename"]
-    value = metadata.get("filename")
+    if not isinstance(asset, dict):
+        return None
+    value = asset.get("filename")
     return value if isinstance(value, str) else None
 
 
 def mime_type(metadata: dict[str, Any]) -> str | None:
     asset = metadata.get("asset")
-    if isinstance(asset, dict) and isinstance(asset.get("mime_type"), str):
-        return asset["mime_type"]
-    value = metadata.get("mime_type")
+    if not isinstance(asset, dict):
+        return None
+    value = asset.get("mime_type")
     return value if isinstance(value, str) else None
 
 
 def embedding_mime_type(metadata: dict[str, Any]) -> str | None:
     asset = metadata.get("asset")
-    if isinstance(asset, dict) and isinstance(asset.get("embedding_mime_type"), str):
-        return asset["embedding_mime_type"]
-    value = metadata.get("embedding_mime_type")
+    if not isinstance(asset, dict):
+        return None
+    value = asset.get("embedding_mime_type")
     return value if isinstance(value, str) else None
 
 
 def media_type(metadata: dict[str, Any]) -> str | None:
     asset = metadata.get("asset")
-    if isinstance(asset, dict) and isinstance(asset.get("media_type"), str):
-        return asset["media_type"]
-    value = metadata.get("media_type")
+    if not isinstance(asset, dict):
+        return None
+    value = asset.get("media_type")
     return value if isinstance(value, str) else None
 
 
 def content_hash(metadata: dict[str, Any]) -> str | None:
     system = metadata.get("system")
-    if isinstance(system, dict) and isinstance(system.get("content_hash"), str):
-        return system["content_hash"]
-    value = metadata.get("content_hash")
+    if not isinstance(system, dict):
+        return None
+    value = system.get("content_hash")
     return value if isinstance(value, str) else None
 
 
 def taken_sort(metadata: dict[str, Any]) -> str | None:
     capture = metadata.get("capture")
-    if isinstance(capture, dict) and isinstance(capture.get("sort_key"), str):
-        return capture["sort_key"]
-    value = metadata.get("taken_sort")
+    if not isinstance(capture, dict):
+        return None
+    value = capture.get("sort_key")
     return value if isinstance(value, str) else None
 
 
 def taken_date(metadata: dict[str, Any]) -> str | None:
     capture = metadata.get("capture")
-    if isinstance(capture, dict) and isinstance(capture.get("date"), str):
-        return capture["date"]
-    value = metadata.get("taken_date")
+    if not isinstance(capture, dict):
+        return None
+    value = capture.get("date")
     return value if isinstance(value, str) else None
 
 
 def taken_year_month(metadata: dict[str, Any]) -> str | None:
     capture = metadata.get("capture")
-    if isinstance(capture, dict) and isinstance(capture.get("year_month"), str):
-        return capture["year_month"]
-    value = metadata.get("taken_year_month")
+    if not isinstance(capture, dict):
+        return None
+    value = capture.get("year_month")
     return value if isinstance(value, str) else None
 
 
 def search_description(metadata: dict[str, Any]) -> str | None:
     search = metadata.get("search")
-    if isinstance(search, dict) and isinstance(search.get("description"), str):
-        return search["description"]
-    value = metadata.get("description")
+    if not isinstance(search, dict):
+        return None
+    value = search.get("description")
     return value if isinstance(value, str) else None
 
 
 def search_phrases(metadata: dict[str, Any]) -> list[str]:
     search = metadata.get("search")
-    if isinstance(search, dict):
-        return _search_phrases_from_value(search.get("phrases"))
-    return _search_phrases_from_value(metadata.get("search_terms"))
+    if not isinstance(search, dict):
+        return []
+    return _search_phrases_from_value(search.get("phrases"))
 
 
 def has_safety_detection(metadata: dict[str, Any]) -> bool:
     safety = metadata.get("safety")
-    if isinstance(safety, dict):
-        return safety.get("state") not in {None, "unknown"}
-    return isinstance(metadata.get("nsfw_detection"), dict)
+    if not isinstance(safety, dict):
+        return False
+    return safety.get("state") not in {None, "unknown"}

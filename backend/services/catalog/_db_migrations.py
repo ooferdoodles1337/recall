@@ -19,7 +19,7 @@ from services.catalog._db_serialization import (
     _safety_score,
 )
 
-_DB_SCHEMA_VERSION = 2
+_DB_SCHEMA_VERSION = 3
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -42,6 +42,8 @@ def run_migrations(conn: sqlite3.Connection, from_version: int) -> None:
         _migrate_embedding_mime_types(conn)
     if from_version < 2:
         _backfill_embedding_mime_type_in_json(conn)
+    if from_version < 3:
+        _migrate_flat_to_nested(conn)
 
 
 def ensure_promoted_columns(conn: sqlite3.Connection) -> bool:
@@ -158,4 +160,29 @@ def _backfill_embedding_mime_type_in_json(conn: sqlite3.Connection) -> None:
         conn.execute(
             "UPDATE media_items SET metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (_metadata_json(metadata), row["id"]),
+        )
+
+
+def _migrate_flat_to_nested(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        'SELECT id, metadata_json FROM media_items WHERE metadata_json NOT LIKE \'%"asset"%\''
+    ).fetchall()
+    for row in rows:
+        metadata = json.loads(row["metadata_json"])
+        path = metadata.get("path")
+        filename = metadata.get("filename")
+        mime = metadata.get("mime_type")
+        media = metadata.get("media_type")
+        if not (path and filename and mime and media):
+            continue
+        nested = metadata_schema.build_metadata(
+            path=path,
+            filename=filename,
+            mime_type=mime,
+            media_type=media,
+            extra_metadata=metadata,
+        )
+        conn.execute(
+            "UPDATE media_items SET metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (_metadata_json(nested), row["id"]),
         )
