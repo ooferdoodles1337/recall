@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import {
   SEARCH_BATCH_SIZE, makeMockItem, readSearchHistory, writeSearchHistory,
@@ -226,14 +227,20 @@ export function useSearchController({
     dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur();
   }, [abortActiveSearch, cancelAutoSearch, dispatch, bgContentRef, modeRef, topBarInputRef]);
 
-  // Initial recent-items load
+  const recentItemsQuery = useQuery({
+    queryKey: ["catalog", "recent", SEARCH_BATCH_SIZE],
+    queryFn: () => listRecentItems(SEARCH_BATCH_SIZE),
+    enabled: !submittedQuery,
+  });
+
   useEffect(() => {
-    const controller = new AbortController();
-    listRecentItems(SEARCH_BATCH_SIZE, { signal: controller.signal })
-      .then((response) => { if (!controller.signal.aborted && response.results.length > 0) setResults(response.results); })
-      .catch(() => { if (!controller.signal.aborted && import.meta.env.DEV) setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`))); });
-    return () => controller.abort();
-  }, []);
+    if (submittedQuery) return;
+    if (recentItemsQuery.data && recentItemsQuery.data.results.length > 0) {
+      setResults(recentItemsQuery.data.results);
+    } else if (recentItemsQuery.isError && import.meta.env.DEV) {
+      setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`)));
+    }
+  }, [recentItemsQuery.data, recentItemsQuery.isError, submittedQuery]);
 
   // Suggestions debounce
   useEffect(() => {
