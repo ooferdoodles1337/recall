@@ -322,13 +322,13 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 **Frontend test count:** 83/84 pass (1 pre-existing failure: selection-tray Confirm button not rendered).
 
-#### Session 4 — usePhoneDetail decoupling
+#### Session 4 — usePhoneDetail decoupling + CSS cleanup
 
 | Commit | Finding | Summary |
 |---|---|---|
 | `0421b12` | #18 | `favoriteItems`/`setFavoriteItems` removed from `usePhoneDetail` deps; hook calls `useQueryClient()` internally; `handleToggleFavorite` uses `queryClient.setQueryData`. Parallel `useState` + sync `useEffect` removed from `PhoneViewportFrame`; `favoriteItems` derived from `favoritesQuery.data` |
-| *(pending)* | #20 | `global.css` split into `tokens.css` (317 lines), `user-testing.css` (911 lines), `phone.css` (2093 lines); `global.css` is now a 6-line entry file of `@import`s |
-| *(pending)* | #21 | 8 behavioral thresholds extracted to `phoneUtils.ts` as named constants; local `HIDE_COMPOSE_THRESHOLD` removed; `PhoneViewportFrame`, `useSearchController`, `VideoDetailView` updated |
+| `afc9fd9` | #20 | `global.css` split into `tokens.css` (317 lines), `user-testing.css` (911 lines), `phone.css` (2093 lines); `global.css` is now a 6-line entry file of `@import`s |
+| `5d0e56f` | #21 | 8 behavioral thresholds extracted to `phoneUtils.ts` as named constants; local `HIDE_COMPOSE_THRESHOLD` removed; `PhoneViewportFrame`, `useSearchController`, `VideoDetailView` updated |
 
 ---
 
