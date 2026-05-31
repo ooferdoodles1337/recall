@@ -6,6 +6,7 @@ export const SEARCH_BATCH_SIZE = 50;
 export const FAVORITES_COUNT = 34;
 export const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 export const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
+export const INDEXED_ALBUMS_KEY = "recall.indexedAlbums.v1";
 export const OVERSCROLL_THRESHOLD = 80;
 
 export const LONG_PRESS_MS = 500;
@@ -65,6 +66,73 @@ export function makeMockItem(seed: string, q?: string): RecallMediaItem {
     },
     links: { media, thumbnail: thumb },
   };
+}
+
+/**
+ * Mock "device albums" for the Indexed Albums picker (UX spec ST-4/ST-5).
+ *
+ * This is a presentational mock only — there is no album concept in the backend
+ * (the indexer just walks MEDIA_DIR). Selecting albums changes nothing functional;
+ * it exists to make the /phone demo feel like a real photo app during user testing.
+ * Thumbnails reuse the picsum-seed approach from makeMockItem so no assets ship.
+ */
+export interface MockAlbum {
+  id: string;
+  name: string;
+  thumbnailSeed: string;
+}
+
+export const MOCK_ALBUMS: readonly MockAlbum[] = [
+  { id: "camera", name: "Camera", thumbnailSeed: "album-camera" },
+  { id: "screenshots", name: "Screenshots", thumbnailSeed: "album-screenshots" },
+  { id: "videos", name: "Videos", thumbnailSeed: "album-videos" },
+  { id: "whatsapp", name: "WhatsApp", thumbnailSeed: "album-whatsapp" },
+  { id: "downloads", name: "Downloads", thumbnailSeed: "album-downloads" },
+  { id: "instagram", name: "Instagram", thumbnailSeed: "album-instagram" },
+  { id: "telegram", name: "Telegram", thumbnailSeed: "album-telegram" },
+  { id: "saved", name: "Saved", thumbnailSeed: "album-saved" },
+];
+
+/** Albums selected on first run, before the user has saved any choice. */
+export const DEFAULT_INDEXED_ALBUM_IDS: readonly string[] = [
+  "camera",
+  "screenshots",
+  "whatsapp",
+  "downloads",
+  "instagram",
+  "saved",
+];
+
+export function albumThumbnailUrl(seed: string): string {
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/240/240`;
+}
+
+export function readIndexedAlbums(): string[] {
+  const fallback = [...DEFAULT_INDEXED_ALBUM_IDS];
+  if (typeof window === "undefined") return fallback;
+  const known = new Set(MOCK_ALBUMS.map((album) => album.id));
+  try {
+    const raw = window.localStorage.getItem(INDEXED_ALBUMS_KEY);
+    if (raw === null) return fallback;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+    return parsed.filter((id): id is string => typeof id === "string" && known.has(id));
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeIndexedAlbums(ids: string[]) {
+  if (typeof window === "undefined") return;
+  const known = new Set(MOCK_ALBUMS.map((album) => album.id));
+  try {
+    window.localStorage.setItem(
+      INDEXED_ALBUMS_KEY,
+      JSON.stringify(ids.filter((id) => known.has(id))),
+    );
+  } catch {
+    // Persistence is a nice-to-have for this mock; ignore quota/availability errors.
+  }
 }
 
 export function readSearchHistory(): string[] {

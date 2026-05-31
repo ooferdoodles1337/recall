@@ -6,9 +6,10 @@ import { MOTION_EASE } from "./phoneUtils";
 
 interface PhoneHomeHeaderProps {
   onExit?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function PhoneHomeHeader({ onExit }: PhoneHomeHeaderProps) {
+export function PhoneHomeHeader({ onExit, onOpenSettings }: PhoneHomeHeaderProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -23,11 +24,18 @@ export function PhoneHomeHeader({ onExit }: PhoneHomeHeaderProps) {
           <h1 className="phone-startpage-title">Recall</h1>
         </div>
         <div className="phone-startpage-actions">
-          <Avatar className="phone-avatar" aria-label="Profile">
-            <AvatarFallback>
-              <UserIcon className="size-3.5" />
-            </AvatarFallback>
-          </Avatar>
+          <button
+            type="button"
+            className="phone-avatar-btn"
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+          >
+            <Avatar className="phone-avatar">
+              <AvatarFallback>
+                <UserIcon className="size-3.5" />
+              </AvatarFallback>
+            </Avatar>
+          </button>
           {onExit ? (
             <Button
               className="phone-exit-btn"
