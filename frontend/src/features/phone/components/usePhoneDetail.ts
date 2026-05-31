@@ -63,8 +63,10 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
       if (exists && current) setFavoriteItems((prev) => prev.filter((f) => f.id !== item.id));
       else if (!exists && !current) setFavoriteItems((prev) => [updated, ...prev]);
       else setFavoriteItems((prev) => prev.map((f) => f.id === item.id ? updated : f));
-    } catch { /* no-op */ }
-  }, [favoriteItems, setFavoriteItems]);
+    } catch {
+      setErrorMessage("Couldn't update favorite — please try again.");
+    }
+  }, [favoriteItems, setFavoriteItems, setErrorMessage]);
 
   const handleToggleSafety = useCallback(async (item: RecallMediaItem, state: "safe" | "nsfw") => {
     const patch = { safety: { state } };
@@ -72,8 +74,10 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
       const updated = await patchCatalogItem(item.id, patch);
       setDetailItem((prev) => prev?.id === item.id ? updated : prev);
       if (state === "safe") { revealSafe(item.id); setNsfwPendingItem(null); }
-    } catch { /* no-op */ }
-  }, [revealSafe, setNsfwPendingItem]);
+    } catch {
+      setErrorMessage("Couldn't update content rating — please try again.");
+    }
+  }, [revealSafe, setNsfwPendingItem, setErrorMessage]);
 
   const searchSameDate = useCallback((item: RecallMediaItem) => {
     const date = itemDateLabel(item);

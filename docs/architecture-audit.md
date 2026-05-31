@@ -195,9 +195,11 @@ The `GridDensityApi.pinchHandlers` precise type is erased to `any` at layer boun
 
 ---
 
-### ❌ 17. Mock fallback logic in the production search path
+### ✅ 17. Mock fallback logic in the production search path
 
 `PhoneViewportFrame.tsx:109,163` — when the backend is unavailable, `runSearch` synthesizes fake `makeMockItem` tiles (defined in `phoneUtils.ts:42–57`, pointing at `picsum.photos`) inline in the production code path. `makeMockItem` constructs a hand-rolled `RecallMediaItem` that must stay manually in sync with the real schema.
+
+**Done:** Both callsites in `PhoneViewportFrame.tsx` now guard `makeMockItem` behind `import.meta.env.DEV`. Production builds show an empty results state on backend failure; the error message is still shown. Dev builds retain the picsum tile fallback for local iteration without a live media bundle.
 
 ---
 
@@ -207,9 +209,11 @@ The `GridDensityApi.pinchHandlers` precise type is erased to `any` at layer boun
 
 ---
 
-### ❌ 19. Optimistic UI updates silently swallow API errors
+### ✅ 19. Optimistic UI updates silently swallow API errors
 
 `usePhoneDetail.ts:65,74` — `handleToggleFavorite` and `handleToggleSafety` both `catch { /* no-op */ }`. API failures leave UI state diverged from server with no user feedback and no revert.
+
+**Done:** Both catch blocks now call `setErrorMessage(...)` with a user-facing message. The handlers were not actually optimistic (state updates happen after a successful `await`), so no state revert was needed — only the missing error surface.
 
 ---
 
@@ -261,7 +265,7 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 | 6 | #11 — untyped/duplicated API responses | ✅ | `response_model` on all search routes; `CatalogItemPatch` model for PATCH |
 | 7 | #7 — duplicated upsert logic | ✅ | `_store_indexed_item` extracted |
 | 8 | #4/#5 — duplicated helpers + private leakage | ✅ | `utils/coerce.py`; `reverse_geocode_coords` + `safety_from_detection` public |
-| 9 | #10/#19 — silent error swallowing | ⚠️ | #10 done (exc_info=True + media.py logger); #19 (optimistic-update revert) still missing |
+| 9 | #10/#19 — silent error swallowing | ✅ | #10: exc_info=True + media.py logger; #19: error message shown in catch blocks |
 | 10 | #15/#16 — type safety erosion | ✅ | Deduped `ModeTransition`; `dispatch`/`pinchHandlers` `any` erased |
 | 11 | #20/#21 — CSS monolith + magic numbers | ❌ | Colocate styles; centralize interaction constants |
 
@@ -298,6 +302,8 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 | — | #10 | `exc_info=True` on all broad catches; `media.py` gains logger + warning for silent `generate_animated_thumbnail` |
 | — | #15 | Duplicate `ModeTransition`/`ModeTransitionReason`/`MotionDirection` removed from `phoneUtils.ts`; re-exported from `phoneReducer.ts` |
 | — | #16 | `dispatch: any` → `dispatch: (action: PhoneModeAction) => void`; `pinchHandlers: Record<string, any>` → `GridGestureHandlers`; `as any` casts removed |
+| — | #19 | `catch { /* no-op */ }` → `catch { setErrorMessage(...) }` in `handleToggleFavorite` and `handleToggleSafety` |
+| — | #17 | `makeMockItem` calls in `PhoneViewportFrame.tsx` guarded behind `import.meta.env.DEV`; production builds show empty state on backend failure |
 
 **Test count:** 155 (unchanged — no new test surface introduced).
 
@@ -309,6 +315,4 @@ No OpenAPI schema, no codegen, no validation. Frontend and backend agree on fiel
 
 **Frontend:**
 - **#12/#13/#14** — `PhoneViewportFrame.tsx` god component + `liveRef` pattern + prop-drilling. Highest-effort frontend item. Entry point: extract a `useSearchController` hook for search/pagination state, then create a `GridHandlersContext` so `ThumbCell` doesn't need handlers tunneled through 3 layers.
-- **#19** — Add error revert in `handleToggleFavorite` and `handleToggleSafety` (store pre-optimistic state, restore on catch, show an error toast).
-- **#17** — Move `makeMockItem` behind a dev-only flag or remove it; don't ship it in production builds.
 - **#20/#21** — CSS monolith and magic numbers are cosmetic debt; safe to defer.

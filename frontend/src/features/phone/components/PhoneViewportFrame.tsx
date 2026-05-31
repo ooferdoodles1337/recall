@@ -106,7 +106,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       if (controller.signal.aborted) return;
       const nextResults = mergeResults(sr.status === "fulfilled" ? sr.value.results : [], tr.status === "fulfilled" ? tr.value.results : []).slice(0, count);
       if (nextResults.length > 0) setResults(nextResults);
-      else if (sr.status === "rejected" && tr.status === "rejected") { setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`${q}-${i}`, q))); setErrorMessage("Backend unavailable. Showing sample tiles until the media bundle is indexed."); }
+      else if (sr.status === "rejected" && tr.status === "rejected") {
+        if (import.meta.env.DEV) { setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`${q}-${i}`, q))); }
+        setErrorMessage("Backend unavailable. Showing sample tiles until the media bundle is indexed.");
+      }
       else setResults([]);
       if (shouldRemember) { rememberSearch(q); setHistory(readSearchHistory()); }
     } finally { if (!controller.signal.aborted && searchAbortRef.current === controller) setIsLoading(false); }
@@ -160,7 +163,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const controller = new AbortController();
     listRecentItems(SEARCH_BATCH_SIZE, { signal: controller.signal })
       .then((response) => { if (!controller.signal.aborted && response.results.length > 0) setResults(response.results); })
-      .catch(() => { if (!controller.signal.aborted) setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`))); });
+      .catch(() => { if (!controller.signal.aborted && import.meta.env.DEV) setResults(Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`recent-${i}`))); });
     return () => controller.abort();
   }, []);
 
