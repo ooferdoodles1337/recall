@@ -9,7 +9,7 @@ import {
   VideoIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { RecallMediaItem } from "@/shared/types/recall";
 
 interface AboutSheetProps {
@@ -95,9 +95,11 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
 
         <div className="about-sheet-header" onClick={onClose}>
           <div className="about-sheet-handle" aria-hidden />
-          <button className="about-sheet-done" type="button" onClick={(e) => { e.stopPropagation(); onClose(); }}>
-            Done
-          </button>
+          <SheetClose asChild>
+            <button className="about-sheet-done" type="button" onClick={(e) => e.stopPropagation()}>
+              Done
+            </button>
+          </SheetClose>
         </div>
 
         <div className="about-sheet-scroll">

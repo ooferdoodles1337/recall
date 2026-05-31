@@ -3,6 +3,7 @@ import { ChevronRightIcon, FolderIcon, Grid3x3Icon, InfoIcon, ShieldIcon, UserIc
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -47,13 +48,11 @@ export function SettingsSheet({
       >
         <div className="about-sheet-header settings-sheet-header">
           <SheetTitle className="settings-sheet-header-title">Settings</SheetTitle>
-          <button
-            className="about-sheet-done"
-            type="button"
-            onClick={onClose}
-          >
-            Done
-          </button>
+          <SheetClose asChild>
+            <button className="about-sheet-done" type="button">
+              Done
+            </button>
+          </SheetClose>
         </div>
 
         <div className="about-sheet-scroll">

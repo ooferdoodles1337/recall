@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CheckIcon } from "lucide-react";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -92,9 +93,11 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
         </div>
 
         <div className="album-picker-footer">
-          <button type="button" className="album-picker-btn album-picker-btn--cancel" onClick={onCancel}>
-            Cancel
-          </button>
+          <SheetClose asChild>
+            <button type="button" className="album-picker-btn album-picker-btn--cancel">
+              Cancel
+            </button>
+          </SheetClose>
           <button
             type="button"
             className="album-picker-btn album-picker-btn--save"
