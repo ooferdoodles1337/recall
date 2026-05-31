@@ -1914,6 +1914,10 @@ body:has(.app-shell--phone) {
   color: #000;
 }
 
+.about-sheet[data-slot="sheet-content"] {
+  z-index: 101;
+}
+
 .about-sheet--full {
   height: 100%;
   max-height: 100%;

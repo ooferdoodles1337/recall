@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { useState } from "react";
 import { ChevronRightIcon, FolderIcon, Grid3x3Icon, InfoIcon, ShieldIcon, UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 
 interface SettingsSheetProps {
@@ -31,47 +35,22 @@ export function SettingsSheet({
   // Cosmetic-only toggle — not persisted, changes no real behavior.
   const [showSensitive, setShowSensitive] = useState(false);
 
-  useEffect(() => {
-    if (escapeDisabled) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [escapeDisabled, onClose]);
-
   return (
-    <motion.div
-      className="about-backdrop"
-      role="dialog"
-      aria-modal
-      aria-label="Settings"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-    >
-      <motion.div
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
         className="about-sheet about-sheet--full"
-        onClick={(e) => e.stopPropagation()}
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 30 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        onEscapeKeyDown={(event) => {
+          if (escapeDisabled) event.preventDefault();
+        }}
       >
         <div className="about-sheet-header settings-sheet-header">
-          <span className="settings-sheet-header-title">Settings</span>
+          <SheetTitle className="settings-sheet-header-title">Settings</SheetTitle>
           <button
             className="about-sheet-done"
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
+            onClick={onClose}
           >
             Done
           </button>
@@ -140,7 +119,7 @@ export function SettingsSheet({
             </div>
           </section>
         </div>
-      </motion.div>
-    </motion.div>
+      </SheetContent>
+    </Sheet>
   );
 }
