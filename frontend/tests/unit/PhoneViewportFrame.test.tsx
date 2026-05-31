@@ -2,6 +2,7 @@ import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PhoneViewportFrame } from "@/features/phone/components/PhoneViewportFrame";
 import { phoneMockState } from "../msw/handlers";
 
@@ -9,7 +10,12 @@ const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
 
 function renderPhone(props: React.ComponentProps<typeof PhoneViewportFrame> = {}) {
-  return render(<PhoneViewportFrame {...props} />);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <PhoneViewportFrame {...props} />
+    </QueryClientProvider>,
+  );
 }
 
 function currentSearchInput() {

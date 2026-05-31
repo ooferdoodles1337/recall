@@ -75,7 +75,7 @@ export function useSearchController({
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [results, setResults] = useState<RecallMediaItem[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [history, setHistory] = useState<string[]>(() => readSearchHistory());
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -242,22 +242,18 @@ export function useSearchController({
     }
   }, [recentItemsQuery.data, recentItemsQuery.isError, submittedQuery]);
 
-  // Suggestions debounce
+  // Debounce query for suggestions
   useEffect(() => {
-    const q = query.trim();
-    if (!q) { setSuggestions(history.slice(0, 5)); return; }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      suggestSearches(q, 6, { signal: controller.signal })
-        .then((response) => {
-          if (controller.signal.aborted) return;
-          const next = [...response.suggestions, ...localSuggestions(q, history)];
-          setSuggestions(next.filter((item, idx, all) => all.findIndex((c) => c.toLowerCase() === item.toLowerCase()) === idx).slice(0, 6));
-        })
-        .catch(() => { if (!controller.signal.aborted) setSuggestions(localSuggestions(q, history)); });
-    }, 140);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [history, query]);
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 140);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const suggestionsQuery = useQuery({
+    queryKey: ["suggestions", debouncedQuery],
+    queryFn: () => suggestSearches(debouncedQuery, 6),
+    enabled: !!debouncedQuery,
+    staleTime: 60_000,
+  });
 
   // Auto-search debounce
   useEffect(() => {
@@ -292,6 +288,13 @@ export function useSearchController({
     return () => el.removeEventListener("scroll", handleScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modeState.screen]);
+
+  const suggestions = useMemo<string[]>(() => {
+    if (!debouncedQuery) return history.slice(0, 5);
+    const remote = suggestionsQuery.data?.suggestions ?? [];
+    const combined = [...remote, ...localSuggestions(debouncedQuery, history)];
+    return combined.filter((item, idx, all) => all.findIndex((c) => c.toLowerCase() === item.toLowerCase()) === idx).slice(0, 6);
+  }, [debouncedQuery, suggestionsQuery.data, history]);
 
   const refinements = useMemo(() => suggestions.filter((s) => s.toLowerCase() !== submittedQuery.toLowerCase()).slice(0, 4), [suggestions, submittedQuery]);
   const visibleHistory = history.length > 0 ? history : readSearchHistory();
