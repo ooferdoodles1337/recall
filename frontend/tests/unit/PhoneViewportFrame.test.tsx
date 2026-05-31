@@ -163,7 +163,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /Select Favorite 02/i }));
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
       expect(screen.queryByRole("region", { name: "Selection tray" })).not.toBeInTheDocument();
     });
@@ -173,7 +173,7 @@ describe("PhoneViewportFrame interactions", () => {
     renderPhone({ onConfirmAnswer });
 
     await user.click(await screen.findByRole("button", { name: /Select Favorite 01/i }));
-    await user.click(await screen.findByRole("button", { name: "Confirm" }));
+    await user.click(await screen.findByRole("button", { name: "Send" }));
     expect(onConfirmAnswer).toHaveBeenCalledWith("favorite-01");
   });
 

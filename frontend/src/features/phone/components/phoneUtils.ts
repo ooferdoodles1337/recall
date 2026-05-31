@@ -177,10 +177,7 @@ export function localSuggestions(query: string, history: string[]): string[] {
   if (!q) return history.slice(0, 5);
   const lower = q.toLowerCase();
   const historyMatches = history.filter((item) => item.toLowerCase().includes(lower));
-  const semanticCompletions = [
-    `${q} video`, `${q} photo`, `${q} meme`, `${q} reaction image`, `${q} from trip`,
-  ];
-  return [...historyMatches, ...semanticCompletions]
+  return historyMatches
     .filter((item, index, all) => all.findIndex((candidate) => candidate.toLowerCase() === item.toLowerCase()) === index)
     .slice(0, 6);
 }
