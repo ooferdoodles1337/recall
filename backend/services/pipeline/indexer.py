@@ -169,6 +169,20 @@ def _preprocess_file(
         return None
 
 
+def _store_indexed_item(item: _PendingItem, embedding: list[float]) -> None:
+    """Write a single preprocessed item and its embedding to ChromaDB and SQLite."""
+    chroma.upsert_content(file_id=item.file_id, embedding=embedding)
+    catalog.upsert_item(
+        file_id=item.file_id,
+        path=item.rel_path,
+        filename=item.path.name,
+        mime_type=item.original_mime,
+        media_type=item.original_media_type,
+        extra_metadata=item.file_metadata,
+        embedding_mime_type=item.processed_mime,
+    )
+
+
 def _index_pending_batch(pending: list[_PendingItem]) -> int:
     if not pending:
         return 0
@@ -203,19 +217,7 @@ def _index_pending_batch(pending: list[_PendingItem]) -> int:
             log.error("no embedding returned for: %s", item.path)
             continue
         try:
-            chroma.upsert_content(
-                file_id=item.file_id,
-                embedding=embedding,
-            )
-            catalog.upsert_item(
-                file_id=item.file_id,
-                path=item.rel_path,
-                filename=item.path.name,
-                mime_type=item.original_mime,
-                media_type=item.original_media_type,
-                extra_metadata=item.file_metadata,
-                embedding_mime_type=item.processed_mime,
-            )
+            _store_indexed_item(item, embedding)
             indexed += 1
             log.info("indexed: %s", item.path)
         except Exception as exc:
@@ -388,16 +390,7 @@ def index_file(path: Path, force: bool) -> None:
 
     try:
         content_embedding = gemini.embed_content(item.processed_data, item.processed_mime)
-        chroma.upsert_content(file_id=item.file_id, embedding=content_embedding)
-        catalog.upsert_item(
-            file_id=item.file_id,
-            path=item.rel_path,
-            filename=item.path.name,
-            mime_type=item.original_mime,
-            media_type=item.original_media_type,
-            extra_metadata=item.file_metadata,
-            embedding_mime_type=item.processed_mime,
-        )
+        _store_indexed_item(item, content_embedding)
         log.info("indexed: %s", item.path)
     except Exception as exc:
         log.error("failed (%s): %s", type(exc).__name__, item.path)
