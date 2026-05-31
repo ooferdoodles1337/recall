@@ -8,6 +8,15 @@ export const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 export const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
 export const OVERSCROLL_THRESHOLD = 80;
 
+export const LONG_PRESS_MS = 500;
+export const LONG_PRESS_CANCEL_DIST_SQ = 64;
+export const SELECTION_SUPPRESS_MS = 450;
+export const AUTOSEARCH_DEBOUNCE_MS = 400;
+export const SUGGESTION_DEBOUNCE_MS = 140;
+export const HIDE_COMPOSE_SCROLL_THRESHOLD = 60;
+export const PREFETCH_TRIGGER_REMAINING = 200;
+export const VIDEO_CHROME_HIDE_MS = 2400;
+
 export type GridColumns = 1 | 2 | 3 | 4 | 5 | 6;
 
 export const GRID_COLUMN_OPTIONS = [1, 2, 3, 4, 5, 6] as const satisfies readonly GridColumns[];

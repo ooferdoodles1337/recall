@@ -5,6 +5,7 @@ import type { RecallMediaItem } from "@/shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
 import {
   SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD, mediaLayoutId, readSearchHistory,
+  LONG_PRESS_MS, LONG_PRESS_CANCEL_DIST_SQ, SELECTION_SUPPRESS_MS, HIDE_COMPOSE_SCROLL_THRESHOLD,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
 import { NsfwDialog } from "./NsfwDialog";
@@ -63,7 +64,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const searchGridRef = useRef<HTMLDivElement>(null);
   const favoritesGridRef = useRef<HTMLDivElement>(null);
 
-  const HIDE_COMPOSE_THRESHOLD = 60;
 
   const { isItemBlurred, nsfwPendingItem, setNsfwPendingItem, revealOne, revealAll, revealSafe } = useNsfwReveal();
   const { toggleSelected } = useSelectionTray(selectedItems, setSelectedItems);
@@ -86,7 +86,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, []);
 
   const suppressTileSelectionBriefly = useCallback(() => {
-    suppressSelectionUntilRef.current = (typeof window !== "undefined" ? window.performance.now() : Date.now()) + 450;
+    suppressSelectionUntilRef.current = (typeof window !== "undefined" ? window.performance.now() : Date.now()) + SELECTION_SUPPRESS_MS;
   }, []);
 
   const isTileSelectionSuppressed = useCallback(() => {
@@ -106,7 +106,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     if (!isItemBlurred(item)) {
       longPressTimerRef.current = setTimeout(() => {
         longPressTriggeredRef.current = true; longPressTimerRef.current = null; openDetail(item);
-      }, 500);
+      }, LONG_PRESS_MS);
     }
   }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, openDetail]);
 
@@ -122,7 +122,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
     if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
       const dx = e.clientX - pointerDownPosRef.current.x, dy = e.clientY - pointerDownPosRef.current.y;
-      if (dx * dx + dy * dy > 64) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      if (dx * dx + dy * dy > LONG_PRESS_CANCEL_DIST_SQ) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
     }
   }, []);
 
@@ -176,7 +176,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       if (modeRef.current !== "compose") return;
       const st = el.scrollTop;
       if (bgContentRef.current === "results") {
-        if (st > HIDE_COMPOSE_THRESHOLD) sc.setShowComposePanel(false);
+        if (st > HIDE_COMPOSE_SCROLL_THRESHOLD) sc.setShowComposePanel(false);
         else if (st <= 0) sc.setShowComposePanel(true);
       } else {
         if (st > prevScrollTop) { dispatch({ type: "COMPOSE_DISMISS" }); topBarInputRef.current?.blur(); }

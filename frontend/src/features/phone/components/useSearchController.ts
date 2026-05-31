@@ -4,6 +4,7 @@ import type { RecallMediaItem } from "@/shared/types/recall";
 import {
   SEARCH_BATCH_SIZE, makeMockItem, readSearchHistory, writeSearchHistory,
   rememberSearch, mergeResults, localSuggestions,
+  AUTOSEARCH_DEBOUNCE_MS, SUGGESTION_DEBOUNCE_MS, PREFETCH_TRIGGER_REMAINING,
 } from "./phoneUtils";
 import {
   listRecentItems, searchSemantic, searchSimilarById, searchText, suggestSearches,
@@ -244,7 +245,7 @@ export function useSearchController({
 
   // Debounce query for suggestions
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 140);
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), SUGGESTION_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [query]);
 
@@ -264,7 +265,7 @@ export function useSearchController({
     autoSearchTimerRef.current = setTimeout(() => {
       autoSearchTimerRef.current = null; setIsAutoSearchPending(false);
       void runSearch(q, SEARCH_BATCH_SIZE, { remember: false, fromAuto: true });
-    }, 400);
+    }, AUTOSEARCH_DEBOUNCE_MS);
     return () => { if (autoSearchTimerRef.current !== null) { clearTimeout(autoSearchTimerRef.current); autoSearchTimerRef.current = null; } setIsAutoSearchPending(false); };
   }, [query, runSearch, modeRef]);
 
@@ -283,7 +284,7 @@ export function useSearchController({
     const el = scrollContainerRef.current;
     const mode = modeRef.current;
     if (!el || mode !== "results") return;
-    const handleScroll = () => { if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) void prefetchNextBatch(); };
+    const handleScroll = () => { if (el.scrollHeight - el.scrollTop - el.clientHeight < PREFETCH_TRIGGER_REMAINING) void prefetchNextBatch(); };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
