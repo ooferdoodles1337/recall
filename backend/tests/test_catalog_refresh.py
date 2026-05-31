@@ -148,7 +148,7 @@ def test_refresh_catalog_reverse_geocodes_existing_gps_without_extraction(refres
 
     monkeypatch.setattr("services.catalog.refresh.metadata_svc.extract", fail_extract)
     monkeypatch.setattr(
-        "services.catalog.refresh.metadata_svc._reverse_geocode",
+        "services.catalog.refresh.metadata_svc.reverse_geocode_coords",
         lambda lat, lon: {
             "geo_city": "Paris",
             "geo_country": "France",

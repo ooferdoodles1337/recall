@@ -9,7 +9,7 @@ def set_test_env():
 
 @pytest.fixture(autouse=True)
 def clear_geocode_cache():
-    """Ensure _reverse_geocode LRU cache is cleared between tests."""
-    from services.catalog.extractor import _reverse_geocode
-    _reverse_geocode.cache_clear()
+    """Ensure reverse_geocode LRU cache is cleared between tests."""
+    from services.catalog.extractor import reverse_geocode_coords
+    reverse_geocode_coords.cache_clear()
     yield

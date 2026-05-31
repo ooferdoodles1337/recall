@@ -241,7 +241,8 @@ def _normalize_dimensions_and_duration(
 
 
 @functools.lru_cache(maxsize=1024)
-def _reverse_geocode(lat: float, lon: float) -> dict[str, str]:
+def reverse_geocode_coords(lat: float, lon: float) -> dict[str, str]:
+    """Resolve GPS coordinates to place-name fields (geo_city, geo_state, etc.)."""
     try:
         hit = _rg.get((lat, lon))
     except Exception as exc:
@@ -280,7 +281,7 @@ def extract(path: str, *, reverse_geocode: bool = True) -> dict[str, str | int |
     lat = raw.get("Composite:GPSLatitude")
     lon = raw.get("Composite:GPSLongitude")
     if reverse_geocode and isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
-        result.update(_reverse_geocode(float(lat), float(lon)))
+        result.update(reverse_geocode_coords(float(lat), float(lon)))
 
     result.update(_normalize_dimensions_and_duration(result))
     result.update(_normalize_taken_date(result, path))

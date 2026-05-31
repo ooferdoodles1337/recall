@@ -179,7 +179,7 @@ def migrate_safety_schema() -> None:
             "state": "nsfw" if float(nsfw_score) >= NSFW_THRESHOLD else "safe",
         }
         try:
-            catalog.replace_safety(item["id"], metadata_schema._safety_from_detection(synthetic))
+            catalog.replace_safety(item["id"], metadata_schema.safety_from_detection(synthetic))
             migrated += 1
         except Exception as exc:
             log.error("migration: failed to update item %s: %s", item["id"], exc)

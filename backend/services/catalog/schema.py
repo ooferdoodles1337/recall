@@ -5,6 +5,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from services.utils.coerce import as_float as _as_float, as_int as _as_int
+
 SCHEMA_VERSION = 2
 EMBEDDING_MODEL = "gemini-embedding-2"
 EMBEDDING_DIMENSIONS = 3072
@@ -45,24 +47,6 @@ def _scalar_dict(values: dict[str, Any]) -> dict[str, Scalar]:
     }
 
 
-def _as_int(value: Any) -> int | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    return None
-
-
-def _as_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
-
-
 def _search_phrases_from_value(value: Any) -> list[str]:
     if value is None:
         return []
@@ -87,7 +71,7 @@ def _search_phrases_from_value(value: Any) -> list[str]:
     return phrases
 
 
-def _safety_from_detection(detection: dict[str, Any] | None) -> dict[str, Any]:
+def safety_from_detection(detection: dict[str, Any] | None) -> dict[str, Any]:
     if not detection:
         return {"state": "unknown"}
 
@@ -193,7 +177,7 @@ def build_metadata(
             "description": extra.get("description") if isinstance(extra.get("description"), str) else None,
             "phrases": _search_phrases_from_value(extra.get("search_terms")),
         },
-        "safety": _safety_from_detection(extra.get("nsfw_detection") if isinstance(extra.get("nsfw_detection"), dict) else None),
+        "safety": safety_from_detection(extra.get("nsfw_detection") if isinstance(extra.get("nsfw_detection"), dict) else None),
         "organization": {
             "favorite": False,
             "folders": [],
@@ -388,7 +372,7 @@ def annotation_patch(
 
 
 def nsfw_patch(detection: dict[str, Any]) -> dict[str, Any]:
-    return {"safety": _safety_from_detection(detection)}
+    return {"safety": safety_from_detection(detection)}
 
 
 def asset_path(metadata: dict[str, Any]) -> str | None:
