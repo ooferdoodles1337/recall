@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from services.catalog import db as catalog
+from services.search import text_index
 
 router = APIRouter()
 
@@ -36,6 +37,7 @@ def patch_item(id: str, body: dict[str, Any]):
         updated = catalog.patch_item(id, body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    text_index.rebuild()
     return updated
 
 
