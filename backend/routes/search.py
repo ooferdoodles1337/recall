@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 
 import config
+from routes._search_result import format_result
 from services.catalog import db as catalog
 from services.providers import gemini
 from services.search import chroma, text_index
@@ -24,12 +25,7 @@ def search_semantic(q: str = Query(..., description="Search query text"), n: int
     return {
         "query": q,
         "results": [
-            {
-                "id": doc_id,
-                "distance": dist,
-                "metadata": item["metadata"],
-                "links": item.get("links", {}),
-            }
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if (item := catalog.get_item_summary(doc_id)) is not None
         ],
@@ -60,15 +56,7 @@ def search_text(
 
     return {
         "query": q,
-        "results": [
-            {
-                "id": item["id"],
-                "distance": None,
-                "metadata": item["metadata"],
-                "links": item.get("links", {}),
-            }
-            for item in items
-        ],
+        "results": [format_result(item, None) for item in items],
     }
 
 
@@ -83,7 +71,7 @@ def search_similar_by_id(id: str, n: int = Query(5, ge=1)):
     return {
         "query_id": id,
         "results": [
-            {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if doc_id != id and (item := catalog.get_item_summary(doc_id)) is not None
         ][:n],
@@ -121,7 +109,7 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
     return {
         "query_filename": file.filename,
         "results": [
-            {"id": doc_id, "distance": dist, "metadata": item["metadata"], "links": item.get("links", {})}
+            format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
             if (item := catalog.get_item_summary(doc_id)) is not None
         ],
