@@ -16,3 +16,5 @@ frontend/node_modules/
 frontend/dist/
 
 .playwright-mcp
+
+.codex-remote-attachments/

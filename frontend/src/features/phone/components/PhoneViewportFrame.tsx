@@ -25,6 +25,9 @@ import { usePhoneDetail } from "./usePhoneDetail";
 import { useSelectionTray } from "./useSelectionTray";
 import { PhoneSearchShell } from "./PhoneSearchShell";
 import { PhoneHomeHeader } from "./PhoneHomeHeader";
+import { SettingsSheet } from "./SettingsSheet";
+import { IndexedAlbumsSheet } from "./IndexedAlbumsSheet";
+import { useIndexedAlbums } from "./useIndexedAlbums";
 import { HomeLayer } from "./HomeLayer";
 import { ResultsLayer } from "./ResultsLayer";
 import { GridHandlersContext } from "./GridHandlersContext";
@@ -52,6 +55,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const isLoadingFavorites = favoritesQuery.isPending;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [albumsOpen, setAlbumsOpen] = useState(false);
+  const indexedAlbums = useIndexedAlbums();
   const [overscrollProgress, setOverscrollProgress] = useState(0);
   const prefersReducedMotion = useReducedMotion();
 
@@ -287,7 +293,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
               style={{ overflow: "hidden" }}>
-              <PhoneHomeHeader onExit={onExit} />
+              <PhoneHomeHeader onExit={onExit} onOpenSettings={() => setSettingsOpen(true)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -348,6 +354,33 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       </MotionConfig>
 
       <MotionConfig reducedMotion="user">
+        <AnimatePresence initial={false}>
+          {settingsOpen && (
+            <SettingsSheet
+              key="settings-sheet"
+              onClose={() => setSettingsOpen(false)}
+              indexedAlbumCount={indexedAlbums.count}
+              indexedAlbumTotal={indexedAlbums.total}
+              gridColumns={gridColumns}
+              onOpenIndexedAlbums={() => setAlbumsOpen(true)}
+              escapeDisabled={albumsOpen}
+            />
+          )}
+          {albumsOpen && (
+            <IndexedAlbumsSheet
+              key="albums-sheet"
+              initialSelectedIds={indexedAlbums.selectedIds}
+              onCancel={() => setAlbumsOpen(false)}
+              onSave={(ids) => {
+                indexedAlbums.save(ids);
+                setAlbumsOpen(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </MotionConfig>
+
+      <MotionConfig reducedMotion="user">
         {showSelectionTray && (
           <SelectionTray selectedItems={selectedItems} toggleSelected={toggleSelected}
             onConfirmAnswer={handleConfirmAnswer} onClearSelection={() => setSelectedItems([])} />
@@ -357,4 +390,3 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     </GridHandlersContext.Provider>
   );
 }
-

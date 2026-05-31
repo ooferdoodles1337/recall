@@ -818,6 +818,23 @@ html {
   color: var(--ut-ink);
 }
 
+@media (max-width: 1180px) {
+  .welcome-shell,
+  .results-shell {
+    padding-right: 48px;
+    padding-left: 48px;
+  }
+
+  .welcome-content {
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 56px;
+  }
+
+  .welcome-title {
+    font-size: 4rem;
+  }
+}
+
 
 /* ============================================================
    Mobile responsive — User Testing Harness screens
@@ -828,34 +845,40 @@ html {
     background: var(--ut-bg);
   }
 
-  /* Welcome Screen — must fit in viewport, no scroll */
   .welcome-shell {
-    height: 100dvh;
-    overflow: hidden;
-    padding: 36px 20px 40px;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    align-items: center;
+    padding: max(28px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom));
   }
 
   .welcome-content {
-    grid-template-columns: 1fr;
-    gap: 20px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 34px;
+    align-items: stretch;
     min-width: 0;
     width: 100%;
+    max-width: 430px;
   }
 
   .welcome-header {
+    max-width: none;
+    min-width: 0;
     padding-bottom: 0;
   }
 
   .welcome-header::after {
-    width: 100px;
-    margin-top: 18px;
+    width: 132px;
+    height: 6px;
+    margin-top: 24px;
   }
 
   .welcome-title {
-    font-size: 2.5rem;
-    line-height: 1.05;
-    margin-bottom: 10px;
+    margin-bottom: 0;
+    font-size: clamp(3rem, 13vw, 3.55rem);
+    line-height: 0.96;
   }
 
   .welcome-actions {
@@ -865,8 +888,30 @@ html {
   }
 
   .action-card {
+    grid-template-columns: 42px minmax(0, 1fr) 18px;
+    gap: 14px;
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
+    padding: 16px;
     box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .action-card-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .action-card-body,
+  .action-card-title,
+  .action-card-desc {
+    min-width: 0;
+  }
+
+  .action-card-title,
+  .action-card-desc {
+    overflow-wrap: anywhere;
   }
 
   .action-card-desc {
@@ -877,35 +922,94 @@ html {
   .trial-idle-shell {
     height: auto;
     min-height: 100dvh;
-    overflow: visible;
-    padding: 40px 20px 48px;
-    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: max(28px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom));
+    justify-content: center;
     align-items: stretch;
   }
 
   .trial-idle-content {
-    grid-template-columns: 1fr;
-    gap: 28px;
+    width: 100%;
+    max-width: 430px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    justify-self: center;
+  }
+
+  .trial-idle-left,
+  .trial-idle-right {
+    min-width: 0;
   }
 
   .trial-idle-title {
-    font-size: 3rem;
-    line-height: 1.02;
+    font-size: clamp(3rem, 13vw, 3.55rem);
+    line-height: 0.96;
+  }
+
+  .trial-idle-desc {
+    margin-bottom: 26px;
+    font-size: 1rem;
+  }
+
+  .trial-idle-actions {
+    align-items: stretch;
+  }
+
+  .trial-start-btn,
+  .trial-exit-btn {
+    width: 100%;
+  }
+
+  .trial-times-card {
+    width: 100%;
+    min-width: 0;
   }
 
   /* Results Screen */
   .results-shell {
     height: auto;
     min-height: 100dvh;
-    overflow: visible;
-    padding: 40px 20px 48px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: max(28px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom));
+  }
+
+  .results-content {
+    width: 100%;
+    max-width: 430px;
+    gap: 26px;
   }
 
   .results-title {
-    font-size: 2.8rem;
+    font-size: clamp(3rem, 13vw, 3.55rem);
+    line-height: 0.96;
   }
 
   .results-metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 380px) {
+  .welcome-shell,
+  .trial-idle-shell,
+  .results-shell {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .welcome-title,
+  .trial-idle-title,
+  .results-title {
+    font-size: clamp(2.65rem, 12.5vw, 3rem);
+  }
+
+  .action-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .action-card-arrow {
+    display: none;
   }
 }

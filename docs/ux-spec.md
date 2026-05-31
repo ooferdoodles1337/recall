@@ -202,3 +202,70 @@ the correct destination.
 - Tray appears at bottom when ≥ 1 item selected.
 - "Use selected" button submits selection and fires result callback.
 - Tray is dismissed by tapping outside or pressing Escape.
+
+---
+
+## Settings & Indexed Albums
+
+The "Indexed Albums" picker is a **presentational mock** — it lets a tester choose
+which simulated device albums get "indexed", mirroring Google Photos' *Back up
+device folders* screen. It has **no functional effect** (ST-6): the backend has no
+album concept (the indexer just walks `MEDIA_DIR`). It exists to make the `/phone`
+demo feel like a real photo app during user testing.
+
+Components: `SettingsSheet.tsx`, `IndexedAlbumsSheet.tsx`, `useIndexedAlbums.ts`;
+mock data + persistence in `phoneUtils.ts` (`MOCK_ALBUMS`,
+`DEFAULT_INDEXED_ALBUM_IDS`, `readIndexedAlbums` / `writeIndexedAlbums`,
+`INDEXED_ALBUMS_KEY`).
+
+### ST-1 — Entry point
+The home-header profile avatar (`PhoneHomeHeader`) is a button (`.phone-avatar-btn`).
+Tapping it opens the Settings sheet. The exit (×) button is unchanged. The avatar
+is the only entry point; the picker is **not** reachable directly (ST-3 rationale).
+
+### ST-2 — Settings sheet
+A full-height slide-up sheet (`.about-sheet.about-sheet--full`) reusing the
+`.about-backdrop` / `.about-sheet` glass + motion idiom (15 ms backdrop fade,
+220 ms `[0.16, 1, 0.3, 1]` sheet rise). Header shows the title "Settings" and a
+"Done" button. Dismiss on Done, backdrop tap, or Escape. Opening it does **not**
+touch search state (cf. MT-1 — it is purely an overlay).
+
+### ST-3 — Settings content (mock)
+The menu has multiple plausible groups so the picker is never the only thing behind
+the profile:
+- *Account*: avatar + static name/email.
+- *Search & Indexing*: **"Indexed Albums"** (value = `{selected} of {total}`,
+  chevron → opens picker) and "Show sensitive results" (cosmetic `Switch`, not
+  persisted).
+- *Appearance*: "Default grid density" (reflects current `gridColumns`, read-only).
+- *About*: app name + version (static).
+
+Only "Indexed Albums" navigates; everything else is cosmetic.
+
+**Rationale:** a settings entry point that opens straight into a single folder
+picker is confusing — users expect a settings *surface*. The picker lives as one
+row within it.
+
+### ST-4 — Indexed Albums picker
+A full-height slide-up sheet (own `AnimatePresence` layer, opens above Settings).
+Large title "Indexed Albums" + subtitle, a scrollable 3-column grid of album cards
+(square thumbnail, selected-check badge top-right, label below), and a pinned
+Cancel/Save footer.
+- Tapping a card toggles its **draft** selected state.
+- **Save** commits the draft (persists via `useIndexedAlbums.save`) and closes the
+  picker, returning to Settings; the Settings count updates. Save is disabled until
+  the draft differs from the committed selection.
+- **Cancel** / backdrop tap / Escape discards the draft and closes.
+- Selection is conveyed by **both** a blue ring and a check icon (never colour
+  alone); cards expose `aria-pressed`.
+
+### ST-5 — Persistence
+Selections persist in `localStorage` under `INDEXED_ALBUMS_KEY`
+(`recall.indexedAlbums.v1`), the same versioned-key pattern as `SEARCH_HISTORY_KEY`
+/ `GRID_COLUMNS_STORAGE_KEY`. First run selects `DEFAULT_INDEXED_ALBUM_IDS`.
+`readIndexedAlbums` filters out ids not present in `MOCK_ALBUMS`.
+
+### ST-6 — No functional effect
+Saving triggers no network call, re-index, or change to results/favorites. Nothing
+else in the app reads the stored selection. This is explicitly a mock for demo
+realism.
