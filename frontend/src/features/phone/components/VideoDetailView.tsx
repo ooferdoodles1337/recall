@@ -1,36 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
-import {
-  CalendarIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  InfoIcon,
-  MoreHorizontalIcon,
-  PauseIcon,
-  PlayIcon,
-  SearchIcon,
-  SendIcon,
-  ShieldAlertIcon,
-  ShieldCheckIcon,
-  StarIcon,
-  Volume2Icon,
-  VolumeXIcon,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { PauseIcon, PlayIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
-import { itemTitle, itemDateLabel, playbackTimeLabel, PHONE_MOTION, MOTION_EASE, VIDEO_CHROME_HIDE_MS } from "./phoneUtils";
+import { itemTitle, playbackTimeLabel, VIDEO_CHROME_HIDE_MS } from "./phoneUtils";
+import { DetailActionRow, DetailScreen, type DetailGestureHandlers } from "./DetailViewChrome";
 
 interface VideoDetailViewProps {
   item: RecallMediaItem;
+  gestureHandlers?: DetailGestureHandlers;
+  isSensitiveHidden?: boolean;
+  onRevealSensitive?: (item: RecallMediaItem) => void;
   onBack: () => void;
   onSearchSameDate: (item: RecallMediaItem) => void;
   onRunSimilarSearch: (item: RecallMediaItem) => void;
@@ -40,16 +20,14 @@ interface VideoDetailViewProps {
   onToggleSafety: (item: RecallMediaItem, state: "safe" | "nsfw") => void;
   onOpenAbout: (item: RecallMediaItem) => void;
   layoutId?: string;
+  navigationDirection?: -1 | 0 | 1;
 }
-
-const detailBackdropMotion = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.18, ease: MOTION_EASE.standard } },
-  exit: { opacity: 0, transition: { duration: 0.16, ease: MOTION_EASE.exit } },
-};
 
 export function VideoDetailView({
   item,
+  gestureHandlers,
+  isSensitiveHidden = false,
+  onRevealSensitive,
   onBack,
   onSearchSameDate,
   onRunSimilarSearch,
@@ -59,6 +37,7 @@ export function VideoDetailView({
   onToggleSafety,
   onOpenAbout,
   layoutId,
+  navigationDirection = 0,
 }: VideoDetailViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,19 +158,79 @@ export function VideoDetailView({
   }
 
   return (
-    <motion.div
-      className={`detail-screen detail-screen--video phone-detail-motion ${chromeVisible ? "detail-screen--chrome-visible" : "detail-screen--chrome-hidden"}${isScrubbing ? " detail-screen--scrubbing" : ""}`}
-      aria-label={`${itemTitle(item)} detail view`}
-      variants={detailBackdropMotion}
-      initial="initial"
-      animate="animate"
-      exit="exit"
+    <DetailScreen
+      className={`detail-screen--video ${chromeVisible ? "detail-screen--chrome-visible" : "detail-screen--chrome-hidden"}${isScrubbing ? " detail-screen--scrubbing" : ""}`}
+      mediaClassName="detail-media-fill--video"
+      topBarClassName="video-chrome"
+      item={item}
+      gestureHandlers={gestureHandlers}
+      isSensitiveHidden={isSensitiveHidden}
+      onRevealSensitive={onRevealSensitive}
+      onBack={onBack}
+      onOpenAbout={onOpenAbout}
+      onToggleFavorite={onToggleFavorite}
+      onToggleSafety={onToggleSafety}
+      layoutId={layoutId}
+      navigationDirection={navigationDirection}
+      controls={
+        <div className="video-control-panel video-chrome" role="group" aria-label="Detail actions" onPointerMove={revealChrome}>
+          <DetailActionRow
+            className="video-action-row"
+            confirmLabel="Confirm"
+            item={item}
+            onSearchSameDate={onSearchSameDate}
+            onRunSimilarSearch={onRunSimilarSearch}
+            onConfirmAnswer={onConfirmAnswer}
+            onSendSelection={onSendSelection}
+          />
+
+          <div className="video-timeline">
+            <Button
+              className="video-play-btn"
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={togglePlayback}
+              aria-label={isPlaying ? "Pause video" : "Play video"}
+            >
+              {isPlaying ? <PauseIcon /> : <PlayIcon />}
+            </Button>
+            <span className="video-time video-time--elapsed">{playbackTimeLabel(currentTime)}</span>
+            <input
+              className="video-scrubber"
+              type="range"
+              min="0"
+              max={timelineMax}
+              step="0.01"
+              value={Math.min(currentTime, timelineMax)}
+              aria-label="Video timeline"
+              aria-valuetext={`${playbackTimeLabel(currentTime)} of ${playbackTimeLabel(duration)}`}
+              style={{ "--video-progress": `${progress}%` } as React.CSSProperties}
+              onChange={handleSeek}
+              onPointerDown={startScrubbing}
+              onPointerUp={stopScrubbing}
+              onPointerCancel={stopScrubbing}
+              onTouchEnd={stopScrubbing}
+              onMouseUp={stopScrubbing}
+            />
+            <span className="video-time video-time--duration">{playbackTimeLabel(duration)}</span>
+            <Button
+              className="video-mute-btn"
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={toggleMute}
+              aria-label={isMuted ? "Unmute video" : "Mute video"}
+            >
+              {isMuted ? <VolumeXIcon /> : <Volume2Icon />}
+            </Button>
+          </div>
+        </div>
+      }
     >
-      <motion.div
-        className="detail-media-fill detail-media-fill--video phone-detail-media-motion"
-        layoutId={layoutId}
-        transition={{ duration: PHONE_MOTION.detailMs / 1000, ease: MOTION_EASE.gentle }}
-      >
+      {isSensitiveHidden ? (
+        <img src={posterUrl ?? item.links?.thumbnail ?? mediaUrl} alt={itemTitle(item)} onContextMenu={(e) => e.preventDefault()} />
+      ) : (
         <video
           ref={videoRef}
           src={mediaUrl}
@@ -207,154 +246,7 @@ export function VideoDetailView({
           onPause={() => { setIsPlaying(false); setChromeVisible(true); }}
           onEnded={() => { setIsPlaying(false); setChromeVisible(true); }}
         />
-      </motion.div>
-
-      <div className="detail-float-top video-chrome">
-        <Button
-          className="detail-float-btn"
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onBack}
-          aria-label="Back"
-        >
-          <ChevronLeftIcon />
-        </Button>
-        {itemDateLabel(item) ? (
-          <Badge variant="outline" className="detail-float-info">
-            <span>{itemDateLabel(item)}</span>
-          </Badge>
-        ) : <div className="detail-float-info-spacer" />}
-        <Button
-          className="detail-float-btn"
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => onToggleFavorite(item)}
-          aria-label={item.metadata.organization?.favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          {item.metadata.organization?.favorite ? (
-            <StarIcon fill="currentColor" />
-          ) : (
-            <StarIcon />
-          )}
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              className="detail-float-btn"
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="More actions"
-            >
-              <MoreHorizontalIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {item.metadata.safety?.state === "nsfw" ? (
-              <DropdownMenuItem onClick={() => onToggleSafety(item, "safe")}>
-                <ShieldCheckIcon />
-                Mark as Safe
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => onToggleSafety(item, "nsfw")}>
-                <ShieldAlertIcon />
-                Mark as NSFW
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onOpenAbout(item)}>
-              <InfoIcon />
-              About
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="video-control-panel video-chrome" role="group" aria-label="Detail actions" onPointerMove={revealChrome}>
-        <div className="video-action-row">
-          <Button
-            className="detail-float-action h-auto"
-            type="button"
-            variant="ghost"
-            onClick={() => onSearchSameDate(item)}
-          >
-            <CalendarIcon data-icon="inline-start" />
-            <span>Same Date</span>
-          </Button>
-          <Button
-            className="detail-float-action h-auto"
-            type="button"
-            variant="ghost"
-            onClick={() => onRunSimilarSearch(item)}
-          >
-            <SearchIcon data-icon="inline-start" />
-            <span>Similar</span>
-          </Button>
-          {onConfirmAnswer ? (
-            <Button
-              className="detail-float-action detail-float-action--primary h-auto"
-              type="button"
-              onClick={() => onConfirmAnswer(item.id)}
-            >
-              <CheckIcon data-icon="inline-start" />
-              <span>Confirm</span>
-            </Button>
-          ) : (
-            <Button
-              className="detail-float-action detail-float-action--primary h-auto"
-              type="button"
-              onClick={() => onSendSelection(item)}
-            >
-              <SendIcon data-icon="inline-start" />
-              <span>Send</span>
-            </Button>
-          )}
-        </div>
-
-        <div className="video-timeline">
-          <Button
-            className="video-play-btn"
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={togglePlayback}
-            aria-label={isPlaying ? "Pause video" : "Play video"}
-          >
-            {isPlaying ? <PauseIcon /> : <PlayIcon />}
-          </Button>
-          <span className="video-time video-time--elapsed">{playbackTimeLabel(currentTime)}</span>
-          <input
-            className="video-scrubber"
-            type="range"
-            min="0"
-            max={timelineMax}
-            step="0.01"
-            value={Math.min(currentTime, timelineMax)}
-            aria-label="Video timeline"
-            aria-valuetext={`${playbackTimeLabel(currentTime)} of ${playbackTimeLabel(duration)}`}
-            style={{ "--video-progress": `${progress}%` } as React.CSSProperties}
-            onChange={handleSeek}
-            onPointerDown={startScrubbing}
-            onPointerUp={stopScrubbing}
-            onPointerCancel={stopScrubbing}
-            onTouchEnd={stopScrubbing}
-            onMouseUp={stopScrubbing}
-          />
-          <span className="video-time video-time--duration">{playbackTimeLabel(duration)}</span>
-          <Button
-            className="video-mute-btn"
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={toggleMute}
-            aria-label={isMuted ? "Unmute video" : "Mute video"}
-          >
-            {isMuted ? <VolumeXIcon /> : <Volume2Icon />}
-          </Button>
-        </div>
-      </div>
-    </motion.div>
+      )}
+    </DetailScreen>
   );
 }
