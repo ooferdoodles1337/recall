@@ -43,7 +43,8 @@ export type SearchControllerApi = {
   setHistory: React.Dispatch<React.SetStateAction<string[]>>;
   suggestions: string[];
   showComposePanel: boolean;
-  setShowComposePanel: React.Dispatch<React.SetStateAction<boolean>>;
+  collapseComposePanel: () => void;
+  expandComposePanel: () => void;
   hasMore: boolean;
   refinements: string[];
   composeQuery: string;
@@ -58,6 +59,7 @@ export type SearchControllerApi = {
   cancelAutoSearch: () => void;
   removeHistoryItem: (item: string) => void;
   clearHistory: () => void;
+  resetSearch: () => void;
   handleAssistSearch: (nextQuery: string) => void;
   handleSearchChange: (nextQuery: string) => void;
   handleSearchSubmit: () => void;
@@ -186,6 +188,21 @@ export function useSearchController({
 
   const clearHistory = useCallback(() => { setHistory([]); writeSearchHistory([]); }, []);
 
+  const collapseComposePanel = useCallback(() => setShowComposePanel(false), []);
+  const expandComposePanel = useCallback(() => setShowComposePanel(true), []);
+
+  const resetSearch = useCallback(() => {
+    abortActiveSearch();
+    cancelAutoSearch();
+    setQuery("");
+    setSubmittedQuery("");
+    setResults([]);
+    setShowHistory(false);
+    setHistory(readSearchHistory());
+    dispatch({ type: "SEARCH_CLEAR" });
+    topBarInputRef.current?.blur();
+  }, [abortActiveSearch, cancelAutoSearch, dispatch, topBarInputRef]);
+
   const enterComposeMode = useCallback((opts: { showHistory?: boolean } = {}) => {
     if (modeRef.current !== "compose") dispatch({ type: "SEARCH_FOCUS", startQuery: query });
     setShowComposePanel(true);
@@ -309,11 +326,11 @@ export function useSearchController({
     isLoading: effectiveIsLoading, setIsLoading, errorMessage, setErrorMessage,
     visibleCount, setVisibleCount, isLoadingMore, isAutoSearchPending,
     showHistory, setShowHistory, history, setHistory, suggestions,
-    showComposePanel, setShowComposePanel,
+    showComposePanel, collapseComposePanel, expandComposePanel,
     hasMore, refinements, composeQuery, composeSuggestions, activeHistory, visibleHistory,
     liveRef,
     runSearch, runSimilarById, loadMore, abortActiveSearch, cancelAutoSearch,
-    removeHistoryItem, clearHistory,
+    removeHistoryItem, clearHistory, resetSearch,
     handleAssistSearch, handleSearchChange, handleSearchSubmit, handleSearchClear,
     handleSearchHistoryToggle, handleSearchFocus,
     enterComposeMode, closeComposeMode,

@@ -1217,6 +1217,35 @@
   color: rgba(60, 60, 67, 0.6);
 }
 
+/* Long-press learnability hint — floats above the selection tray */
+.long-press-hint {
+  position: absolute;
+  /* bottom reference mirrors selection-tray: inset + tray height + gap */
+  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + 158px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 0.5px solid rgba(60, 60, 67, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  cursor: default;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ios-label-secondary);
+  pointer-events: auto;
+  user-select: none;
+}
+
 /* iOS yellow tint CTA pill */
 .send-btn {
   min-height: 44px;

@@ -4,8 +4,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
 import {
-  SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD, mediaLayoutId, readSearchHistory,
+  SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD, mediaLayoutId,
   LONG_PRESS_MS, LONG_PRESS_CANCEL_DIST_SQ, SELECTION_SUPPRESS_MS, HIDE_COMPOSE_SCROLL_THRESHOLD,
+  readLongPressHintDismissed, writeLongPressHintDismissed,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
 import { NsfwDialog } from "./NsfwDialog";
@@ -30,6 +31,7 @@ import { IndexedAlbumsSheet } from "./IndexedAlbumsSheet";
 import { useIndexedAlbums } from "./useIndexedAlbums";
 import { HomeLayer } from "./HomeLayer";
 import { ResultsLayer } from "./ResultsLayer";
+import { LongPressHint } from "./LongPressHint";
 import { GridHandlersContext } from "./GridHandlersContext";
 import { useSearchController } from "./useSearchController";
 
@@ -54,6 +56,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const favoriteItems = favoritesQuery.data?.results ?? [];
   const isLoadingFavorites = favoritesQuery.isPending;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
+  const [showLongPressHint, setShowLongPressHint] = useState(false);
+  const hasShownHintRef = useRef(false);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [albumsOpen, setAlbumsOpen] = useState(false);
@@ -129,10 +133,17 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     cancelLongPress();
     if (isTileSelectionSuppressed()) return;
     if (!longPressTriggeredRef.current) {
-      if (isItemBlurred(item)) setNsfwPendingItem(item);
-      else toggleSelected(item);
+      if (isItemBlurred(item)) {
+        setNsfwPendingItem(item);
+      } else {
+        toggleSelected(item);
+        if (modeRef.current === "results" && !hasShownHintRef.current && !readLongPressHintDismissed()) {
+          hasShownHintRef.current = true;
+          setTimeout(() => setShowLongPressHint(true), 400);
+        }
+      }
     }
-  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, toggleSelected, setNsfwPendingItem]);
+  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, toggleSelected, setNsfwPendingItem, modeRef]);
 
   const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
     if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
@@ -192,22 +203,23 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     // Absorb residual momentum scroll events that occur right after the user taps
     // the search bar to enter compose — without this, those events race with the
     // mode change and immediately dismiss compose or collapse the panel.
-    const ignoreUntil = Date.now() + 250;
+    let graceOver = false;
+    const graceTimer = setTimeout(() => { graceOver = true; }, 250);
     const handleScroll = () => {
       if (modeRef.current !== "compose") return;
       const st = el.scrollTop;
-      if (Date.now() < ignoreUntil) { prevScrollTop = st; return; }
+      if (!graceOver) { prevScrollTop = st; return; }
       if (bgContentRef.current === "results") {
-        if (st > HIDE_COMPOSE_SCROLL_THRESHOLD) sc.setShowComposePanel(false);
-        else if (st <= 0) sc.setShowComposePanel(true);
+        if (st > HIDE_COMPOSE_SCROLL_THRESHOLD) sc.collapseComposePanel();
+        else if (st <= 0) sc.expandComposePanel();
       } else {
         if (st > prevScrollTop) { dispatch({ type: "COMPOSE_DISMISS" }); topBarInputRef.current?.blur(); }
       }
       prevScrollTop = st;
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
-  }, [mode, dispatch, sc.setShowComposePanel]);
+    return () => { clearTimeout(graceTimer); el.removeEventListener("scroll", handleScroll); };
+  }, [mode, dispatch, sc.collapseComposePanel, sc.expandComposePanel]);
 
   // Overscroll-to-load-more physics (touch)
   useEffect(() => {
@@ -257,9 +269,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const handleConfirmAnswer = useCallback((id: string) => {
     onConfirmAnswer?.(id);
-    sc.setQuery(""); sc.setSubmittedQuery(""); sc.setResults([]); setSelectedItems([]); sc.setShowHistory(false);
-    dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur();
-  }, [onConfirmAnswer, dispatch, sc.setQuery, sc.setSubmittedQuery, sc.setResults, sc.setShowHistory]);
+    setSelectedItems([]);
+    sc.resetSearch();
+  }, [onConfirmAnswer, sc.resetSearch]);
 
   const isSearching = sc.isAutoSearchPending || (sc.isLoading && mode === "compose");
 
@@ -287,10 +299,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       aria-label="Phone interface viewport"
       onKeyDown={(event) => {
         if (event.key === "Escape" && modeRef.current === "compose") { sc.closeComposeMode(); return; }
-        if (event.key === "Escape" && mode !== "home") {
-          sc.abortActiveSearch(); sc.setQuery(""); sc.setSubmittedQuery(""); sc.setShowHistory(false); sc.setHistory(readSearchHistory());
-          dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur();
-        }
+        if (event.key === "Escape" && mode !== "home") sc.resetSearch();
       }}
     >
       {mode === "results" && sc.hasMore ? (
@@ -406,6 +415,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           <SelectionTray selectedItems={selectedItems} toggleSelected={toggleSelected}
             onConfirmAnswer={handleConfirmAnswer} onClearSelection={() => setSelectedItems([])} />
         )}
+        <LongPressHint visible={showLongPressHint} onDismiss={() => {
+          writeLongPressHintDismissed();
+          setShowLongPressHint(false);
+        }} />
       </MotionConfig>
     </div>
     </GridHandlersContext.Provider>

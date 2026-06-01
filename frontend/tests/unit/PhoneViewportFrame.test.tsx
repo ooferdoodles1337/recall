@@ -34,6 +34,11 @@ async function commitSearch(query: string, user = userEvent.setup()) {
   await user.keyboard("{Enter}");
 }
 
+// Wait for the 250ms scroll-grace period (real setTimeout) to expire.
+async function advancePastScrollGrace() {
+  await act(async () => { await new Promise<void>(resolve => setTimeout(resolve, 260)); });
+}
+
 async function openDetailFromButton(button: HTMLElement) {
   vi.useFakeTimers();
   fireEvent.pointerDown(button, {
@@ -132,8 +137,9 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Recent searches" }));
-    expect(screen.getByRole("button", { name: "sunset picnic" })).toBeInTheDocument();
+    // Tap the search bar to open compose — history shows automatically (CP-3)
+    await user.click(currentSearchInput());
+    expect(await screen.findByRole("button", { name: "sunset picnic" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Remove sunset picnic" }));
     await waitFor(() => {
@@ -144,8 +150,9 @@ describe("PhoneViewportFrame interactions", () => {
     window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(["mountain", "coffee"]));
     renderPhone();
     await waitForPhoneHome();
-    await user.click(screen.getByRole("button", { name: "Recent searches" }));
-    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    // Tap the search bar to open compose — history shows automatically (CP-3)
+    await user.click(currentSearchInput());
+    await user.click(await screen.findByRole("button", { name: "Clear all" }));
     expect(JSON.parse(window.localStorage.getItem(SEARCH_HISTORY_KEY) ?? "[]")).toEqual([]);
   });
 
@@ -209,13 +216,13 @@ describe("PhoneViewportFrame interactions", () => {
     renderPhone();
 
     await user.click((await screen.findAllByRole("button", { name: /Sensitive content/i }))[0]);
-    const oneDialog = await screen.findByRole("alertdialog", { name: "Sensitive content warning" });
-    await user.click(within(oneDialog).getByRole("button", { name: "Reveal This One" }));
+    const oneDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
+    await user.click(within(oneDialog).getByRole("button", { name: "View" }));
     expect(await screen.findByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: /Sensitive content/i })[0]);
-    const allDialog = await screen.findByRole("alertdialog", { name: "Sensitive content warning" });
-    await user.click(within(allDialog).getByRole("button", { name: "Reveal for Session" }));
+    const allDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
+    await user.click(within(allDialog).getByRole("button", { name: /Show all sensitive/i }));
 
     expect(await screen.findByRole("button", { name: /Select Second sensitive favorite/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
@@ -257,16 +264,19 @@ describe("PhoneViewportFrame interactions", () => {
     expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
 
     await waitFor(() => {
       expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
     });
-    expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    // search-panel--expanded is removed with the panel (showComposePanel=false drives the condition)
+    expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
     expect(document.activeElement).toBe(currentSearchInput());
 
     scrollTopSpy.mockReturnValue(0);
+    await advancePastScrollGrace();
     fireEvent.scroll(viewport);
 
     await waitFor(() => {
@@ -288,6 +298,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
     await waitFor(() => {
@@ -312,6 +323,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
     scrollTopSpy.mockRestore();
