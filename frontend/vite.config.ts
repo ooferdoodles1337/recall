@@ -16,9 +16,10 @@ export default defineConfig({
     },
   },
   server: {
-    host: true,
+    host: "localhost",
     port: 5173,
     strictPort: true,
+    allowedHosts: ["recall.318437129.xyz"],
     proxy: {
       "/search": backendProxy,
       "/catalog": backendProxy,
