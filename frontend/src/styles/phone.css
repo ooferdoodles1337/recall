@@ -2,6 +2,22 @@
    Phone viewport frame
    ============================================================ */
 
+/* Glass tokens hoisted to :root so portaled elements (Radix dropdowns,
+   sheets) that render outside .phone-rect can still resolve them. */
+:root {
+  --glass-dark-xs:    blur(8px) saturate(1.4);
+  --glass-light-xs:   blur(8px) saturate(1.8);
+  --glass-dark-sm:    blur(12px) saturate(1.4);
+  --glass-dark-md:    blur(16px) saturate(1.4);
+  --glass-light-md:   blur(16px) saturate(1.8);
+  --glass-dark-lg:    blur(20px) saturate(1.4);
+  --glass-light-lg:   blur(20px) saturate(1.8);
+  --glass-dark-xl:    blur(24px) saturate(1.4);
+  --glass-light-xl:   blur(24px) saturate(1.8);
+  --glass-light-2xl:  blur(32px) saturate(1.8);
+  --glass-scrim:      blur(12px);
+}
+
 /* iOS 26 light theme — scopes all shadcn tokens inside the phone UI.
    Font: -apple-system resolves to SF Pro on Apple devices; Inter Variable
    is the closest open-weight web equivalent on other platforms. */
@@ -101,6 +117,11 @@
      Canonical location: margin-bottom on .phone-persistent-section. */
   --phone-bar-gap: var(--sp-2);
 
+  /* Approximate rendered height of the selection tray. Both the viewport
+     scroll padding and the long-press hint offset derive from this value —
+     update here when tray content or padding changes. */
+  --selection-tray-h: 148px;
+
   /* Glass morphism tokens */
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
   --glass-edge-left: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
@@ -119,9 +140,9 @@
      Token          blur   sat    typical surfaces
      --glass-dark-xs   8px  1.4   video badge, remove-chip, album check
      --glass-light-xs  8px  1.8   light remove-chip (light tray context)
-     --glass-dark-sm  12px  1.4   detail info pill, bottom action btns
+     --glass-dark-sm  12px  1.4   detail info pill, bottom action btns, pull indicator
      --glass-dark-md  16px  1.4   chrome circles, side-nav, video bar
-     --glass-light-md 16px  1.8   zoom controls, pull indicator
+     --glass-light-md 16px  1.8   zoom controls
      --glass-dark-lg  20px  1.4   detail menus, neighbor label
      --glass-light-lg 20px  1.8   search bar, compose panel, hints
      --glass-dark-xl  24px  1.4   sensitive content overlay
@@ -218,6 +239,7 @@
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
   padding: 0 0 var(--sp-8);
   scrollbar-width: none;
 }
@@ -747,7 +769,7 @@
   z-index: 4;
   width: 42px;
   height: 56px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -755,6 +777,7 @@
   background: rgba(0, 0, 0, 0.3);
   color: #fff;
   opacity: 0;
+  pointer-events: none;
   transform: translateY(-50%);
   backdrop-filter: var(--glass-dark-md);
   -webkit-backdrop-filter: var(--glass-dark-md);
@@ -779,14 +802,16 @@
   height: 24px;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .detail-side-nav {
-    display: flex;
-  }
+/* Keyboard users on any device can reach and see the nav via focus. */
+.detail-side-nav:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 
-  .detail-screen:hover .detail-side-nav,
-  .detail-side-nav:focus-visible {
+@media (hover: hover) and (pointer: fine) {
+  .detail-screen:hover .detail-side-nav {
     opacity: 1;
+    pointer-events: auto;
   }
 }
 
@@ -817,11 +842,9 @@
     box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.search-bar--no-icon {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.search-bar--date-browse {
+.search-bar--no-icon,
+.search-bar--date-browse,
+.search-bar--similar {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -1210,8 +1233,8 @@
   border: 0.5px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.76);
-  backdrop-filter: var(--glass-light-md);
-  -webkit-backdrop-filter: var(--glass-light-md);
+  backdrop-filter: var(--glass-dark-sm);
+  -webkit-backdrop-filter: var(--glass-dark-sm);
   box-shadow:
     0 2px 16px rgba(0, 0, 0, 0.10),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -1249,7 +1272,7 @@
 }
 
 .pull-indicator--dismissing {
-  animation: pull-dismiss-pop 0.18s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  animation: pull-dismiss-pop 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 @keyframes pull-dismiss-pop {
@@ -1364,7 +1387,7 @@
 }
 
 .phone-rect--has-selection .phone-rect-viewport {
-  padding-bottom: calc(var(--sp-8) + 130px);
+  padding-bottom: calc(var(--sp-8) + var(--selection-tray-h));
 }
 
 .selection-tray-content {
@@ -1466,8 +1489,7 @@
 /* Long-press learnability hint — floats above the selection tray */
 .long-press-hint {
   position: absolute;
-  /* bottom reference mirrors selection-tray: inset + tray height + gap */
-  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + 158px);
+  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + var(--selection-tray-h));
   left: 50%;
   transform: translateX(-50%);
   z-index: 36;
@@ -2680,10 +2702,6 @@ body:has(.app-shell--phone) {
 }
 
 /* Similar search context chip — replaces text input in the search bar */
-
-.search-bar--similar {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
 
 .similar-source-chip {
   min-width: 0;
