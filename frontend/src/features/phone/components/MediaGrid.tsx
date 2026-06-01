@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { EyeOffIcon, PlayIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,9 +95,18 @@ const ThumbCell = React.memo(function ThumbCell({
         ) : !isBlurred && animated ? (
           <Badge variant="secondary" className="video-badge video-badge--gif">GIF</Badge>
         ) : null}
-        {!isBlurred && selected ? (
-          <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
-        ) : null}
+        <AnimatePresence>
+          {!isBlurred && selected && (
+            <motion.div
+              style={{ position: "absolute", top: "var(--sp-1)", right: "var(--sp-1)" }}
+              initial={{ opacity: 0, scale: 0.72 }}
+              animate={{ opacity: 1, scale: 1, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } }}
+              exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } }}
+            >
+              <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Button>
     </motion.div>
   );
@@ -140,30 +149,38 @@ export function MediaGrid({
 
   return (
     <div ref={gridRef} className={className} data-phone-grid-scope={scope} role="group" aria-label={ariaLabel}>
-      {showInitialLoading ? (
-        Array.from({ length: loadingCount }, (_, index) => (
-          <Skeleton key={index} className="thumb-skeleton" data-phone-grid-item={`${loadingKeyPrefix}-${index}`} aria-hidden="true" />
-        ))
-      ) : items.length === 0 ? (
-        emptyContent
-      ) : items.map((result) => {
-        const selectionIndex = selectedItems.findIndex((item) => item.id === result.id);
-        return (
-          <ThumbCell
-            key={result.id}
-            result={result}
-            isBlurred={isItemBlurred(result)}
-            selected={selectionIndex >= 0}
-            selectionIndex={selectionIndex}
-            naturalAspectRatio={naturalAspectRatio}
-            onPointerDown={onPointerDown}
-            onPointerUp={onPointerUp}
-            onPointerMove={onPointerMove}
-            onPointerCancel={onPointerCancel}
-            toggleSelected={toggleSelected}
-          />
-        );
-      })}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {showInitialLoading ? (
+          Array.from({ length: loadingCount }, (_, index) => (
+            <motion.div
+              key={`${loadingKeyPrefix}-${index}`}
+              className="thumb-skeleton"
+              data-phone-grid-item={`${loadingKeyPrefix}-${index}`}
+              aria-hidden="true"
+              exit={{ opacity: 0, transition: { duration: 0.12, ease: "easeOut" } }}
+            />
+          ))
+        ) : items.length === 0 ? (
+          emptyContent
+        ) : items.map((result) => {
+          const selectionIndex = selectedItems.findIndex((item) => item.id === result.id);
+          return (
+            <ThumbCell
+              key={result.id}
+              result={result}
+              isBlurred={isItemBlurred(result)}
+              selected={selectionIndex >= 0}
+              selectionIndex={selectionIndex}
+              naturalAspectRatio={naturalAspectRatio}
+              onPointerDown={onPointerDown}
+              onPointerUp={onPointerUp}
+              onPointerMove={onPointerMove}
+              onPointerCancel={onPointerCancel}
+              toggleSelected={toggleSelected}
+            />
+          );
+        })}
+      </AnimatePresence>
       {trailingLoadingCount > 0 ? (
         Array.from({ length: trailingLoadingCount }, (_, index) => (
           <Skeleton key={`${trailingLoadingKeyPrefix}-${index}`} className="thumb-skeleton" data-phone-grid-item={`${trailingLoadingKeyPrefix}-${index}`} aria-hidden="true" />

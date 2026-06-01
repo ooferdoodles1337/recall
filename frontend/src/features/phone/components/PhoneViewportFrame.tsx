@@ -59,6 +59,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const [albumsOpen, setAlbumsOpen] = useState(false);
   const indexedAlbums = useIndexedAlbums();
   const [overscrollProgress, setOverscrollProgress] = useState(0);
+  const [pullDismissing, setPullDismissing] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   const phoneRectRef = useRef<HTMLDivElement>(null);
@@ -80,6 +81,14 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
     setQuery: sc.setQuery, runSearch: sc.runSearch, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
   });
+
+  const handleViewNsfwItem = useCallback((item: RecallMediaItem) => {
+    if (modeRef.current === "detail") return;
+    revealOne(item.id);
+    dispatch({ type: "DETAIL_OPEN" });
+    setDetailItem(item);
+    onSelectCandidate?.(item.id);
+  }, [revealOne, dispatch, setDetailItem, onSelectCandidate]);
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -177,10 +186,17 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    let prevScrollTop = 0;
+    // Start at actual scroll position so momentum events that fired before this
+    // effect ran don't look like a downward scroll from 0.
+    let prevScrollTop = el.scrollTop;
+    // Absorb residual momentum scroll events that occur right after the user taps
+    // the search bar to enter compose — without this, those events race with the
+    // mode change and immediately dismiss compose or collapse the panel.
+    const ignoreUntil = Date.now() + 250;
     const handleScroll = () => {
       if (modeRef.current !== "compose") return;
       const st = el.scrollTop;
+      if (Date.now() < ignoreUntil) { prevScrollTop = st; return; }
       if (bgContentRef.current === "results") {
         if (st > HIDE_COMPOSE_SCROLL_THRESHOLD) sc.setShowComposePanel(false);
         else if (st <= 0) sc.setShowComposePanel(true);
@@ -214,6 +230,8 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const onTouchEnd = () => {
       const delta = currentOverscroll; currentOverscroll = 0; setOverscrollProgress(0);
       if (delta >= OVERSCROLL_THRESHOLD && sc.liveRef.current.hasMore) {
+        setPullDismissing(true);
+        setTimeout(() => setPullDismissing(false), 200);
         const { prefetchedResults: cached, visibleCount: vc } = sc.liveRef.current;
         if (cached) { sc.setResults(cached); sc.setVisibleCount(vc + SEARCH_BATCH_SIZE); sc.setErrorMessage(null); }
         else { void sc.loadMore(); }
@@ -273,7 +291,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       }}
     >
       {mode === "results" && sc.hasMore ? (
-        <div className={`pull-indicator${overscrollProgress > 0 ? " pull-indicator--visible" : ""}${overscrollProgress >= 1 ? " pull-indicator--ready" : ""}`} aria-hidden>
+        <div className={`pull-indicator${overscrollProgress > 0 ? " pull-indicator--visible" : ""}${overscrollProgress >= 1 ? " pull-indicator--ready" : ""}${pullDismissing ? " pull-indicator--dismissing" : ""}`} aria-hidden>
           <svg className="pull-indicator-ring" viewBox="0 0 20 20">
             <circle className="pull-indicator-track" cx="10" cy="10" r="8" />
             <circle className="pull-indicator-fill" cx="10" cy="10" r="8" style={{ strokeDashoffset: 50.3 * (1 - overscrollProgress) }} />
@@ -343,8 +361,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
       {nsfwPendingItem && (
         <NsfwDialog item={nsfwPendingItem} onKeepHidden={() => setNsfwPendingItem(null)}
-          onRevealOne={revealOne} onRevealAll={revealAll}
-          onMarkSafe={(item) => void handleToggleSafety(item, "safe")} />
+          onViewItem={handleViewNsfwItem} onRevealAll={revealAll} />
       )}
 
       <MotionConfig reducedMotion="user">
@@ -363,6 +380,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               indexedAlbumTotal={indexedAlbums.total}
               gridColumns={gridColumns}
               onOpenIndexedAlbums={() => setAlbumsOpen(true)}
+              onRevealAll={revealAll}
               escapeDisabled={albumsOpen}
             />
           )}

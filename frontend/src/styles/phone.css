@@ -850,7 +850,6 @@
 
 .video-badge,
 .selected-num {
-  position: absolute;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -859,6 +858,7 @@
 }
 
 .video-badge {
+  position: absolute;
   right: var(--sp-1);
   bottom: var(--sp-1);
   gap: var(--sp-1);
@@ -879,8 +879,6 @@
 }
 
 .selected-num {
-  top: var(--sp-1);
-  right: var(--sp-1);
   min-width: var(--sp-5);
   height: var(--sp-5);
   padding: 0 var(--sp-1);
@@ -890,18 +888,6 @@
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1;
-  animation: selected-badge-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes selected-badge-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.72);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* Results footer card */
@@ -1014,6 +1000,15 @@
   50%  { scale: 1.14; }
   80%  { scale: 0.97; }
   100% { scale: 1; }
+}
+
+.pull-indicator--dismissing {
+  animation: pull-dismiss-pop 0.18s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+@keyframes pull-dismiss-pop {
+  0%   { scale: 1; opacity: 1; translate: -50% 0; }
+  100% { scale: 0.72; opacity: 0; translate: -50% 0; }
 }
 
 .pull-indicator-ring {
@@ -1785,38 +1780,20 @@ body:has(.app-shell--phone) {
   opacity: 0.9;
 }
 
-.nsfw-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.nsfw-sheet {
-  background: rgba(255, 255, 255, 0.82);
+.nsfw-sheet[data-slot="sheet-content"] {
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(28px) saturate(1.8);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.6);
-  border-radius: 14px;
-  width: min(300px, 90vw);
-  overflow: hidden;
-  box-shadow:
-    0 12px 48px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.nsfw-sheet[data-slot="alert-dialog-content"] {
+  border-top: 0.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px 14px 0 0;
   z-index: 201;
+  overflow: hidden;
 }
 
 .nsfw-sheet-header {
-  padding: 24px 20px 18px;
+  padding: 24px 20px 20px;
   text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
 
 .nsfw-sheet-icon {
@@ -1843,48 +1820,62 @@ body:has(.app-shell--phone) {
 }
 
 .nsfw-sheet-actions {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 16px 16px max(env(safe-area-inset-bottom), 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .nsfw-sheet-btn {
   display: block;
   width: 100%;
-  padding: 14px 20px;
-  background: none;
   border: none;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
   cursor: pointer;
   font-size: 0.9375rem;
   font-family: inherit;
   text-align: center;
-  transition: background 0.1s;
+  border-radius: 12px;
+  transition: opacity 0.1s;
 }
 
-.nsfw-sheet-btn:first-child {
-  border-top: none;
-}
-
-.nsfw-sheet-btn:active {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.nsfw-sheet-btn--reveal-all {
-  color: #d97706;
-}
-
-.nsfw-sheet-btn--reveal-one {
-  color: #2563eb;
+.nsfw-sheet-btn--view {
+  padding: 14px 20px;
+  background: #2563eb;
+  color: #fff;
   font-weight: 600;
+}
+
+.nsfw-sheet-btn--view:active {
+  opacity: 0.82;
 }
 
 .nsfw-sheet-btn--cancel {
-  color: #111827;
-  font-weight: 700;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #374151;
+  font-weight: 500;
 }
 
-.nsfw-sheet-btn--mark-safe {
-  color: #16a34a;
-  font-weight: 600;
+.nsfw-sheet-btn--cancel:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.nsfw-sheet-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 4px;
+}
+
+.nsfw-sheet-btn--reveal-all {
+  padding: 6px 20px;
+  background: none;
+  color: #d97706;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.nsfw-sheet-btn--reveal-all:active {
+  opacity: 0.65;
 }
 
 /* About bottom sheet — frosted glass, slides up from bottom */

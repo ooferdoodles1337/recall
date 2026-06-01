@@ -15,6 +15,7 @@ interface SettingsSheetProps {
   indexedAlbumTotal: number;
   gridColumns: number;
   onOpenIndexedAlbums: () => void;
+  onRevealAll?: () => void;
   escapeDisabled?: boolean;
 }
 
@@ -31,9 +32,9 @@ export function SettingsSheet({
   indexedAlbumTotal,
   gridColumns,
   onOpenIndexedAlbums,
+  onRevealAll,
   escapeDisabled = false,
 }: SettingsSheetProps) {
-  // Cosmetic-only toggle — not persisted, changes no real behavior.
   const [showSensitive, setShowSensitive] = useState(false);
 
   return (
@@ -90,7 +91,10 @@ export function SettingsSheet({
                 <Switch
                   id="settings-show-sensitive"
                   checked={showSensitive}
-                  onCheckedChange={setShowSensitive}
+                  onCheckedChange={(checked) => {
+                    setShowSensitive(checked);
+                    if (checked) onRevealAll?.();
+                  }}
                 />
               </div>
             </div>

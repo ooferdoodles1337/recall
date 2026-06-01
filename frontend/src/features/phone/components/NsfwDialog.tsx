@@ -1,54 +1,46 @@
 import { ShieldAlertIcon } from "lucide-react";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import type { RecallMediaItem } from "@/shared/types/recall";
 
 interface NsfwDialogProps {
   item: RecallMediaItem;
   onKeepHidden: () => void;
-  onRevealOne: (id: string) => void;
+  onViewItem: (item: RecallMediaItem) => void;
   onRevealAll: () => void;
-  onMarkSafe: (item: RecallMediaItem) => void;
 }
 
-export function NsfwDialog({ item, onKeepHidden, onRevealOne, onRevealAll, onMarkSafe }: NsfwDialogProps) {
+export function NsfwDialog({ item, onKeepHidden, onViewItem, onRevealAll }: NsfwDialogProps) {
   const mediaType = item.metadata.asset?.media_type === "video" ? "video" : "photo";
   return (
-    <AlertDialog open onOpenChange={(open) => { if (!open) onKeepHidden(); }}>
-      <AlertDialogContent className="nsfw-sheet p-0 gap-0">
-        <AlertDialogHeader className="nsfw-sheet-header block">
-          <AlertDialogMedia className="nsfw-sheet-icon bg-transparent p-0" aria-hidden>
+    <Sheet open onOpenChange={(open) => { if (!open) onKeepHidden(); }}>
+      <SheetContent side="bottom" showCloseButton={false} className="nsfw-sheet p-0">
+        <div className="nsfw-sheet-header">
+          <div className="nsfw-sheet-icon" aria-hidden>
             <ShieldAlertIcon />
-          </AlertDialogMedia>
-          <AlertDialogTitle className="sr-only">Sensitive content warning</AlertDialogTitle>
-          <p className="nsfw-sheet-title">Sensitive Content</p>
-          <AlertDialogDescription className="nsfw-sheet-body">
-            This {mediaType} was flagged as potentially inappropriate.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="nsfw-sheet-actions">
-          <AlertDialogAction className="nsfw-sheet-btn nsfw-sheet-btn--reveal-all h-auto" onClick={onRevealAll}>
-            Reveal for Session
-          </AlertDialogAction>
-          <AlertDialogAction className="nsfw-sheet-btn nsfw-sheet-btn--reveal-one h-auto" onClick={() => onRevealOne(item.id)}>
-            Reveal This One
-          </AlertDialogAction>
-          <AlertDialogAction className="nsfw-sheet-btn nsfw-sheet-btn--mark-safe h-auto" onClick={() => onMarkSafe(item)}>
-            Mark as Safe
-          </AlertDialogAction>
-          <AlertDialogCancel className="nsfw-sheet-btn nsfw-sheet-btn--cancel h-auto" onClick={onKeepHidden}>
-            Keep Hidden
-          </AlertDialogCancel>
+          </div>
+          <SheetTitle className="nsfw-sheet-title">Sensitive Content</SheetTitle>
+          <SheetDescription className="nsfw-sheet-body">
+            This {mediaType} was flagged by automated review.
+          </SheetDescription>
         </div>
-      </AlertDialogContent>
-    </AlertDialog>
+        <div className="nsfw-sheet-actions">
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--view" type="button" onClick={() => onViewItem(item)}>
+            View
+          </button>
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--cancel" type="button" onClick={onKeepHidden}>
+            Keep Hidden
+          </button>
+          <div className="nsfw-sheet-divider" aria-hidden />
+          <button className="nsfw-sheet-btn nsfw-sheet-btn--reveal-all" type="button" onClick={onRevealAll}>
+            Show all sensitive for this session
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
