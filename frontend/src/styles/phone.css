@@ -484,9 +484,8 @@
   min-width: 0;
   width: fit-content;
   max-width: calc(100% - 116px);
-  height: auto;
-  min-height: 32px;
-  padding: 6px 10px;
+  height: 40px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   border-color: rgba(255, 255, 255, 0.18);

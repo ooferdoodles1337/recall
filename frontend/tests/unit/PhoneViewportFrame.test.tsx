@@ -228,6 +228,45 @@ describe("PhoneViewportFrame interactions", () => {
     expect(screen.getByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
   });
 
+  it("blurs a favorite tile after marking it NSFW from detail", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+
+    await waitFor(() => {
+      expect(phoneMockState.favoriteItems.find((item) => item.id === "favorite-01")?.metadata.safety?.state).toBe("nsfw");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(document.querySelector('[data-phone-grid-item="favorite-01"]')).toHaveAccessibleName(/Sensitive content/i);
+    });
+    expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
+  });
+
+  it("blurs a search result tile after marking it NSFW from detail", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+
+    await waitFor(() => {
+      expect(phoneMockState.semanticResults.find((item) => item.id === "sunset-result")?.metadata.safety?.state).toBe("nsfw");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(document.querySelector('[data-phone-grid-item="sunset-result"]')).toHaveAccessibleName(/Sensitive content/i);
+    });
+    expect(screen.queryByRole("button", { name: /Select Sunset pier photo/i })).not.toBeInTheDocument();
+  });
+
   it("shows video detail playback controls without breaking Back, Similar, or Send", async () => {
     const user = userEvent.setup();
     renderPhone();

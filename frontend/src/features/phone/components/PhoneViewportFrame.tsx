@@ -81,9 +81,16 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const sc = useSearchController({ dispatch, scrollContainerRef, topBarInputRef, modeRef, bgContentRef, modeState, modeTransition });
 
+  const handleItemUpdated = useCallback((updated: RecallMediaItem) => {
+    sc.updateItem(updated);
+    setSelectedItems((prev) => prev.map((item) => item.id === updated.id ? updated : item));
+    setAboutSheetItem((prev) => prev?.id === updated.id ? updated : prev);
+  }, [sc.updateItem]);
+
   const { detailItem, setDetailItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate } = usePhoneDetail({
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
     setQuery: sc.setQuery, runSearch: sc.runSearch, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
+    onItemUpdated: handleItemUpdated,
   });
 
   const handleViewNsfwItem = useCallback((item: RecallMediaItem) => {

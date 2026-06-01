@@ -27,17 +27,38 @@ type Dependencies = {
   setErrorMessage: (msg: string | null) => void;
   setNsfwPendingItem: (item: RecallMediaItem | null) => void;
   revealSafe: (id: string) => void;
+  onItemUpdated?: (item: RecallMediaItem) => void;
 };
+
+type CatalogItemsCache = {
+  count: number;
+  results: RecallMediaItem[];
+};
+
+function replaceItem(items: RecallMediaItem[], updated: RecallMediaItem) {
+  return items.map((item) => item.id === updated.id ? updated : item);
+}
 
 export function usePhoneDetail(deps: Dependencies): DetailApi {
   const {
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
     setQuery, runSearch, setErrorMessage, setNsfwPendingItem, revealSafe,
+    onItemUpdated,
   } = deps;
   const queryClient = useQueryClient();
 
   const [detailItem, setDetailItem] = useState<RecallMediaItem | null>(null);
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
+
+  const publishUpdatedItem = useCallback((updated: RecallMediaItem) => {
+    setDetailItem((prev) => prev?.id === updated.id ? updated : prev);
+    setAboutSheetItem((prev) => prev?.id === updated.id ? updated : prev);
+    queryClient.setQueriesData<CatalogItemsCache>({ queryKey: ["catalog"] }, (old) => {
+      if (!old?.results) return old;
+      return { ...old, results: replaceItem(old.results, updated) };
+    });
+    onItemUpdated?.(updated);
+  }, [onItemUpdated, queryClient]);
 
   const openDetail = useCallback((item: RecallMediaItem) => {
     if (isItemBlurred(item)) { setNsfwPendingItem(item); return; }
@@ -55,8 +76,8 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
   const { mutate: mutateFavorite } = useMutation({
     mutationFn: ({ item, favorite }: { item: RecallMediaItem; favorite: boolean }) =>
       patchCatalogItem(item.id, { organization: { favorite } }),
-    onSuccess: (updated, { item }) => {
-      setDetailItem((prev) => prev?.id === item.id ? updated : prev);
+    onSuccess: (updated) => {
+      publishUpdatedItem(updated);
       void queryClient.invalidateQueries({ queryKey: ["catalog", "favorites"] });
     },
     onError: () => setErrorMessage("Couldn't update favorite — please try again."),
@@ -70,7 +91,7 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
     mutationFn: ({ item, state }: { item: RecallMediaItem; state: "safe" | "nsfw" }) =>
       patchCatalogItem(item.id, { safety: { state } }),
     onSuccess: (updated, { item, state }) => {
-      setDetailItem((prev) => prev?.id === item.id ? updated : prev);
+      publishUpdatedItem(updated);
       if (state === "safe") { revealSafe(item.id); setNsfwPendingItem(null); }
     },
     onError: () => setErrorMessage("Couldn't update content rating — please try again."),

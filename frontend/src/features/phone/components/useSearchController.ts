@@ -52,6 +52,7 @@ export type SearchControllerApi = {
   activeHistory: string[];
   visibleHistory: string[];
   liveRef: React.MutableRefObject<{ hasMore: boolean; submittedQuery: string; query: string; visibleCount: number; prefetchedResults: RecallMediaItem[] | null }>;
+  updateItem: (updated: RecallMediaItem) => void;
   runSearch: (rawQuery: string, count?: number, options?: { remember?: boolean; fromAuto?: boolean }) => Promise<void>;
   runSimilarById: (itemId: string) => Promise<void>;
   loadMore: () => Promise<void>;
@@ -191,6 +192,12 @@ export function useSearchController({
   const collapseComposePanel = useCallback(() => setShowComposePanel(false), []);
   const expandComposePanel = useCallback(() => setShowComposePanel(true), []);
 
+  const updateItem = useCallback((updated: RecallMediaItem) => {
+    const replace = (items: RecallMediaItem[]) => items.map((item) => item.id === updated.id ? updated : item);
+    setResults(replace);
+    setPrefetchedResults((prev) => prev ? replace(prev) : prev);
+  }, []);
+
   const resetSearch = useCallback(() => {
     abortActiveSearch();
     cancelAutoSearch();
@@ -328,7 +335,7 @@ export function useSearchController({
     showHistory, setShowHistory, history, setHistory, suggestions,
     showComposePanel, collapseComposePanel, expandComposePanel,
     hasMore, refinements, composeQuery, composeSuggestions, activeHistory, visibleHistory,
-    liveRef,
+    liveRef, updateItem,
     runSearch, runSimilarById, loadMore, abortActiveSearch, cancelAutoSearch,
     removeHistoryItem, clearHistory, resetSearch,
     handleAssistSearch, handleSearchChange, handleSearchSubmit, handleSearchClear,
