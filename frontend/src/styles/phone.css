@@ -105,6 +105,20 @@
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
   --glass-edge-left: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+
+  /* ── iOS 26 glass material tiers ─────────────────────────────────
+     All floating surfaces must use backdrop-filter: blur().
+     Light glass pumps vibrancy (saturate 1.8); dark glass tints
+     without over-vibrancy (saturate 1.4).
+
+     xs   blur(8px)  sat(1.4)  tiny chips, badges
+     sm   blur(12px) sat(1.4)  thin dark floating pills
+     md   blur(16px) sat(1.4/1.8)  standard controls
+     lg   blur(20px) sat(1.8/1.4)  panels, menus, search
+     xl   blur(24px) sat(1.8/1.4)  cards, trays
+     2xl  blur(32px) sat(1.8)  heavy sheets
+     scrim blur(12px) —         modal backdrop
+  ──────────────────────────────────────────────────────────────── */
 }
 
 .phone-rect:focus {
@@ -487,8 +501,8 @@
   font-size: 0.76rem;
   font-weight: 700;
   transform: translate(-50%, -50%);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   pointer-events: none;
 }
 
@@ -621,8 +635,8 @@
   border-color: rgba(255, 255, 255, 0.18);
   border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
 }
 
 .detail-float-info strong {
@@ -673,8 +687,8 @@
   color: #fff;
   cursor: pointer;
   font-family: var(--font-ui);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
@@ -721,8 +735,8 @@
   color: #fff;
   opacity: 0;
   transform: translateY(-50%);
-  backdrop-filter: blur(16px) saturate(1.35);
-  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
   transition: opacity 0.14s ease, background 0.14s ease, transform 0.14s ease;
 }
 
@@ -989,8 +1003,8 @@
     0 4px 14px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
 }
 
 .phone-grid-zoom-controls::before {
@@ -1076,8 +1090,8 @@
   min-height: 18px;
   padding: var(--sp-1) var(--sp-2);
   background: rgba(0, 0, 0, 0.52);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
   font-family: inherit;
   font-size: 0.6rem;
   font-weight: 600;
@@ -1175,8 +1189,8 @@
   border: 0.5px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.76);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
   box-shadow:
     0 2px 16px rgba(0, 0, 0, 0.10),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -1295,8 +1309,8 @@
   border: 1px solid rgba(60, 60, 67, 0.14);
   border-radius: var(--r-4);
   background: rgba(242, 242, 247, 0.82);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
   color: #000;
   box-shadow:
     0 -2px 24px rgba(0, 0, 0, 0.1),
@@ -1389,10 +1403,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(44, 44, 46, 0.9);
+  background: rgba(44, 44, 46, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(235, 235, 245, 0.7);
   border-radius: 50%;
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
   pointer-events: none;
 }
 
@@ -1419,9 +1435,11 @@
 }
 
 .selection-thumb-x {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.72);
   border-color: rgba(60, 60, 67, 0.12);
   color: rgba(60, 60, 67, 0.6);
+  backdrop-filter: blur(8px) saturate(1.8);
+  -webkit-backdrop-filter: blur(8px) saturate(1.8);
 }
 
 /* Long-press learnability hint — floats above the selection tray */
@@ -1800,8 +1818,8 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 
 .video-timeline::before {
@@ -2022,8 +2040,8 @@ body:has(.app-shell--phone) {
 
 .nsfw-sheet[data-slot="sheet-content"] {
   background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
   border-top: 0.5px solid rgba(255, 255, 255, 0.6);
   border-radius: 14px 14px 0 0;
   z-index: 201;
@@ -2128,8 +2146,8 @@ body:has(.app-shell--phone) {
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .about-sheet {
@@ -2458,8 +2476,8 @@ body:has(.app-shell--phone) {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.22);
   color: transparent;
-  backdrop-filter: blur(10px) saturate(1.5);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
 }
 
 .album-card--selected .album-card-check {
@@ -2491,8 +2509,8 @@ body:has(.app-shell--phone) {
   padding: var(--sp-3, 12px) var(--sp-4, 16px) max(var(--sp-4, 16px), env(safe-area-inset-bottom));
   border-top: 0.5px solid rgba(60, 60, 67, 0.14);
   background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
 }
 
 .album-picker-btn {
@@ -2619,8 +2637,8 @@ body:has(.app-shell--phone) {
   border-color: rgba(255, 255, 255, 0.15) !important;
   border-radius: var(--r-2, 8px) !important;
   color: rgba(255, 255, 255, 0.92) !important;
-  backdrop-filter: blur(22px) saturate(1.4);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
