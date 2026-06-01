@@ -232,7 +232,9 @@ describe("PhoneViewportFrame interactions", () => {
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await user.click(screen.getByRole("button", { name: /Same Date/i }));
     expect((await screen.findAllByRole("button", { name: /Select Dated picnic photo/i })).length).toBeGreaterThan(0);
-    expect(phoneMockState.requests.some((request) => request.includes("q=2024-03-18"))).toBe(true);
+    expect(screen.getByLabelText("Showing March 18, 2024")).toBeInTheDocument();
+    expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?date_prefix=2024-03-18"))).toBe(true);
+    expect(phoneMockState.requests.some((request) => request.includes("q=2024-03-18"))).toBe(false);
     secondView.unmount();
 
     renderPhone();

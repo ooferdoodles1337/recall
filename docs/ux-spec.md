@@ -323,3 +323,89 @@ Selections persist in `localStorage` under `INDEXED_ALBUMS_KEY`
 Saving triggers no network call, re-index, or change to results/favorites. Nothing
 else in the app reads the stored selection. This is explicitly a mock for demo
 realism.
+
+---
+
+## Similar search context
+
+### SI-1 — Search bar shows a source thumbnail chip when in similar-search mode
+
+When a similar-by-ID search is active, the search bar text input is replaced by a
+**source thumbnail chip** in the same horizontal slot:
+
+- A **26×26 px** square image of the source item (`object-fit: cover`, `border-radius: 4px`)
+  appears flush-left inside the input area, separated from the left icon by the same
+  internal padding as normal query text.
+- Immediately to the right of the thumbnail, the static label **"Similar"** is
+  rendered in the same position as normal query text but with muted/secondary color
+  (`--muted-foreground`) to signal that it is not editable text.
+- The input is **not** a live text field in this state — the chip row is a read-only
+  presentational element. Touch and pointer events on the chip row forward to the
+  compose-enter behavior (SI-3).
+- The × clear button on the right of the bar is present and dismisses the similar
+  context (SI-2).
+
+**Rationale:** "similar items" as a plain-text query string is meaningless — the user
+can't read it, edit it, or search history by it. A thumbnail chip communicates the
+source image at a glance (the same idiom as Google Lens / Apple Visual Look Up).
+
+### SI-2 — Similar context is cleared by × and by any new text search
+
+The similar-source state is a separate field (`similarSourceItem`) from the text
+query. It is cleared in exactly two ways:
+
+1. **× button** — fires SC-1: clears `similarSourceItem`, `query`, and
+   `submittedQuery`, returns to home, blurs input. Identical to × on a text query.
+2. **Any `runSearch` call** — starting a new text search sets `similarSourceItem`
+   to `null` before the request fires. The thumbnail chip disappears; the new
+   query text takes its place in the bar.
+
+Navigating from results back to home via the back gesture also clears similar
+context (same as `SEARCH_CLEAR`).
+
+### SI-3 — Tapping the bar in similar mode enters compose with an empty query
+
+Tapping anywhere inside the search bar (except the × button) while a similar
+search is active:
+
+- Clears `similarSourceItem` immediately (thumbnail disappears in the same frame).
+- Opens compose mode with `query = ""`.
+- Shows the history panel (CP-3, empty-query path).
+
+The user lands in the same compose state as if they had tapped the bar from the
+home screen. No trace of the similar context remains.
+
+**Rationale:** the user tapping the bar signals intent to start a new search.
+Keeping the thumbnail visible inside an active text input would be visually
+confusing and technically complex. Clearing it on compose-enter is the least
+surprising behavior.
+
+### SI-4 — Similar searches are never added to search history
+
+`runSimilarById` must not call `rememberSearch`. The pseudo-query `"similar items"`
+(or any surrogate string) must never appear in the search history list shown in
+the compose panel. The history panel after dismissing a similar search must show
+the same items it showed before the similar search was launched.
+
+### SI-5 — Source item is passed by value, not by ID, into the search controller
+
+`runSimilarById` must accept a full `RecallMediaItem` (renamed to `runSimilarSearch`
+or its signature extended) so the controller can store the item in `similarSourceItem`
+state and pass the thumbnail URL to the search bar without a separate catalog lookup.
+
+The call site in `PhoneViewportFrame` already has the full item at the point it
+calls `runSimilarSearch(item)` — passing `item.id` and discarding the rest is
+unnecessary. The controller extracts `item.id` internally for the API call and
+retains the full item for the UI chip.
+
+### SI-6 — Spinner during similar search uses the existing HI-3 slot
+
+While the similar-by-ID fetch is in flight (`isSearching === true`), the spinner
+from HI-3 occupies the left icon slot of the search bar as usual. The thumbnail
+chip is not yet shown — the bar shows only the spinner on the left and no text in
+the center (or a faint "Searching…" label). Once the fetch resolves, the spinner
+is replaced by the standard search icon and the thumbnail chip renders.
+
+**Rationale:** showing the thumbnail before results arrive confirms to the user
+what is being searched, but the loading state must remain legible. Rendering the
+spinner in its existing slot avoids a second loading indicator.

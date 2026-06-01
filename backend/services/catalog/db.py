@@ -235,6 +235,7 @@ def _search_phrases_from_row(row: sqlite3.Row) -> list[str]:
 def list_library_items(
     media_type: str | None = None,
     favorite: bool | None = None,
+    date_prefix: str | None = None,
     order: str = "desc",
     limit: int | None = None,
 ) -> list[dict]:
@@ -248,6 +249,9 @@ def list_library_items(
     if favorite is not None:
         filters.append("favorite = ?")
         params.append(1 if favorite else 0)
+    if date_prefix is not None:
+        filters.append("taken_sort LIKE ?")
+        params.append(f"{date_prefix}%")
     if filters:
         query += " WHERE " + " AND ".join(filters)
     direction = "DESC" if order == "desc" else "ASC"

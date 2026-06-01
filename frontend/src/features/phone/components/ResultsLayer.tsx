@@ -16,13 +16,14 @@ interface ResultsLayerProps {
   submittedQuery: string;
   errorMessage: string | null;
   hasMore: boolean;
+  isDateBrowse: boolean;
   refinements: string[];
   loadMore: () => void;
   onRunRefinement: (refinement: string) => void;
 }
 
 export function ResultsLayer({ visible, mode, contentMode, isLoading, isLoadingMore, modeTransition,
-  results, searchGridRef, submittedQuery, errorMessage, hasMore, refinements, loadMore, onRunRefinement }: ResultsLayerProps) {
+  results, searchGridRef, submittedQuery, errorMessage, hasMore, isDateBrowse, refinements, loadMore, onRunRefinement }: ResultsLayerProps) {
   if (!visible) return null;
   return (
     <motion.div key="screen-search"
@@ -31,7 +32,7 @@ export function ResultsLayer({ visible, mode, contentMode, isLoading, isLoadingM
       <ResultsSection results={results} searchGridRef={searchGridRef}
         isLoading={isLoading} isLoadingMore={isLoadingMore}
         contentMode={contentMode} submittedQuery={submittedQuery} errorMessage={errorMessage} hasMore={hasMore}
-        refinements={refinements} onLoadMore={loadMore} onRunRefinement={onRunRefinement} />
+        isDateBrowse={isDateBrowse} refinements={refinements} onLoadMore={loadMore} onRunRefinement={onRunRefinement} />
     </motion.div>
   );
 }

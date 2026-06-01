@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
 import { itemTitle, playbackTimeLabel, VIDEO_CHROME_HIDE_MS } from "./phoneUtils";
-import { DetailActionRow, DetailScreen, type DetailGestureHandlers } from "./DetailViewChrome";
+import { DetailActionRow, DetailScreen, type DetailNeighborPreview } from "./DetailViewChrome";
 
 interface VideoDetailViewProps {
   item: RecallMediaItem;
-  gestureHandlers?: DetailGestureHandlers;
+  canNavigateNext?: boolean;
+  canNavigatePrevious?: boolean;
   isSensitiveHidden?: boolean;
   onRevealSensitive?: (item: RecallMediaItem) => void;
   onBack: () => void;
+  onNavigate?: (direction: 1 | -1) => void;
   onSearchSameDate: (item: RecallMediaItem) => void;
   onRunSimilarSearch: (item: RecallMediaItem) => void;
   onConfirmAnswer?: (id: string) => void;
@@ -21,14 +23,18 @@ interface VideoDetailViewProps {
   onOpenAbout: (item: RecallMediaItem) => void;
   layoutId?: string;
   navigationDirection?: -1 | 0 | 1;
+  nextPreview?: DetailNeighborPreview | null;
+  previousPreview?: DetailNeighborPreview | null;
 }
 
 export function VideoDetailView({
   item,
-  gestureHandlers,
+  canNavigateNext = false,
+  canNavigatePrevious = false,
   isSensitiveHidden = false,
   onRevealSensitive,
   onBack,
+  onNavigate,
   onSearchSameDate,
   onRunSimilarSearch,
   onConfirmAnswer,
@@ -38,6 +44,8 @@ export function VideoDetailView({
   onOpenAbout,
   layoutId,
   navigationDirection = 0,
+  nextPreview = null,
+  previousPreview = null,
 }: VideoDetailViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,15 +171,19 @@ export function VideoDetailView({
       mediaClassName="detail-media-fill--video"
       topBarClassName="video-chrome"
       item={item}
-      gestureHandlers={gestureHandlers}
+      canNavigateNext={canNavigateNext}
+      canNavigatePrevious={canNavigatePrevious}
       isSensitiveHidden={isSensitiveHidden}
       onRevealSensitive={onRevealSensitive}
       onBack={onBack}
+      onNavigate={onNavigate}
       onOpenAbout={onOpenAbout}
       onToggleFavorite={onToggleFavorite}
       onToggleSafety={onToggleSafety}
       layoutId={layoutId}
       navigationDirection={navigationDirection}
+      nextPreview={nextPreview}
+      previousPreview={previousPreview}
       controls={
         <div className="video-control-panel video-chrome" role="group" aria-label="Detail actions" onPointerMove={revealChrome}>
           <DetailActionRow

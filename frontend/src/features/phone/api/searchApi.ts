@@ -62,6 +62,11 @@ export function listFavoriteItems(count = 34, options?: RecallRequestOptions) {
     }));
 }
 
+export function listItemsByDate(datePrefix: string, order: "asc" | "desc" = "asc", options?: RecallRequestOptions) {
+  const params = new URLSearchParams({ date_prefix: datePrefix, order });
+  return recallFetch<RecallCatalogItemsResponse>(`/catalog/items?${params.toString()}`, { signal: options?.signal });
+}
+
 export function patchCatalogItem(id: string, patch: Record<string, unknown>) {
   return recallFetch<RecallMediaItem>(`/catalog/items/${encodeURIComponent(id)}`, {
     method: "PATCH",

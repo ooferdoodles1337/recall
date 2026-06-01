@@ -52,9 +52,16 @@ function limitParam(url: URL, fallback: number) {
 
 function searchResultsForQuery(url: URL, fallback: RecallSearchResult[]) {
   const query = url.searchParams.get("q") ?? "";
-  if (query === "2024-03-18") return phoneMockState.dateResults;
   if (query.toLowerCase().includes("empty")) return [];
   return fallback;
+}
+
+function dateItemsForPrefix(prefix: string) {
+  return phoneMockState.dateResults.filter((item) => {
+    const sortKey = item.metadata.capture?.sort_key ?? item.metadata.capture?.taken_at;
+    const date = item.metadata.capture?.date;
+    return sortKey?.startsWith(prefix) || date?.startsWith(prefix);
+  });
 }
 
 function patchItem<T extends RecallMediaItem>(item: T, patch: Partial<RecallMediaItem["metadata"]>): T {
@@ -82,7 +89,8 @@ export function phoneHandlers() {
       const url = new URL(request.url);
       phoneMockState.requests.push(`${url.pathname}?${url.searchParams.toString()}`);
       const isFavorite = url.searchParams.get("favorite") === "true";
-      const source = isFavorite ? phoneMockState.favoriteItems : phoneMockState.recentItems;
+      const datePrefix = url.searchParams.get("date_prefix");
+      const source = datePrefix ? dateItemsForPrefix(datePrefix) : isFavorite ? phoneMockState.favoriteItems : phoneMockState.recentItems;
       const limit = limitParam(url, source.length);
       const results = source.slice(0, limit);
       return HttpResponse.json({ count: results.length, results });

@@ -107,6 +107,39 @@ def test_list_library_items_filters_and_sorts(catalog_db):
     assert [item["id"] for item in limited_items] == ["newer"]
 
 
+def test_list_library_items_filters_date_prefix(catalog_db):
+    catalog_db.upsert_item(
+        "morning",
+        "media/morning.jpg",
+        "morning.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-morning", "taken_sort": "2024-03-18T09:00:00"},
+    )
+    catalog_db.upsert_item(
+        "evening",
+        "media/evening.jpg",
+        "evening.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-evening", "taken_sort": "2024-03-18T19:00:00"},
+    )
+    catalog_db.upsert_item(
+        "next-day",
+        "media/next-day.jpg",
+        "next-day.jpg",
+        "image/jpeg",
+        "image",
+        extra_metadata={"content_hash": "hash-next-day", "taken_sort": "2024-03-19T10:00:00"},
+    )
+
+    day_items = catalog_db.list_library_items(date_prefix="2024-03-18", order="asc")
+    month_items = catalog_db.list_library_items(date_prefix="2024-03", order="asc")
+
+    assert [item["id"] for item in day_items] == ["morning", "evening"]
+    assert [item["id"] for item in month_items] == ["morning", "evening", "next-day"]
+
+
 def test_list_library_items_filters_favorites(catalog_db):
     catalog_db.upsert_item(
         "favorite-image",

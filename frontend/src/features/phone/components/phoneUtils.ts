@@ -266,7 +266,42 @@ export function itemTitle(item: RecallMediaItem) {
 }
 
 export function itemDateLabel(item: RecallMediaItem) {
-  return item.metadata.capture?.date ?? item.metadata.capture?.year_month ?? null;
+  const prefix = datePrefixForItem(item);
+  return prefix ? formatDatePrefix(prefix) : null;
+}
+
+export function datePrefixForItem(item: RecallMediaItem) {
+  const capture = item.metadata.capture;
+  const sortKey = capture?.sort_key ?? capture?.taken_at;
+  if (typeof sortKey === "string" && /^\d{4}-\d{2}-\d{2}/.test(sortKey)) return sortKey.slice(0, 10);
+  if (typeof capture?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(capture.date)) return capture.date;
+  if (typeof capture?.year_month === "string" && /^\d{4}-\d{2}$/.test(capture.year_month)) return capture.year_month;
+  return null;
+}
+
+export function formatDatePrefix(prefix: string): string {
+  const dayMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(prefix);
+  if (dayMatch) {
+    const [, year, month, day] = dayMatch;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
+  }
+
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(prefix);
+  if (monthMatch) {
+    const [, year, month] = monthMatch;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(Number(year), Number(month) - 1, 1)));
+  }
+
+  return prefix;
 }
 
 export function durationLabel(seconds?: number) {

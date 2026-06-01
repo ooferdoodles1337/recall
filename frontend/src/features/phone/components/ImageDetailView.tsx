@@ -1,14 +1,16 @@
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { resolvedMediaUrl } from "@/shared/media/mediaItem";
 import { itemTitle } from "./phoneUtils";
-import { DetailActionRow, DetailScreen, type DetailGestureHandlers } from "./DetailViewChrome";
+import { DetailActionRow, DetailScreen, type DetailNeighborPreview } from "./DetailViewChrome";
 
 interface ImageDetailViewProps {
   item: RecallMediaItem;
-  gestureHandlers?: DetailGestureHandlers;
+  canNavigateNext?: boolean;
+  canNavigatePrevious?: boolean;
   isSensitiveHidden?: boolean;
   onRevealSensitive?: (item: RecallMediaItem) => void;
   onBack: () => void;
+  onNavigate?: (direction: 1 | -1) => void;
   onSearchSameDate: (item: RecallMediaItem) => void;
   onRunSimilarSearch: (item: RecallMediaItem) => void;
   onConfirmAnswer?: (id: string) => void;
@@ -18,14 +20,18 @@ interface ImageDetailViewProps {
   onOpenAbout: (item: RecallMediaItem) => void;
   layoutId?: string;
   navigationDirection?: -1 | 0 | 1;
+  nextPreview?: DetailNeighborPreview | null;
+  previousPreview?: DetailNeighborPreview | null;
 }
 
 export function ImageDetailView({
   item,
-  gestureHandlers,
+  canNavigateNext = false,
+  canNavigatePrevious = false,
   isSensitiveHidden = false,
   onRevealSensitive,
   onBack,
+  onNavigate,
   onSearchSameDate,
   onRunSimilarSearch,
   onConfirmAnswer,
@@ -35,19 +41,25 @@ export function ImageDetailView({
   onOpenAbout,
   layoutId,
   navigationDirection = 0,
+  nextPreview = null,
+  previousPreview = null,
 }: ImageDetailViewProps) {
   return (
     <DetailScreen
       item={item}
-      gestureHandlers={gestureHandlers}
+      canNavigateNext={canNavigateNext}
+      canNavigatePrevious={canNavigatePrevious}
       isSensitiveHidden={isSensitiveHidden}
       onRevealSensitive={onRevealSensitive}
       onBack={onBack}
+      onNavigate={onNavigate}
       onOpenAbout={onOpenAbout}
       onToggleFavorite={onToggleFavorite}
       onToggleSafety={onToggleSafety}
       layoutId={layoutId}
       navigationDirection={navigationDirection}
+      nextPreview={nextPreview}
+      previousPreview={previousPreview}
       controls={
         <DetailActionRow
           className="detail-float-bottom"

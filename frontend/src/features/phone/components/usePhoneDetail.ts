@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import type { PhoneModeAction } from "../phoneReducer";
 import { patchCatalogItem } from "../api/searchApi";
-import { itemDateLabel } from "./phoneUtils";
+import { datePrefixForItem, formatDatePrefix } from "./phoneUtils";
 
 export type DetailApi = {
   detailItem: RecallMediaItem | null;
@@ -22,8 +22,7 @@ type Dependencies = {
   onSelectCandidate?: (id: string) => void;
   modeRef: React.MutableRefObject<string>;
   dispatch: (action: PhoneModeAction) => void;
-  setQuery: (q: string) => void;
-  runSearch: (q: string) => void;
+  runDateBrowse: (datePrefix: string, label: string) => void;
   setErrorMessage: (msg: string | null) => void;
   setNsfwPendingItem: (item: RecallMediaItem | null) => void;
   revealSafe: (id: string) => void;
@@ -42,7 +41,7 @@ function replaceItem(items: RecallMediaItem[], updated: RecallMediaItem) {
 export function usePhoneDetail(deps: Dependencies): DetailApi {
   const {
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    setQuery, runSearch, setErrorMessage, setNsfwPendingItem, revealSafe,
+    runDateBrowse, setErrorMessage, setNsfwPendingItem, revealSafe,
     onItemUpdated,
   } = deps;
   const queryClient = useQueryClient();
@@ -102,17 +101,15 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
   }, [mutateSafety]);
 
   const searchSameDate = useCallback((item: RecallMediaItem) => {
-    const date = itemDateLabel(item);
-    if (!date) {
+    const datePrefix = datePrefixForItem(item);
+    if (!datePrefix) {
       setErrorMessage("This item has no date metadata yet.");
-      setDetailItem(null);
-      dispatch({ type: "SEARCH_COMMIT" });
       return;
     }
-    setQuery(date);
-    runSearch(date);
+    const label = datePrefix.length === 7 ? `All of ${formatDatePrefix(datePrefix)}` : formatDatePrefix(datePrefix);
+    runDateBrowse(datePrefix, label);
     setDetailItem(null);
-  }, [dispatch, runSearch, setErrorMessage, setQuery]);
+  }, [runDateBrowse, setErrorMessage]);
 
   return { detailItem, setDetailItem, aboutSheetItem, setAboutSheetItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate };
 }

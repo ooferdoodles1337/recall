@@ -25,6 +25,7 @@ interface ResultsSectionProps {
   submittedQuery: string;
   errorMessage: string | null;
   hasMore: boolean;
+  isDateBrowse: boolean;
   refinements: string[];
   onLoadMore: () => void;
   onRunRefinement: (refinement: string) => void;
@@ -38,6 +39,7 @@ export function ResultsSection({
   contentMode,
   errorMessage,
   hasMore,
+  isDateBrowse,
   refinements,
   onLoadMore,
   onRunRefinement,
@@ -49,8 +51,8 @@ export function ResultsSection({
         <EmptyMedia variant="icon">
           <ImageOffIcon />
         </EmptyMedia>
-        <EmptyTitle>No results</EmptyTitle>
-        <EmptyDescription>Try another description.</EmptyDescription>
+        <EmptyTitle>{isDateBrowse ? "No items found" : "No results"}</EmptyTitle>
+        <EmptyDescription>{isDateBrowse ? "No items found for this date." : "Try another description."}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   ) : null;
@@ -97,7 +99,7 @@ export function ResultsSection({
               </Button>
             ) : null}
             {hasMore && refinements.length > 0 ? <Separator className="results-footer-separator" /> : null}
-            {refinements.length > 0 ? (
+            {!isDateBrowse && refinements.length > 0 ? (
               <div className="refinement-row">
                 <span>Did you mean</span>
                 {refinements.map((refinement) => (
