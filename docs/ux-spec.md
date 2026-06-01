@@ -168,6 +168,33 @@ compose dismisses and the user returns to home, the reverse plays (HA-1).
 
 ---
 
+## History icon
+
+### HI-1 — Icon is only shown when it has a meaningful toggle effect
+
+The history icon button (`.history-btn`) is visible only when toggling it would produce a perceptible change. Specifically, it is shown when **all** of the following hold:
+
+- History is non-empty (`history.length > 0`).
+- The current query is non-empty (suggestions are or will be the natural panel content, so the toggle has something to switch *away from*).
+
+When the query is empty, hide the icon — history is already the automatic panel content per CP-3, so the toggle is a no-op and adds visual clutter. When history is empty, hide the icon — there is nothing to toggle to.
+
+**Rationale:** an icon that has no observable effect trains the user to ignore it, and an icon that cannot do anything on press is confusing.
+
+### HI-2 — History icon in results mode (non-compose)
+
+In `results` mode, the persistent search bar contains the committed query (non-empty). Tapping the search input enters compose and shows suggestions (CP-3, non-empty-query path). The history icon is the **only** one-tap shortcut to "open compose and see recent searches instead of suggestions" when a query is already committed. Show it in results mode when history is non-empty; hide it when history is empty.
+
+Do **not** show the history icon in `home` mode — the search bar has no committed query and the natural compose-open state is already history (CP-3, empty-query path).
+
+### HI-3 — Spinner replaces the icon during active search
+
+When `isSearching === true`, the history icon is replaced by a `Loader2Icon` spinner and the button is `disabled`. This reuses the icon slot to signal search progress without adding a separate element. The disabled state prevents accidental toggles while results are loading.
+
+The spinner condition takes precedence over HI-1 visibility logic — if a search is in flight, show the spinner regardless of query/history state.
+
+---
+
 ## Search clearing
 
 ### SC-1 — Emptying the search field returns to home when results are visible

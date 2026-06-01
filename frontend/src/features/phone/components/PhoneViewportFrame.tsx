@@ -263,9 +263,12 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const isSearching = sc.isAutoSearchPending || (sc.isLoading && mode === "compose");
 
+  const showHistoryIcon = isSearching
+    || (mode !== "home" && sc.history.length > 0 && (mode === "results" || sc.query.trim().length > 0));
+
   const renderSearchBar = (className?: string, clearLabel = "Clear search") => (
     <PhoneSearchBar ref={topBarInputRef} value={sc.query} className={className} clearLabel={clearLabel}
-      showHistory={sc.showHistory} isSearching={isSearching}
+      showHistory={sc.showHistory} showHistoryIcon={showHistoryIcon} isSearching={isSearching}
       onToggleHistory={sc.handleSearchHistoryToggle} onFocus={sc.handleSearchFocus}
       onChange={sc.handleSearchChange} onSubmit={sc.handleSearchSubmit} onClear={sc.handleSearchClear} />
   );

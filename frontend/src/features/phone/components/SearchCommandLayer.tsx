@@ -37,6 +37,7 @@ interface PhoneSearchBarProps {
   className?: string;
   clearLabel?: string;
   showHistory: boolean;
+  showHistoryIcon: boolean;
   isSearching?: boolean;
   onToggleHistory: () => void;
   onFocus: () => void;
@@ -51,6 +52,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
     className,
     clearLabel = "Clear search",
     showHistory,
+    showHistoryIcon,
     isSearching = false,
     onToggleHistory,
     onFocus,
@@ -61,19 +63,21 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
   ref,
 ) {
   return (
-    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
-      <Button
-        className={`history-btn${showHistory ? " history-btn--active" : ""}`}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Recent searches"
-        aria-pressed={showHistory}
-        onClick={onToggleHistory}
-        disabled={isSearching}
-      >
-        {isSearching ? <Loader2Icon className="animate-spin" /> : <HistoryIcon />}
-      </Button>
+    <div className={`search-bar search-bar--semantic${showHistoryIcon ? "" : " search-bar--no-icon"}${className ? ` ${className}` : ""}`}>
+      {showHistoryIcon ? (
+        <Button
+          className={`history-btn${showHistory ? " history-btn--active" : ""}`}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Recent searches"
+          aria-pressed={showHistory}
+          onClick={onToggleHistory}
+          disabled={isSearching}
+        >
+          {isSearching ? <Loader2Icon className="animate-spin" /> : <HistoryIcon />}
+        </Button>
+      ) : null}
       <Input
         ref={ref}
         aria-label="Search your media"
