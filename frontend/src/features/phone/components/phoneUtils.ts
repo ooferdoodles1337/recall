@@ -18,6 +18,8 @@ export const SUGGESTION_DEBOUNCE_MS = 140;
 export const HIDE_COMPOSE_SCROLL_THRESHOLD = 60;
 export const PREFETCH_TRIGGER_REMAINING = 200;
 export const VIDEO_CHROME_HIDE_MS = 2400;
+export const DETAIL_SWIPE_THRESHOLD = 56;
+export const DETAIL_SWIPE_VERTICAL_TOLERANCE = 48;
 
 export type GridColumns = 1 | 2 | 3 | 4 | 5 | 6;
 

@@ -53,6 +53,37 @@ async function openDetailFromButton(button: HTMLElement) {
   vi.useRealTimers();
 }
 
+async function swipeDetail(label: RegExp, fromX: number, toX: number) {
+  const detail = await screen.findByLabelText(label);
+  fireEvent.pointerDown(detail, {
+    clientX: fromX,
+    clientY: 240,
+    pointerId: 7,
+    pointerType: "touch",
+  });
+  fireEvent.pointerUp(detail, {
+    clientX: toX,
+    clientY: 242,
+    pointerId: 7,
+    pointerType: "touch",
+  });
+}
+
+async function touchSwipeDetail(label: RegExp, fromX: number, toX: number) {
+  const detail = await screen.findByLabelText(label);
+  fireEvent.touchStart(detail, {
+    touches: [{ clientX: fromX, clientY: 240 }],
+  });
+  fireEvent.touchEnd(detail, {
+    changedTouches: [{ clientX: toX, clientY: 242 }],
+  });
+}
+
+async function clickVisibleBack() {
+  const buttons = screen.getAllByRole("button", { name: "Back" });
+  await userEvent.click(buttons[buttons.length - 1]);
+}
+
 function dispatchSyntheticPointer(
   target: Element,
   type: string,
@@ -209,6 +240,66 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(screen.getByRole("button", { name: /Similar/i }));
     expect(await screen.findByRole("button", { name: /Select Similar yellow umbrella/i })).toBeInTheDocument();
     expect(phoneMockState.requests.some((request) => request.includes("/search/similar/dated-favorite"))).toBe(true);
+  });
+
+  it("swipes between detail items from favorites and search result grids", async () => {
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await touchSwipeDetail(/Favorite 01 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Favorite 02 detail view/i)).toBeInTheDocument();
+
+    await swipeDetail(/Favorite 02 detail view/i, 160, 320);
+    expect(await screen.findByLabelText(/Favorite 01 detail view/i)).toBeInTheDocument();
+
+    await clickVisibleBack();
+    await commitSearch("sunset");
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await swipeDetail(/Sunset pier photo detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Shared picnic blanket detail view/i)).toBeInTheDocument();
+  });
+
+  it("shows a blurred prompt when swiping detail to an NSFW item", async () => {
+    const user = userEvent.setup();
+    const sensitiveFavorite = phoneMockState.favoriteItems.find((item) => item.id === "sensitive-favorite");
+    if (!sensitiveFavorite) throw new Error("Missing sensitive fixture");
+    const sensitiveSearch = {
+      ...sensitiveFavorite,
+      id: "search-sensitive",
+      distance: 0.2,
+      metadata: {
+        ...sensitiveFavorite.metadata,
+        asset: {
+          ...sensitiveFavorite.metadata.asset,
+          filename: "search-sensitive.jpg",
+        },
+        search: {
+          description: "Search sensitive",
+          phrases: ["search", "sensitive"],
+        },
+      },
+    };
+    phoneMockState.favoriteItems = [phoneMockState.favoriteItems[0], sensitiveFavorite, phoneMockState.favoriteItems[1]];
+    phoneMockState.semanticResults = [phoneMockState.semanticResults[0], sensitiveSearch];
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await swipeDetail(/Favorite 01 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Sensitive favorite detail view/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View" }));
+    expect((await screen.findAllByRole("button", { name: "More actions" })).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Sensitive Content" })).not.toBeInTheDocument();
+    });
+
+    await clickVisibleBack();
+    await commitSearch("sunset", user);
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await swipeDetail(/Sunset pier photo detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Search sensitive detail view/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
   });
 
   it("guards NSFW tiles until revealing one item or all sensitive items", async () => {

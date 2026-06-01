@@ -115,6 +115,33 @@ suggestion fetch completes.
 ### MT-1 — Entering detail does not affect the search bar
 Detail mode covers the persistent section visually; no extra state resets are needed.
 
+### MT-2 — Detail swipe navigation follows the source grid
+
+In detail mode, a horizontal swipe navigates to the adjacent item from the grid
+that opened detail:
+- Details opened from Home/Favorites swipe through the current favorites grid.
+- Details opened from Results swipe through the current search results grid.
+
+Swipe left advances to the next item; swipe right returns to the previous item.
+At the start or end of the source grid, the swipe is a no-op. Buttons, menus,
+inputs, and video timeline controls do not initiate detail swipe navigation.
+Detail-to-detail transitions use horizontal spatial continuity: advancing
+slides the next item in from the right while the current item exits left; going
+back mirrors the direction. Regular open/close transitions keep the existing
+detail fade/shared-media motion.
+
+### MT-3 — NSFW detail swipe interstitial
+
+Swiping to an NSFW item must not skip the item and must not reveal it directly.
+Instead, detail lands on that item with the media blurred and a centered
+"Sensitive Content" prompt. The prompt has a single explicit "View" action that
+reveals only that item for the session. Back and horizontal swipe navigation
+remain available from the blurred interstitial.
+
+**Rationale:** search and favorites should feel like continuous media sequences,
+but swipe navigation must not bypass the safety gate. The blurred in-place prompt
+preserves spatial context while requiring deliberate consent before viewing.
+
 ---
 
 ## Grid density

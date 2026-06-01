@@ -1,0 +1,29 @@
+import { ShieldAlertIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { RecallMediaItem } from "@/shared/types/recall";
+
+interface SensitiveDetailPromptProps {
+  item: RecallMediaItem;
+  onView: (item: RecallMediaItem) => void;
+}
+
+export function SensitiveDetailPrompt({ item, onView }: SensitiveDetailPromptProps) {
+  return (
+    <div className="detail-sensitive-prompt" aria-live="polite">
+      <div className="detail-sensitive-card">
+        <ShieldAlertIcon className="detail-sensitive-icon" aria-hidden />
+        <h2 className="detail-sensitive-title">Sensitive Content</h2>
+        <p className="detail-sensitive-body">
+          This item is hidden until you choose to view it.
+        </p>
+        <Button
+          className="detail-sensitive-view h-auto"
+          type="button"
+          onClick={() => onView(item)}
+        >
+          View
+        </Button>
+      </div>
+    </div>
+  );
+}
