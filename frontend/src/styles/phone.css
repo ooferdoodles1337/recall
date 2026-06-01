@@ -107,6 +107,10 @@
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
 }
 
+.phone-rect:focus {
+  outline: none;
+}
+
 /* Flex sibling above the scroll area — NOT sticky/absolute.
    Gap between bar and scroll content lives here via margin-bottom (--phone-bar-gap). */
 .phone-persistent-section {
@@ -392,24 +396,54 @@
 
 /* Full-screen gallery detail view */
 
+.detail-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 49;
+  background: #000;
+  pointer-events: none;
+}
+
 .detail-screen {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: #000;
+  overflow: hidden;
+  background: transparent;
   touch-action: pan-y;
+  cursor: grab;
+}
+
+.detail-screen:active {
+  cursor: grabbing;
 }
 
 .phone-detail-motion {
   transform-origin: center;
 }
 
-.detail-media-fill {
+.detail-media-rail {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.detail-media-fill,
+.detail-media-neighbor {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.detail-media-neighbor--previous {
+  transform: translateX(-100%);
+}
+
+.detail-media-neighbor--next {
+  transform: translateX(100%);
 }
 
 .phone-detail-media-motion {
@@ -418,7 +452,8 @@
 }
 
 .detail-media-fill img,
-.detail-media-fill video {
+.detail-media-fill video,
+.detail-media-neighbor img {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -429,9 +464,38 @@
 }
 
 .detail-media-fill--sensitive-hidden img,
-.detail-media-fill--sensitive-hidden video {
+.detail-media-fill--sensitive-hidden video,
+.detail-media-neighbor--sensitive-hidden img {
   filter: blur(28px) saturate(0.7) brightness(0.56);
   transform: scale(1.03);
+}
+
+.detail-media-neighbor-sensitive-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--r-pill);
+  background: rgba(18, 18, 20, 0.68);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.76rem;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  pointer-events: none;
+}
+
+.detail-media-neighbor-sensitive-label svg {
+  width: 15px;
+  height: 15px;
+  color: #fbbf24;
 }
 
 .detail-sensitive-prompt {
@@ -555,6 +619,7 @@
   display: inline-flex;
   align-items: center;
   border-color: rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -641,6 +706,55 @@
 
 .detail-float-action--primary:hover { background: rgba(255, 214, 10, 0.34); }
 
+.detail-side-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  width: 42px;
+  height: 56px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-50%);
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  transition: opacity 0.14s ease, background 0.14s ease, transform 0.14s ease;
+}
+
+.detail-side-nav--prev {
+  left: 14px;
+}
+
+.detail-side-nav--next {
+  right: 14px;
+}
+
+.detail-side-nav:hover {
+  background: rgba(0, 0, 0, 0.58);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.detail-side-nav svg {
+  width: 24px;
+  height: 24px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .detail-side-nav {
+    display: flex;
+  }
+
+  .detail-screen:hover .detail-side-nav,
+  .detail-side-nav:focus-visible {
+    opacity: 1;
+  }
+}
+
 /* --- Semantic Recall phone UI (iOS dark) --- */
 
 /* iOS-style capsule search bar — glass scoped to the pill itself.
@@ -670,6 +784,34 @@
 
 .search-bar--no-icon {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.search-bar--date-browse {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.date-browse-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ios-label);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.date-browse-chip svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--ios-label-secondary);
+}
+
+.date-browse-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-bar--semantic::before {
@@ -2467,6 +2609,72 @@ body:has(.app-shell--phone) {
 .detail-float-info-spacer {
   flex: 1;
   min-width: 0;
+}
+
+/* Dark glass dropdown for detail view — portaled to body so must be self-contained */
+
+.detail-menu {
+  min-width: 168px;
+  background: rgba(22, 22, 28, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-radius: var(--r-2, 8px) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.detail-menu [data-slot="dropdown-menu-item"] {
+  color: rgba(255, 255, 255, 0.88);
+  border-radius: 6px;
+}
+
+.detail-menu [data-slot="dropdown-menu-item"][data-highlighted] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+.detail-menu [data-slot="dropdown-menu-separator"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Similar search context chip — replaces text input in the search bar */
+
+.search-bar--similar {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.similar-source-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.similar-source-thumb {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ios-fill, rgba(118, 118, 128, 0.12));
+}
+
+.similar-source-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground, rgba(60, 60, 67, 0.6));
+  font-size: 0.92rem;
 }
 
 /* Dropdown menu animation keyframes for tailwind animate-in/out */

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RecallMediaItem } from "@/shared/types/recall";
@@ -6,8 +6,7 @@ import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
 import {
   SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD, mediaLayoutId,
   LONG_PRESS_MS, LONG_PRESS_CANCEL_DIST_SQ, SELECTION_SUPPRESS_MS, HIDE_COMPOSE_SCROLL_THRESHOLD,
-  readLongPressHintDismissed, writeLongPressHintDismissed,
-  DETAIL_SWIPE_THRESHOLD, DETAIL_SWIPE_VERTICAL_TOLERANCE,
+  MOTION_EASE, readLongPressHintDismissed, writeLongPressHintDismissed,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
 import { NsfwDialog } from "./NsfwDialog";
@@ -76,9 +75,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchGridRef = useRef<HTMLDivElement>(null);
   const favoritesGridRef = useRef<HTMLDivElement>(null);
-  const detailSwipeStartRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
-  const detailTouchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const detailLastSwipeAtRef = useRef(0);
 
 
   const { isItemBlurred, nsfwPendingItem, setNsfwPendingItem, revealOne, revealAll, revealSafe } = useNsfwReveal();
@@ -94,7 +90,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const { detailItem, setDetailItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate } = usePhoneDetail({
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    setQuery: sc.setQuery, runSearch: sc.runSearch, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
+    runDateBrowse: sc.runDateBrowse, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
     onItemUpdated: handleItemUpdated,
   });
 
@@ -207,6 +203,10 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     return wheelHandler(el);
   }, [wheelHandler]);
 
+  useEffect(() => {
+    if (mode === "detail") phoneRectRef.current?.focus({ preventScroll: true });
+  }, [detailItem?.id, mode]);
+
   // SR-4: home header hides on scroll, reappears at scroll top
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -283,8 +283,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const runSimilarSearch = useCallback(async (item: RecallMediaItem) => {
     setDetailNavDirection(0);
     setDetailItem(null);
-    await sc.runSimilarById(item.id);
+    await sc.runSimilarById(item);
   }, [setDetailItem, sc.runSimilarById]);
+
+  const handleSimilarChipTap = useCallback(() => {
+    sc.clearSimilarSource();
+    sc.enterComposeMode({ showHistory: true });
+  }, [sc.clearSimilarSource, sc.enterComposeMode]);
 
   const searchSameDateFromDetail = useCallback((item: RecallMediaItem) => {
     setDetailNavDirection(0);
@@ -304,56 +309,29 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     }
   }, [detailItem, favoriteItems, isItemBlurred, onSelectCandidate, sc.results, setDetailItem]);
 
+  const detailSource = useMemo(
+    () => (contentMode === "results" ? sc.results : favoriteItems),
+    [contentMode, favoriteItems, sc.results],
+  );
+
+  const detailIndex = useMemo(
+    () => detailItem ? detailSource.findIndex((item) => item.id === detailItem.id) : -1,
+    [detailItem, detailSource],
+  );
+
+  const canNavigateDetailPrevious = detailIndex > 0;
+  const canNavigateDetailNext = detailIndex >= 0 && detailIndex < detailSource.length - 1;
+  const previousDetailPreview = canNavigateDetailPrevious
+    ? { item: detailSource[detailIndex - 1], isSensitiveHidden: isItemBlurred(detailSource[detailIndex - 1]) }
+    : null;
+  const nextDetailPreview = canNavigateDetailNext
+    ? { item: detailSource[detailIndex + 1], isSensitiveHidden: isItemBlurred(detailSource[detailIndex + 1]) }
+    : null;
+
   const handleRevealDetailSensitive = useCallback((item: RecallMediaItem) => {
     revealOne(item.id);
     if (detailItem?.id === item.id) onSelectCandidate?.(item.id);
   }, [detailItem?.id, onSelectCandidate, revealOne]);
-
-  const shouldIgnoreDetailSwipeTarget = (target: EventTarget | null) => {
-    return target instanceof HTMLElement
-      && Boolean(target.closest("button, [role='button'], a, input, textarea, select, [role='menu'], [role='menuitem']"));
-  };
-
-  const commitDetailSwipe = (dx: number, dy: number) => {
-    if (Math.abs(dx) < DETAIL_SWIPE_THRESHOLD || Math.abs(dy) > DETAIL_SWIPE_VERTICAL_TOLERANCE) return;
-    const now = typeof window !== "undefined" ? window.performance.now() : Date.now();
-    if (now - detailLastSwipeAtRef.current < 180) return;
-    detailLastSwipeAtRef.current = now;
-    navigateDetail(dx < 0 ? 1 : -1);
-  };
-
-  const detailGestureHandlers = {
-    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
-      if (shouldIgnoreDetailSwipeTarget(event.target)) return;
-      detailSwipeStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    },
-    onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
-      const start = detailSwipeStartRef.current;
-      detailSwipeStartRef.current = null;
-      if (!start || start.pointerId !== event.pointerId) return;
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-      commitDetailSwipe(event.clientX - start.x, event.clientY - start.y);
-    },
-    onPointerCancel: () => {
-      detailSwipeStartRef.current = null;
-    },
-    onTouchStart: (event: React.TouchEvent<HTMLDivElement>) => {
-      if (shouldIgnoreDetailSwipeTarget(event.target) || event.touches.length !== 1) return;
-      const touch = event.touches[0];
-      detailTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
-    },
-    onTouchEnd: (event: React.TouchEvent<HTMLDivElement>) => {
-      const start = detailTouchStartRef.current;
-      detailTouchStartRef.current = null;
-      const touch = event.changedTouches[0];
-      if (!start || !touch) return;
-      commitDetailSwipe(touch.clientX - start.x, touch.clientY - start.y);
-    },
-    onTouchCancel: () => {
-      detailTouchStartRef.current = null;
-    },
-  };
 
   const sendSelection = useCallback((item?: RecallMediaItem) => {
     const next = item && !selectedItems.some((c) => c.id === item.id) ? [...selectedItems, item] : selectedItems;
@@ -374,6 +352,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const renderSearchBar = (className?: string, clearLabel = "Clear search") => (
     <PhoneSearchBar ref={topBarInputRef} value={sc.query} className={className} clearLabel={clearLabel}
       showHistory={sc.showHistory} showHistoryIcon={showHistoryIcon} isSearching={isSearching}
+      dateBrowseLabel={mode === "results" ? sc.dateBrowseContext?.label : null}
+      similarThumbnailUrl={mode === "results" && sc.similarSourceItem
+        ? (sc.similarSourceItem.links?.thumbnail ?? null)
+        : undefined}
+      onSimilarChipTap={handleSimilarChipTap}
       onToggleHistory={sc.handleSearchHistoryToggle} onFocus={sc.handleSearchFocus}
       onChange={sc.handleSearchChange} onSubmit={sc.handleSearchSubmit} onClear={sc.handleSearchClear} />
   );
@@ -390,7 +373,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       className={`phone-rect${contentMode === "home" ? " phone-rect--home" : ""}${showSelectionTray ? " phone-rect--has-selection" : ""}`}
       style={gridDensityStyle} data-reduced-motion={prefersReducedMotion ? "true" : undefined}
       aria-label="Phone interface viewport"
+      tabIndex={0}
       onKeyDown={(event) => {
+        if (modeRef.current === "detail") {
+          if (event.key === "ArrowLeft") { event.preventDefault(); navigateDetail(-1); return; }
+          if (event.key === "ArrowRight") { event.preventDefault(); navigateDetail(1); return; }
+          if (event.key === "Escape") { event.preventDefault(); closeDetailFromChrome(); return; }
+        }
         if (event.key === "Escape" && modeRef.current === "compose") { sc.closeComposeMode(); return; }
         if (event.key === "Escape" && mode !== "home") sc.resetSearch();
       }}
@@ -439,6 +428,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
               isLoading={sc.isLoading} isLoadingMore={sc.isLoadingMore} modeTransition={modeTransition}
               results={sc.results} searchGridRef={searchGridRef}
               submittedQuery={sc.submittedQuery} errorMessage={sc.errorMessage} hasMore={sc.hasMore}
+              isDateBrowse={!!sc.dateBrowseContext}
               refinements={sc.refinements}
               loadMore={() => void sc.loadMore()}
               onRunRefinement={(refinement) => { sc.setQuery(refinement); void sc.runSearch(refinement); }} />
@@ -447,20 +437,38 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
         <AnimatePresence initial={false}>
           {mode === "detail" && detailItem && (
+            <motion.div
+              key="detail-backdrop"
+              className="detail-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.16, ease: MOTION_EASE.gentle }}
+              aria-hidden
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence initial={false} custom={mode === "detail" ? detailNavDirection : 0}>
+          {mode === "detail" && detailItem && (
             isVideo(detailItem) && resolvedMediaUrl(detailItem) ? (
               <VideoDetailView key={detailItem.id} item={detailItem} onBack={closeDetailFromChrome} onSearchSameDate={searchSameDateFromDetail}
                 onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={handleConfirmAnswer}
                 onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
-                onOpenAbout={setAboutSheetItem} gestureHandlers={detailGestureHandlers}
+                onOpenAbout={setAboutSheetItem} onNavigate={navigateDetail}
+                canNavigatePrevious={canNavigateDetailPrevious} canNavigateNext={canNavigateDetailNext}
                 isSensitiveHidden={isItemBlurred(detailItem)} onRevealSensitive={handleRevealDetailSensitive}
+                previousPreview={previousDetailPreview} nextPreview={nextDetailPreview}
                 navigationDirection={detailNavDirection}
                 layoutId={mediaLayoutId(detailItem.id)} />
             ) : (
               <ImageDetailView key={detailItem.id} item={detailItem} onBack={closeDetailFromChrome} onSearchSameDate={searchSameDateFromDetail}
                 onRunSimilarSearch={(item) => void runSimilarSearch(item)} onConfirmAnswer={handleConfirmAnswer}
                 onSendSelection={sendSelection} onToggleFavorite={handleToggleFavorite} onToggleSafety={handleToggleSafety}
-                onOpenAbout={setAboutSheetItem} gestureHandlers={detailGestureHandlers}
+                onOpenAbout={setAboutSheetItem} onNavigate={navigateDetail}
+                canNavigatePrevious={canNavigateDetailPrevious} canNavigateNext={canNavigateDetailNext}
                 isSensitiveHidden={isItemBlurred(detailItem)} onRevealSensitive={handleRevealDetailSensitive}
+                previousPreview={previousDetailPreview} nextPreview={nextDetailPreview}
                 navigationDirection={detailNavDirection}
                 layoutId={mediaLayoutId(detailItem.id)} />
             )
