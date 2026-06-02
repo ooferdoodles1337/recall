@@ -398,9 +398,9 @@ def index_file(path: Path, force: bool) -> None:
 
 def run(
     force: bool,
-    annotate: bool = False,
+    annotate: bool = True,
     annotate_sample: int | None = None,
-    detect_nsfw: bool = False,
+    detect_nsfw: bool = True,
     db_path: str | None = None,
     media_dir: str | None = None,
     reset: bool = False,
@@ -516,21 +516,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Index media files into SQLite and ChromaDB")
     parser.add_argument("--force", action="store_true", help="Re-index already-indexed files")
     parser.add_argument(
-        "--annotate",
-        action="store_true",
-        help="Annotate unannotated items with descriptions and search terms via Gemini",
+        "--no-annotate",
+        dest="annotate",
+        action="store_false",
+        help="Skip annotating unannotated items with descriptions and search terms via Gemini",
     )
     parser.add_argument(
         "--annotate-sample",
         type=int,
         default=None,
         metavar="N",
-        help="Annotate a random sample of N unannotated items (implies --annotate)",
+        help="Annotate a random sample of N unannotated items instead of all",
     )
     parser.add_argument(
-        "--detect-nsfw",
-        action="store_true",
-        help="Detect NSFW content locally and store results in item metadata",
+        "--no-detect-nsfw",
+        dest="detect_nsfw",
+        action="store_false",
+        help="Skip NSFW detection",
     )
     parser.add_argument(
         "--db-path",
@@ -587,6 +589,7 @@ if __name__ == "__main__":
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         help="Console log level (default: INFO)",
     )
+    parser.set_defaults(annotate=True, detect_nsfw=True)
     args = parser.parse_args()
     _configure_log_level(args.log_level)
     if args.regen_thumbnails:

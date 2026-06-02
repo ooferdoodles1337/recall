@@ -25,7 +25,9 @@ IMAGE_EXTENSIONS = {
     ".png", ".apng",
     ".webp",
     ".gif",
+    ".heic", ".heif",
 }
+HEIC_EXTENSIONS = {".heic", ".heif"}
 VIDEO_EXTENSIONS = {
     ".mp4", ".m4v", ".mov",
     ".avi", ".mkv", ".wmv", ".flv", ".webm", ".3gp",
@@ -54,8 +56,26 @@ def is_animated(path: str) -> bool:
         return getattr(img, "n_frames", 1) > 1
 
 
+def _heic_to_jpeg_bytes(path: str) -> bytes:
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+    tmp.close()
+    try:
+        result = subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-i", path, tmp.name],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg HEIC conversion failed for {path}: {result.stderr.strip()}")
+        return Path(tmp.name).read_bytes()
+    finally:
+        os.unlink(tmp.name)
+
+
 def process_image(path: str) -> ProcessedFile:
     ext = Path(path).suffix.lower()
+    if ext in HEIC_EXTENSIONS:
+        return ProcessedFile(data=_heic_to_jpeg_bytes(path), embedding_mime="image/jpeg", media_type="image")
     if ext in {".jpg", ".jpeg", ".jfif", ".pjpeg", ".pjp"}:
         return ProcessedFile(data=Path(path).read_bytes(), embedding_mime="image/jpeg", media_type="image")
     if ext in {".png", ".apng"}:
@@ -144,6 +164,10 @@ def generate_thumbnail(path: str, media_type: str) -> bytes:
     if ext in ANIMATED_IMAGE_EXTS:
         with Image.open(path) as raw:
             img = raw.convert("RGB")
+    elif ext in HEIC_EXTENSIONS:
+        jpeg_bytes = _heic_to_jpeg_bytes(path)
+        with Image.open(io.BytesIO(jpeg_bytes)) as raw:
+            img = ImageOps.exif_transpose(raw).convert("RGB")
     elif media_type == "video":
         frame = iio.imread(path, index=0, plugin="FFMPEG")
         img = Image.fromarray(frame).convert("RGB")
