@@ -12,7 +12,7 @@ export function SensitiveDetailPrompt({ item, onView }: SensitiveDetailPromptPro
     <div className="detail-sensitive-prompt" aria-live="polite">
       <div className="detail-sensitive-card">
         <ShieldAlertIcon className="detail-sensitive-icon" aria-hidden />
-        <h2 className="detail-sensitive-title">Sensitive Content</h2>
+        <h2 className="detail-sensitive-title">Hidden</h2>
         <p className="detail-sensitive-body">
           This item is hidden until you choose to view it.
         </p>

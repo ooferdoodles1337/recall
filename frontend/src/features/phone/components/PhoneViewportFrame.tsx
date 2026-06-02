@@ -9,7 +9,7 @@ import {
   MOTION_EASE, readLongPressHintDismissed, writeLongPressHintDismissed,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
-import { NsfwDialog } from "./NsfwDialog";
+import { HiddenDialog } from "./HiddenDialog";
 import { ImageDetailView } from "./ImageDetailView";
 import { SelectionTray } from "./SelectionTray";
 import { VideoDetailView } from "./VideoDetailView";
@@ -21,7 +21,7 @@ import {
 } from "../phoneReducer";
 import { PhoneSearchBar } from "./SearchCommandLayer";
 import { useGridDensity } from "./useGridDensity";
-import { useNsfwReveal } from "./useNsfwReveal";
+import { useHiddenReveal } from "./useHiddenReveal";
 import { usePhoneDetail } from "./usePhoneDetail";
 import { useSelectionTray } from "./useSelectionTray";
 import { PhoneSearchShell } from "./PhoneSearchShell";
@@ -77,7 +77,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const favoritesGridRef = useRef<HTMLDivElement>(null);
 
 
-  const { isItemBlurred, nsfwPendingItem, setNsfwPendingItem, revealOne, revealAll, revealSafe } = useNsfwReveal();
+  const { isItemBlurred, hiddenPendingItem, setHiddenPendingItem, revealOne, revealAll, revealSafe } = useHiddenReveal();
   const { toggleSelected } = useSelectionTray(selectedItems, setSelectedItems);
 
   const sc = useSearchController({ dispatch, scrollContainerRef, topBarInputRef, modeRef, bgContentRef, modeState, modeTransition });
@@ -90,7 +90,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const { detailItem, setDetailItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate } = usePhoneDetail({
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    runDateBrowse: sc.runDateBrowse, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem, revealSafe,
+    runDateBrowse: sc.runDateBrowse, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem: setHiddenPendingItem, revealSafe,
     onItemUpdated: handleItemUpdated,
   });
 
@@ -104,7 +104,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     closeDetail();
   }, [closeDetail]);
 
-  const handleViewNsfwItem = useCallback((item: RecallMediaItem) => {
+  const handleViewHiddenItem = useCallback((item: RecallMediaItem) => {
     if (modeRef.current === "detail") return;
     setDetailNavDirection(0);
     revealOne(item.id);
@@ -153,7 +153,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     if (isTileSelectionSuppressed()) return;
     if (!longPressTriggeredRef.current) {
       if (isItemBlurred(item)) {
-        setNsfwPendingItem(item);
+        setHiddenPendingItem(item);
       } else {
         toggleSelected(item);
         if (modeRef.current === "results" && !hasShownHintRef.current && !readLongPressHintDismissed()) {
@@ -162,7 +162,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
         }
       }
     }
-  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, toggleSelected, setNsfwPendingItem, modeRef]);
+  }, [cancelLongPress, isItemBlurred, isTileSelectionSuppressed, toggleSelected, setHiddenPendingItem, modeRef]);
 
   const handleItemPointerMove = useCallback((e: React.PointerEvent) => {
     if (longPressTimerRef.current !== null && pointerDownPosRef.current) {
@@ -478,9 +478,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       </LayoutGroup>
       </MotionConfig>
 
-      {nsfwPendingItem && (
-        <NsfwDialog item={nsfwPendingItem} onKeepHidden={() => setNsfwPendingItem(null)}
-          onViewItem={handleViewNsfwItem} onRevealAll={revealAll} />
+      {hiddenPendingItem && (
+        <HiddenDialog item={hiddenPendingItem} onKeepHidden={() => setHiddenPendingItem(null)}
+          onViewItem={handleViewHiddenItem} onRevealAll={revealAll} />
       )}
 
       <MotionConfig reducedMotion="user">

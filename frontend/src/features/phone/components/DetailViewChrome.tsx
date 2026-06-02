@@ -146,7 +146,7 @@ function DetailMediaPreview({ preview, position }: { preview: DetailNeighborPrev
       {isSensitiveHidden ? (
         <div className="detail-media-neighbor-sensitive-label">
           <ShieldAlertIcon aria-hidden />
-          <span>Sensitive</span>
+          <span>Hidden</span>
         </div>
       ) : null}
     </motion.div>
@@ -389,7 +389,7 @@ export function DetailTopBar({
               ) : (
                 <DropdownMenuItem onClick={() => onToggleSafety(item, "nsfw")}>
                   <ShieldAlertIcon />
-                  Mark as NSFW
+                  Mark as Hidden
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

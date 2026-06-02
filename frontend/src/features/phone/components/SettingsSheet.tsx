@@ -86,7 +86,7 @@ export function SettingsSheet({
               <div className="settings-row">
                 <ShieldIcon className="settings-row-icon" aria-hidden />
                 <label className="settings-row-label" htmlFor="settings-show-sensitive">
-                  Show sensitive results
+                  Show hidden results
                 </label>
                 <Switch
                   id="settings-show-sensitive"

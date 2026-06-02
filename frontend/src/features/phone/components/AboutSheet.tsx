@@ -73,7 +73,7 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
   const safety = item.metadata.safety;
   const safetyState = safety?.state ?? "unknown";
   const isSafe = safetyState === "safe";
-  const isNsfw = safetyState === "nsfw";
+  const isHidden = safetyState === "nsfw";
 
   const search = item.metadata.search;
   const description = search?.description;
@@ -165,11 +165,11 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
                 {isSafe ? (
                   <ShieldCheckIcon className="about-field-icon about-field-icon--safe" />
                 ) : (
-                  <ShieldAlertIcon className="about-field-icon about-field-icon--nsfw" />
+                  <ShieldAlertIcon className="about-field-icon about-field-icon--hidden" />
                 )}
                 <span>
-                  {isNsfw ? (
-                    <Badge variant="destructive">NSFW</Badge>
+                  {isHidden ? (
+                    <Badge variant="destructive">Hidden</Badge>
                   ) : isSafe ? (
                     <Badge variant="secondary">Safe</Badge>
                   ) : (

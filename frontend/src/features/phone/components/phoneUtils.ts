@@ -50,7 +50,7 @@ export const MOTION_EASE = {
   exit: [0.4, 0, 1, 1] as [number, number, number, number],
 };
 
-export function isItemNsfw(item: RecallMediaItem) {
+export function isItemHidden(item: RecallMediaItem) {
   return item.metadata.safety?.state === "nsfw";
 }
 

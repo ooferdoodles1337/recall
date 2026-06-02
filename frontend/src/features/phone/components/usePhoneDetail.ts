@@ -24,7 +24,7 @@ type Dependencies = {
   dispatch: (action: PhoneModeAction) => void;
   runDateBrowse: (datePrefix: string, label: string) => void;
   setErrorMessage: (msg: string | null) => void;
-  setNsfwPendingItem: (item: RecallMediaItem | null) => void;
+  setHiddenPendingItem: (item: RecallMediaItem | null) => void;
   revealSafe: (id: string) => void;
   onItemUpdated?: (item: RecallMediaItem) => void;
 };
@@ -41,7 +41,7 @@ function replaceItem(items: RecallMediaItem[], updated: RecallMediaItem) {
 export function usePhoneDetail(deps: Dependencies): DetailApi {
   const {
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    runDateBrowse, setErrorMessage, setNsfwPendingItem, revealSafe,
+    runDateBrowse, setErrorMessage, setHiddenPendingItem, revealSafe,
     onItemUpdated,
   } = deps;
   const queryClient = useQueryClient();
@@ -60,12 +60,12 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
   }, [onItemUpdated, queryClient]);
 
   const openDetail = useCallback((item: RecallMediaItem) => {
-    if (isItemBlurred(item)) { setNsfwPendingItem(item); return; }
+    if (isItemBlurred(item)) { setHiddenPendingItem(item); return; }
     if (modeRef.current === "detail") return;
     dispatch({ type: "DETAIL_OPEN" });
     setDetailItem(item);
     onSelectCandidate?.(item.id);
-  }, [isItemBlurred, modeRef, dispatch, onSelectCandidate, setNsfwPendingItem]);
+  }, [isItemBlurred, modeRef, dispatch, onSelectCandidate, setHiddenPendingItem]);
 
   const closeDetail = useCallback(() => {
     dispatch({ type: "DETAIL_CLOSE" });
@@ -91,7 +91,7 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
       patchCatalogItem(item.id, { safety: { state } }),
     onSuccess: (updated, { item, state }) => {
       publishUpdatedItem(updated);
-      if (state === "safe") { revealSafe(item.id); setNsfwPendingItem(null); }
+      if (state === "safe") { revealSafe(item.id); setHiddenPendingItem(null); }
     },
     onError: () => setErrorMessage("Couldn't update content rating — please try again."),
   });

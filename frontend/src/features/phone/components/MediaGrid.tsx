@@ -71,17 +71,17 @@ const ThumbCell = React.memo(function ThumbCell({
         onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(result); } }}
-        aria-label={isBlurred ? "Sensitive content — tap to review" : `${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
+        aria-label={isBlurred ? "Hidden — tap to review" : `${selected ? "Deselect" : "Select"} ${itemTitle(result)}`}
         aria-pressed={isBlurred ? undefined : selected}
       >
         {thumb ? (
-          <div className={`thumb-img-wrap${isBlurred ? " thumb-img-wrap--nsfw" : ""}`}>
+          <div className={`thumb-img-wrap${isBlurred ? " thumb-img-wrap--hidden" : ""}`}>
             <img src={thumb} alt={result.metadata.search?.description ?? ""} loading="lazy" decoding="async" onLoad={handleStaticThumbLoad} />
             {!isBlurred && staticLoaded && animatedThumb ? (
               <img src={animatedThumb} alt="" aria-hidden loading="lazy" decoding="async" className="thumb-animated" onLoad={(e) => { e.currentTarget.style.opacity = "1"; }} />
             ) : null}
             {isBlurred ? (
-              <div className="nsfw-thumb-overlay" aria-hidden>
+              <div className="hidden-thumb-overlay" aria-hidden>
                 <EyeOffIcon />
               </div>
             ) : null}

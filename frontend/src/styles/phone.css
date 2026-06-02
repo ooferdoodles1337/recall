@@ -147,7 +147,7 @@
      --glass-light-lg 20px  1.8   search bar, compose panel, hints
      --glass-dark-xl  24px  1.4   sensitive content overlay
      --glass-light-xl 24px  1.8   result cards, selection tray, footer
-     --glass-light-2xl 32px 1.8   about sheet, nsfw sheet
+     --glass-light-2xl 32px 1.8   about sheet, hidden sheet
      --glass-scrim    12px  —     modal backdrop (no vibrancy)
   ──────────────────────────────────────────────────────────────── */
   --glass-dark-xs:    blur(8px) saturate(1.4);
@@ -2055,15 +2055,15 @@ body:has(.app-shell--phone) {
 
 
 
-/* NSFW content guard */
+/* Hidden content guard */
 
-.thumb-img-wrap--nsfw img,
-.thumb-img-wrap--nsfw .thumb-animated {
+.thumb-img-wrap--hidden img,
+.thumb-img-wrap--hidden .thumb-animated {
   filter: blur(20px);
   transform: scale(1.08);
 }
 
-.nsfw-thumb-overlay {
+.hidden-thumb-overlay {
   position: absolute;
   inset: 0;
   display: flex;
@@ -2075,13 +2075,13 @@ body:has(.app-shell--phone) {
   pointer-events: none;
 }
 
-.nsfw-thumb-overlay svg {
+.hidden-thumb-overlay svg {
   width: 1.375rem;
   height: 1.375rem;
   opacity: 0.9;
 }
 
-.nsfw-sheet[data-slot="sheet-content"] {
+.hidden-sheet[data-slot="sheet-content"] {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: var(--glass-light-2xl);
   -webkit-backdrop-filter: var(--glass-light-2xl);
@@ -2091,13 +2091,13 @@ body:has(.app-shell--phone) {
   overflow: hidden;
 }
 
-.nsfw-sheet-header {
+.hidden-sheet-header {
   padding: 24px 20px 20px;
   text-align: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
 
-.nsfw-sheet-icon {
+.hidden-sheet-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2107,27 +2107,27 @@ body:has(.app-shell--phone) {
   color: #d97706;
 }
 
-.nsfw-sheet-title {
+.hidden-sheet-title {
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 4px;
   color: #111827;
 }
 
-.nsfw-sheet-body {
+.hidden-sheet-body {
   font-size: 0.8125rem;
   color: #6b7280;
   line-height: 1.45;
 }
 
-.nsfw-sheet-actions {
+.hidden-sheet-actions {
   padding: 16px 16px max(env(safe-area-inset-bottom), 24px);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.nsfw-sheet-btn {
+.hidden-sheet-btn {
   display: block;
   width: 100%;
   border: none;
@@ -2139,35 +2139,35 @@ body:has(.app-shell--phone) {
   transition: opacity 0.1s;
 }
 
-.nsfw-sheet-btn--view {
+.hidden-sheet-btn--view {
   padding: 14px 20px;
   background: #2563eb;
   color: #fff;
   font-weight: 600;
 }
 
-.nsfw-sheet-btn--view:active {
+.hidden-sheet-btn--view:active {
   opacity: 0.82;
 }
 
-.nsfw-sheet-btn--cancel {
+.hidden-sheet-btn--cancel {
   padding: 14px 20px;
   background: rgba(0, 0, 0, 0.06);
   color: #374151;
   font-weight: 500;
 }
 
-.nsfw-sheet-btn--cancel:active {
+.hidden-sheet-btn--cancel:active {
   background: rgba(0, 0, 0, 0.1);
 }
 
-.nsfw-sheet-divider {
+.hidden-sheet-divider {
   height: 1px;
   background: rgba(0, 0, 0, 0.08);
   margin: 4px 4px;
 }
 
-.nsfw-sheet-btn--reveal-all {
+.hidden-sheet-btn--reveal-all {
   padding: 6px 20px;
   background: none;
   color: #d97706;
@@ -2175,7 +2175,7 @@ body:has(.app-shell--phone) {
   font-weight: 500;
 }
 
-.nsfw-sheet-btn--reveal-all:active {
+.hidden-sheet-btn--reveal-all:active {
   opacity: 0.65;
 }
 
@@ -2649,7 +2649,7 @@ body:has(.app-shell--phone) {
   color: #16a34a;
 }
 
-.about-field-icon--nsfw {
+.about-field-icon--hidden {
   color: #d97706;
 }
 
