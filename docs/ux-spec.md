@@ -67,6 +67,21 @@ are relevant when the user first arrives but do not need to occupy permanent rea
 Keeping it non-sticky reclaims screen space for the photo grid while ensuring the search
 bar (the primary action) is always reachable.
 
+### SR-5 — Page-level pull-to-refresh is disabled
+
+The `/phone` route must never allow the browser page to overscroll far enough to
+trigger pull-to-refresh or page-level rubber-band gestures. All touch scrolling
+should be contained inside the phone viewport's intended scroll regions.
+
+At scroll boundaries, dragging past the top or bottom of a phone scroll area must
+feel inert or locally bounded; it must not chain to `html`, `body`, or the browser
+viewport. This applies to home, results, detail overlays, compose overlays,
+settings sheets, and indexed-album sheets.
+
+**Rationale:** accidental pull-to-refresh destroys the tester's current task
+state and is easy to trigger during rapid photo browsing, especially on mobile
+devices. The phone UI should behave like an app shell, not a refreshable web page.
+
 ---
 
 ## Compose panel
