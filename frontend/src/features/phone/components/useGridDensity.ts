@@ -32,12 +32,12 @@ export type GridDensityApi = {
 };
 
 export function useGridDensity(
-  favoritesGridRef: React.RefObject<HTMLDivElement | null>,
+  homeGridRef: React.RefObject<HTMLDivElement | null>,
   searchGridRef: React.RefObject<HTMLDivElement | null>,
-  favoriteItems: RecallMediaItem[],
+  homeItems: RecallMediaItem[],
   results: RecallMediaItem[],
   isLoading: boolean,
-  isLoadingFavorites: boolean,
+  isLoadingHomeFeed: boolean,
   isLoadingMore: boolean,
   mode: string,
   cancelLongPress: () => void,
@@ -61,7 +61,7 @@ export function useGridDensity(
 
   const captureGridSnapshot = useCallback((): GridItemSnapshot => {
     const snapshot: GridItemSnapshot = new Map();
-    for (const grid of [favoritesGridRef.current, searchGridRef.current]) {
+    for (const grid of [homeGridRef.current, searchGridRef.current]) {
       if (!grid) continue;
       const scope = grid.dataset.phoneGridScope ?? "grid";
       grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
@@ -70,7 +70,7 @@ export function useGridDensity(
       });
     }
     return snapshot;
-  }, [favoritesGridRef, searchGridRef]);
+  }, [homeGridRef, searchGridRef]);
 
   const updateGridColumns = useCallback((nextColumns: GridColumns) => {
     if (nextColumns === gridColumnsRef.current) return;
@@ -88,7 +88,7 @@ export function useGridDensity(
     gridFlipAnimationsRef.current = [];
     if (snapshot.size === 0 || reduceMotionEnabled()) return;
     const animations: Animation[] = [];
-    for (const grid of [favoritesGridRef.current, searchGridRef.current]) {
+    for (const grid of [homeGridRef.current, searchGridRef.current]) {
       if (!grid) continue;
       const scope = grid.dataset.phoneGridScope ?? "grid";
       grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
@@ -112,7 +112,7 @@ export function useGridDensity(
       });
     }
     gridFlipAnimationsRef.current = animations;
-  }, [favoriteItems, gridColumns, isLoading, isLoadingFavorites, isLoadingMore, mode, results, favoritesGridRef, searchGridRef]);
+  }, [homeItems, gridColumns, isLoading, isLoadingHomeFeed, isLoadingMore, mode, results, homeGridRef, searchGridRef]);
 
   const zoomGridIn = useCallback(() => {
     const idx = GRID_COLUMN_OPTIONS.indexOf(gridColumnsRef.current);

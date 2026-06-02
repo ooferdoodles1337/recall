@@ -8,6 +8,7 @@ export const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 export const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
 export const INDEXED_ALBUMS_KEY = "recall.indexedAlbums.v1";
 export const LONG_PRESS_HINT_KEY = "recall.longPressHint.v1";
+export const SEARCH_PULSE_KEY = "recall.searchPulse.v1";
 export const OVERSCROLL_THRESHOLD = 80;
 
 export const LONG_PRESS_MS = 500;
@@ -144,6 +145,14 @@ export function readLongPressHintDismissed(): boolean {
 
 export function writeLongPressHintDismissed(): void {
   localStorage.setItem(LONG_PRESS_HINT_KEY, "1");
+}
+
+export function readSearchPulseDismissed(): boolean {
+  return localStorage.getItem(SEARCH_PULSE_KEY) === "1";
+}
+
+export function writeSearchPulseDismissed(): void {
+  localStorage.setItem(SEARCH_PULSE_KEY, "1");
 }
 
 export function readSearchHistory(): string[] {

@@ -1,26 +1,33 @@
 import { motion } from "motion/react";
-import { FavoritesSection } from "./FavoritesSection";
+import { HomeFeedSection, type HomeFeed } from "./HomeFeedSection";
 import type { RecallMediaItem } from "@/shared/types/recall";
 import { screenMotionVariants, type ModeTransition } from "./phoneUtils";
 
 interface HomeLayerProps {
   visible: boolean;
   modeTransition: ModeTransition;
-  favoriteItems: RecallMediaItem[];
-  favoritesGridRef: React.RefObject<HTMLDivElement | null>;
-  isLoadingFavorites: boolean;
+  feed: HomeFeed;
+  items: RecallMediaItem[];
+  homeGridRef: React.RefObject<HTMLDivElement | null>;
+  isLoading: boolean;
+  isLoadingMore?: boolean;
+  onFeedChange: (feed: HomeFeed) => void;
 }
 
-export function HomeLayer({ visible, modeTransition, favoriteItems, favoritesGridRef, isLoadingFavorites }: HomeLayerProps) {
-  const showFavoritesSection = isLoadingFavorites || favoriteItems.length > 0;
+export function HomeLayer({ visible, modeTransition, feed, items, homeGridRef, isLoading, isLoadingMore = false, onFeedChange }: HomeLayerProps) {
   if (!visible) return null;
   return (
     <motion.div key="screen-home" className="phone-screen phone-screen--home"
       custom={modeTransition} variants={screenMotionVariants} initial="enter" animate="center" exit="exit">
       <div className="phone-startpage">
-        {showFavoritesSection ? (
-          <FavoritesSection favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} isLoadingFavorites={isLoadingFavorites} />
-        ) : null}
+        <HomeFeedSection
+          feed={feed}
+          items={items}
+          homeGridRef={homeGridRef}
+          isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          onFeedChange={onFeedChange}
+        />
       </div>
     </motion.div>
   );

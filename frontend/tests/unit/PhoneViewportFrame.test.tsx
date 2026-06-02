@@ -61,6 +61,12 @@ async function swipeDetail(label: RegExp, fromX: number, toX: number) {
     pointerId: 7,
     pointerType: "touch",
   });
+  fireEvent.pointerMove(detail, {
+    clientX: toX,
+    clientY: 242,
+    pointerId: 7,
+    pointerType: "touch",
+  });
   fireEvent.pointerUp(detail, {
     clientX: toX,
     clientY: 242,
@@ -73,6 +79,9 @@ async function touchSwipeDetail(label: RegExp, fromX: number, toX: number) {
   const detail = await screen.findByLabelText(label);
   fireEvent.touchStart(detail, {
     touches: [{ clientX: fromX, clientY: 240 }],
+  });
+  fireEvent.touchMove(detail, {
+    touches: [{ clientX: toX, clientY: 242 }],
   });
   fireEvent.touchEnd(detail, {
     changedTouches: [{ clientX: toX, clientY: 242 }],
@@ -213,6 +222,41 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await user.click(await screen.findByRole("button", { name: "Send" }));
     expect(onConfirmAnswer).toHaveBeenCalledWith("favorite-01");
+  });
+
+  it("switches the home feed from favorites to recents and expands recents on scroll", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(screen.getByRole("button", { name: "Choose home feed, current feed Favorites" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Recents" }));
+
+    expect(await screen.findByRole("button", { name: "Select Recent item 1" })).toBeInTheDocument();
+    expect(screen.getByText("50 loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
+    expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=50"))).toBe(true);
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    fireEvent.scroll(viewport);
+
+    await waitFor(() => {
+      expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=100"))).toBe(true);
+    });
+    expect(await screen.findByRole("button", { name: /Select Recent item 51/i })).toBeInTheDocument();
+  });
+
+  it("uses recents as the detail swipe source after switching the home feed", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(screen.getByRole("button", { name: "Choose home feed, current feed Favorites" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Recents" }));
+
+    await openDetailFromButton(await screen.findByRole("button", { name: "Select Recent item 1" }));
+    await touchSwipeDetail(/Recent item 1 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Recent item 2 detail view/i)).toBeInTheDocument();
   });
 
   it("opens detail on long press, goes back, searches same date, and runs similar search", async () => {
@@ -524,7 +568,7 @@ describe("PhoneViewportFrame interactions", () => {
     expect(phone).toHaveStyle({ "--phone-grid-columns": "6" });
     expect(window.localStorage.getItem(GRID_COLUMNS_STORAGE_KEY)).toBe("6");
 
-    const gestureZone = screen.getByTestId("phone-favorites-grid-zone");
+    const gestureZone = screen.getByTestId("phone-home-feed-grid-zone");
     dispatchSyntheticPointer(gestureZone, "pointerdown", {
       pointerId: 1,
       pointerType: "touch",

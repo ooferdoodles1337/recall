@@ -37,6 +37,7 @@ interface PhoneSearchBarProps {
   value: string;
   className?: string;
   clearLabel?: string;
+  placeholder?: string;
   showHistory: boolean;
   showHistoryIcon: boolean;
   isSearching?: boolean;
@@ -55,6 +56,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
     value,
     className,
     clearLabel = "Clear search",
+    placeholder = "Describe a photo or video...",
     showHistory,
     showHistoryIcon,
     isSearching = false,
@@ -140,7 +142,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
         ref={ref}
         aria-label="Search your media"
         value={value}
-        placeholder="Describe a photo or video..."
+        placeholder={placeholder}
         autoComplete="off"
         enterKeyHint="search"
         onFocus={onFocus}

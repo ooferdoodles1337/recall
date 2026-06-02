@@ -6,7 +6,8 @@ import { isVideo, resolvedMediaUrl } from "@/shared/media/mediaItem";
 import {
   SEARCH_BATCH_SIZE, FAVORITES_COUNT, OVERSCROLL_THRESHOLD, mediaLayoutId,
   LONG_PRESS_MS, LONG_PRESS_CANCEL_DIST_SQ, SELECTION_SUPPRESS_MS, HIDE_COMPOSE_SCROLL_THRESHOLD,
-  MOTION_EASE, readLongPressHintDismissed, writeLongPressHintDismissed,
+  MOTION_EASE, PREFETCH_TRIGGER_REMAINING, readLongPressHintDismissed, writeLongPressHintDismissed,
+  readSearchPulseDismissed, writeSearchPulseDismissed,
 } from "./phoneUtils";
 import { AboutSheet } from "./AboutSheet";
 import { HiddenDialog } from "./HiddenDialog";
@@ -14,7 +15,7 @@ import { ImageDetailView } from "./ImageDetailView";
 import { SelectionTray } from "./SelectionTray";
 import { VideoDetailView } from "./VideoDetailView";
 import { useQuery } from "@tanstack/react-query";
-import { listFavoriteItems } from "../api/searchApi";
+import { listFavoriteItems, listRecentItems } from "../api/searchApi";
 import {
   initialPhoneModeState, phoneModeReducer,
   type PhoneScreen,
@@ -30,6 +31,7 @@ import { SettingsSheet } from "./SettingsSheet";
 import { IndexedAlbumsSheet } from "./IndexedAlbumsSheet";
 import { useIndexedAlbums } from "./useIndexedAlbums";
 import { HomeLayer } from "./HomeLayer";
+import type { HomeFeed } from "./HomeFeedSection";
 import { ResultsLayer } from "./ResultsLayer";
 import { LongPressHint } from "./LongPressHint";
 import { GridHandlersContext } from "./GridHandlersContext";
@@ -42,6 +44,7 @@ interface PhoneViewportFrameProps {
   onExit?: () => void;
 }
 type PhoneMode = PhoneScreen;
+const HOME_RECENTS_MAX = 500;
 
 export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer, onExit }: PhoneViewportFrameProps) {
   const [modeState, dispatch] = useReducer(phoneModeReducer, initialPhoneModeState);
@@ -55,9 +58,25 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   });
   const favoriteItems = favoritesQuery.data?.results ?? [];
   const isLoadingFavorites = favoritesQuery.isPending;
+  const [homeFeed, setHomeFeed] = useState<HomeFeed>("favorites");
+  const [recentLimit, setRecentLimit] = useState(SEARCH_BATCH_SIZE);
+  const homeFeedScrollTopRef = useRef<Record<HomeFeed, number>>({ favorites: 0, recents: 0 });
+  const recentItemsQuery = useQuery({
+    queryKey: ["catalog", "recent", recentLimit],
+    queryFn: () => listRecentItems(recentLimit),
+    enabled: homeFeed === "recents",
+    placeholderData: (previous) => previous,
+  });
+  const recentItems = recentItemsQuery.data?.results ?? [];
+  const isLoadingRecents = homeFeed === "recents" && recentItemsQuery.isPending;
+  const isLoadingMoreRecents = homeFeed === "recents" && recentItems.length > 0 && recentItemsQuery.isFetching;
+  const hasMoreRecents = homeFeed === "recents" && recentItems.length >= recentLimit && recentLimit < HOME_RECENTS_MAX;
+  const activeHomeItems = homeFeed === "recents" ? recentItems : favoriteItems;
+  const isLoadingHomeFeed = homeFeed === "recents" ? isLoadingRecents : isLoadingFavorites;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
   const [showLongPressHint, setShowLongPressHint] = useState(false);
   const hasShownHintRef = useRef(false);
+  const [showSearchPulse, setShowSearchPulse] = useState(() => !readSearchPulseDismissed());
   const [aboutSheetItem, setAboutSheetItem] = useState<RecallMediaItem | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [albumsOpen, setAlbumsOpen] = useState(false);
@@ -74,7 +93,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   bgContentRef.current = contentMode;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const searchGridRef = useRef<HTMLDivElement>(null);
-  const favoritesGridRef = useRef<HTMLDivElement>(null);
+  const homeGridRef = useRef<HTMLDivElement>(null);
 
 
   const { isItemBlurred, hiddenPendingItem, setHiddenPendingItem, revealOne, revealAll, revealSafe } = useHiddenReveal();
@@ -90,7 +109,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const { detailItem, setDetailItem, openDetail, closeDetail, handleToggleFavorite, handleToggleSafety, searchSameDate } = usePhoneDetail({
     isItemBlurred, onSelectCandidate, modeRef, dispatch,
-    runDateBrowse: sc.runDateBrowse, setErrorMessage: sc.setErrorMessage, setNsfwPendingItem: setHiddenPendingItem, revealSafe,
+    runDateBrowse: sc.runDateBrowse, setErrorMessage: sc.setErrorMessage, setHiddenPendingItem, revealSafe,
     onItemUpdated: handleItemUpdated,
   });
 
@@ -132,7 +151,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, []);
 
   const { gridColumns, gridDensityStyle, zoomGridIn, zoomGridOut, pinchHandlers, wheelHandler } = useGridDensity(
-    favoritesGridRef, searchGridRef, favoriteItems, sc.results, sc.isLoading, isLoadingFavorites, sc.isLoadingMore, mode,
+    homeGridRef, searchGridRef, activeHomeItems, sc.results, sc.isLoading, isLoadingHomeFeed, sc.isLoadingMore || isLoadingMoreRecents, mode,
     cancelLongPress, suppressTileSelectionBriefly,
   );
 
@@ -190,6 +209,15 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, [currentTarget?.id, dispatch, setDetailItem]);
 
   useEffect(() => { if (mode === "compose") topBarInputRef.current?.focus(); modeRef.current = mode; }, [contentMode, mode]);
+
+  // Dismiss search pulse on first interaction
+  useEffect(() => {
+    if (!showSearchPulse) return;
+    if (mode === "compose" || mode === "results") {
+      setShowSearchPulse(false);
+      writeSearchPulseDismissed();
+    }
+  }, [mode, showSearchPulse]);
 
   // Reset header visibility when returning to home
   const [isAtScrollTop, setIsAtScrollTop] = useState(true);
@@ -280,6 +308,33 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || contentMode !== "home" || homeFeed !== "recents") return;
+    const handleScroll = () => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight >= PREFETCH_TRIGGER_REMAINING) return;
+      if (!hasMoreRecents || recentItemsQuery.isFetching) return;
+      setRecentLimit((limit) => Math.min(limit + SEARCH_BATCH_SIZE, HOME_RECENTS_MAX));
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [contentMode, hasMoreRecents, homeFeed, recentItemsQuery.isFetching]);
+
+  const handleHomeFeedChange = useCallback((nextFeed: HomeFeed) => {
+    if (nextFeed === homeFeed) return;
+    const el = scrollContainerRef.current;
+    if (el) homeFeedScrollTopRef.current[homeFeed] = el.scrollTop;
+    const nextItems = nextFeed === "recents" ? recentItems : favoriteItems;
+    const nextIds = new Set(nextItems.map((item) => item.id));
+    setSelectedItems((prev) => prev.filter((item) => nextIds.has(item.id)));
+    setHomeFeed(nextFeed);
+    window.setTimeout(() => {
+      const target = homeFeedScrollTopRef.current[nextFeed] ?? 0;
+      scrollContainerRef.current?.scrollTo({ top: target });
+      setIsAtScrollTop(target <= 4);
+    }, 0);
+  }, [favoriteItems, homeFeed, recentItems]);
+
   const runSimilarSearch = useCallback(async (item: RecallMediaItem) => {
     setDetailNavDirection(0);
     setDetailItem(null);
@@ -298,7 +353,7 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
 
   const navigateDetail = useCallback((direction: 1 | -1) => {
     if (!detailItem) return;
-    const source = bgContentRef.current === "results" ? sc.results : favoriteItems;
+    const source = bgContentRef.current === "results" ? sc.results : activeHomeItems;
     const currentIndex = source.findIndex((item) => item.id === detailItem.id);
     if (currentIndex < 0) return;
     const candidate = source[currentIndex + direction];
@@ -307,11 +362,11 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
       setDetailItem(candidate);
       if (!isItemBlurred(candidate)) onSelectCandidate?.(candidate.id);
     }
-  }, [detailItem, favoriteItems, isItemBlurred, onSelectCandidate, sc.results, setDetailItem]);
+  }, [activeHomeItems, detailItem, isItemBlurred, onSelectCandidate, sc.results, setDetailItem]);
 
   const detailSource = useMemo(
-    () => (contentMode === "results" ? sc.results : favoriteItems),
-    [contentMode, favoriteItems, sc.results],
+    () => (contentMode === "results" ? sc.results : activeHomeItems),
+    [activeHomeItems, contentMode, sc.results],
   );
 
   const detailIndex = useMemo(
@@ -349,17 +404,23 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   const showHistoryIcon = isSearching
     || (mode !== "home" && sc.history.length > 0 && (mode === "results" || sc.query.trim().length > 0));
 
-  const renderSearchBar = (className?: string, clearLabel = "Clear search") => (
-    <PhoneSearchBar ref={topBarInputRef} value={sc.query} className={className} clearLabel={clearLabel}
-      showHistory={sc.showHistory} showHistoryIcon={showHistoryIcon} isSearching={isSearching}
-      dateBrowseLabel={mode === "results" ? sc.dateBrowseContext?.label : null}
-      similarThumbnailUrl={mode === "results" && sc.similarSourceItem
-        ? (sc.similarSourceItem.links?.thumbnail ?? null)
-        : undefined}
-      onSimilarChipTap={handleSimilarChipTap}
-      onToggleHistory={sc.handleSearchHistoryToggle} onFocus={sc.handleSearchFocus}
-      onChange={sc.handleSearchChange} onSubmit={sc.handleSearchSubmit} onClear={sc.handleSearchClear} />
-  );
+  const renderSearchBar = (className?: string, clearLabel = "Clear search") => {
+    const isHomeContext = contentMode === "home";
+    const pulseClass = isHomeContext && showSearchPulse ? " search-bar--pulse" : "";
+    const mergedClass = `${className ?? ""}${pulseClass}`.trim() || undefined;
+    return (
+      <PhoneSearchBar ref={topBarInputRef} value={sc.query} className={mergedClass} clearLabel={clearLabel}
+        placeholder={isHomeContext && !sc.query ? "People, places, moments…" : undefined}
+        showHistory={sc.showHistory} showHistoryIcon={showHistoryIcon} isSearching={isSearching}
+        dateBrowseLabel={mode === "results" ? sc.dateBrowseContext?.label : null}
+        similarThumbnailUrl={mode === "results" && sc.similarSourceItem
+          ? (sc.similarSourceItem.links?.thumbnail ?? null)
+          : undefined}
+        onSimilarChipTap={handleSimilarChipTap}
+        onToggleHistory={sc.handleSearchHistoryToggle} onFocus={sc.handleSearchFocus}
+        onChange={sc.handleSearchChange} onSubmit={sc.handleSearchSubmit} onClear={sc.handleSearchClear} />
+    );
+  };
 
   return (
     <GridHandlersContext.Provider value={{
@@ -423,7 +484,9 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
           onPointerDownCapture={mode === "compose" && contentMode !== "home" ? () => dispatch({ type: "COMPOSE_DISMISS" }) : undefined}>
           <>
             <HomeLayer visible={contentMode === "home"} modeTransition={modeTransition}
-              favoriteItems={favoriteItems} favoritesGridRef={favoritesGridRef} isLoadingFavorites={isLoadingFavorites} />
+              feed={homeFeed} items={activeHomeItems} homeGridRef={homeGridRef}
+              isLoading={isLoadingHomeFeed} isLoadingMore={isLoadingMoreRecents}
+              onFeedChange={handleHomeFeedChange} />
             <ResultsLayer visible={contentMode === "results"} mode={mode} contentMode={contentMode}
               isLoading={sc.isLoading} isLoadingMore={sc.isLoadingMore} modeTransition={modeTransition}
               results={sc.results} searchGridRef={searchGridRef}

@@ -839,7 +839,29 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
   transition:
     border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Home state: taller bar with stronger presence */
+.phone-rect--home .search-bar--semantic {
+  min-height: 52px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* One-shot attention pulse — fires once, clears after animation */
+@keyframes search-bar-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.013); }
+  100% { transform: scale(1); }
+}
+
+.search-bar--pulse {
+  animation: search-bar-pulse 640ms cubic-bezier(0.45, 0, 0.55, 1) 800ms 1 both;
 }
 
 .search-bar--no-icon,
@@ -1564,15 +1586,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   color: var(--ios-label);
 }
 
-/* iOS Large Title — HIG specifies 34pt Bold */
+/* Slightly reduced from iOS Large Title (34pt) to keep weight below the search bar */
 .phone-startpage-title {
   margin: 0;
-  font-size: 2.125rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -1654,15 +1676,15 @@
   background: transparent;
 }
 
-/* Favorites section */
-.phone-favorites-section {
+/* Home feed section */
+.phone-home-feed-section {
   width: 100%;
   margin: var(--sp-5) 0 var(--sp-5);
   padding: 0 var(--sp-4);
   overflow: hidden;
 }
 
-.phone-favorites-header {
+.phone-home-feed-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1670,23 +1692,81 @@
   padding: 0 var(--sp-1) var(--sp-2);
 }
 
-.phone-favorites-actions {
+.phone-home-feed-actions {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
 }
 
 /* iOS section header style */
-.phone-favorites-title {
+.phone-home-feed-title {
   margin: 0;
   color: var(--ios-label);
   font-size: 1.1rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
-.phone-favorites-count {
+.phone-home-feed-trigger {
+  height: 32px;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 3px;
+  margin-left: calc(var(--sp-1) * -1);
+  padding: 0 var(--sp-1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ios-label);
+  text-align: left;
+}
+
+.phone-home-feed-trigger:hover,
+.phone-home-feed-trigger[data-state="open"] {
+  background: rgba(60, 60, 67, 0.08);
+  color: var(--ios-label);
+}
+
+.phone-home-feed-trigger svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ios-label-secondary);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.phone-home-feed-trigger[data-state="open"] svg {
+  color: var(--ios-label);
+  transform: rotate(180deg);
+}
+
+.phone-home-feed-menu {
+  z-index: 120;
+  min-width: 148px;
+  border-color: rgba(60, 60, 67, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  backdrop-filter: var(--glass-light-md);
+  -webkit-backdrop-filter: var(--glass-light-md);
+}
+
+.phone-home-feed-menu-item {
+  justify-content: space-between;
+  min-height: 34px;
+  color: var(--ios-label);
+  cursor: pointer;
+  letter-spacing: 0;
+}
+
+.phone-home-feed-menu-item svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ios-blue);
+}
+
+.phone-home-feed-count {
   flex: 0 0 auto;
   color: var(--ios-label-secondary);
   font-size: 0.78rem;
@@ -1695,8 +1775,20 @@
 }
 
 /* Tight iOS Photos grid */
-.phone-favorites-grid {
+.phone-home-feed-grid {
   width: 100%;
+}
+
+.phone-home-feed-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: var(--ios-label-secondary);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  text-align: center;
 }
 
 /* Row: flex, full-width interactive target */
@@ -2040,7 +2132,7 @@ body:has(.app-shell--phone) {
     --r: 11px;
   }
   .phone-startpage-title {
-    font-size: 1.875rem; /* 30pt — still within iOS Large Title range */
+    font-size: 1.625rem; /* 26pt — scaled down from 28pt base */
   }
 }
 
@@ -2049,7 +2141,7 @@ body:has(.app-shell--phone) {
     --r: 10px;
   }
   .phone-startpage-title {
-    font-size: 1.625rem; /* 26pt */
+    font-size: 1.375rem; /* 22pt */
   }
 }
 
