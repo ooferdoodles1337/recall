@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { RecallMediaItem } from "@/shared/types/recall";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type GridColumns,
   GRID_COLUMN_OPTIONS,
@@ -8,17 +7,13 @@ import {
   readGridColumns,
   writeGridColumns,
   pointerDistance,
-  pointerMidpoint,
   nearestGridColumns,
-  reduceMotionEnabled,
 } from "./phoneUtils";
 
 type GridPoint = { x: number; y: number };
-type GridItemSnapshot = Map<string, DOMRect>;
 type PinchGesture = {
   startColumns: GridColumns;
   startDistance: number;
-  midpoint: GridPoint;
 };
 
 export type GridDensityApi = {
@@ -32,21 +27,11 @@ export type GridDensityApi = {
 };
 
 export function useGridDensity(
-  homeGridRef: React.RefObject<HTMLDivElement | null>,
-  searchGridRef: React.RefObject<HTMLDivElement | null>,
-  homeItems: RecallMediaItem[],
-  results: RecallMediaItem[],
-  isLoading: boolean,
-  isLoadingHomeFeed: boolean,
-  isLoadingMore: boolean,
-  mode: string,
   cancelLongPress: () => void,
   suppressTileSelectionBriefly: () => void,
 ): GridDensityApi {
   const [gridColumns, setGridColumns] = useState<GridColumns>(() => readGridColumns());
   const gridColumnsRef = useRef<GridColumns>(gridColumns);
-  const pendingGridSnapshotRef = useRef<GridItemSnapshot | null>(null);
-  const gridFlipAnimationsRef = useRef<Animation[]>([]);
   const activeTouchPointersRef = useRef<Map<number, GridPoint>>(new Map());
   const pinchGestureRef = useRef<PinchGesture | null>(null);
   const wheelAccumRef = useRef(0);
@@ -59,60 +44,12 @@ export function useGridDensity(
     "--phone-grid-radius": GRID_RADIUS_BY_COLUMNS[gridColumns],
   }) as React.CSSProperties, [gridColumns]);
 
-  const captureGridSnapshot = useCallback((): GridItemSnapshot => {
-    const snapshot: GridItemSnapshot = new Map();
-    for (const grid of [homeGridRef.current, searchGridRef.current]) {
-      if (!grid) continue;
-      const scope = grid.dataset.phoneGridScope ?? "grid";
-      grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
-        const id = element.dataset.phoneGridItem;
-        if (id) snapshot.set(`${scope}:${id}`, element.getBoundingClientRect());
-      });
-    }
-    return snapshot;
-  }, [homeGridRef, searchGridRef]);
-
   const updateGridColumns = useCallback((nextColumns: GridColumns) => {
     if (nextColumns === gridColumnsRef.current) return;
-    pendingGridSnapshotRef.current = captureGridSnapshot();
     gridColumnsRef.current = nextColumns;
     writeGridColumns(nextColumns);
     setGridColumns(nextColumns);
-  }, [captureGridSnapshot]);
-
-  useLayoutEffect(() => {
-    const snapshot = pendingGridSnapshotRef.current;
-    if (!snapshot) return;
-    pendingGridSnapshotRef.current = null;
-    gridFlipAnimationsRef.current.forEach((a) => a.cancel());
-    gridFlipAnimationsRef.current = [];
-    if (snapshot.size === 0 || reduceMotionEnabled()) return;
-    const animations: Animation[] = [];
-    for (const grid of [homeGridRef.current, searchGridRef.current]) {
-      if (!grid) continue;
-      const scope = grid.dataset.phoneGridScope ?? "grid";
-      grid.querySelectorAll<HTMLElement>("[data-phone-grid-item]").forEach((element) => {
-        const id = element.dataset.phoneGridItem;
-        if (!id) return;
-        const first = snapshot.get(`${scope}:${id}`);
-        if (!first) return;
-        const last = element.getBoundingClientRect();
-        const dx = first.left - last.left, dy = first.top - last.top;
-        const sx = first.width / Math.max(last.width, 1), sy = first.height / Math.max(last.height, 1);
-        if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5 && Math.abs(sx - 1) <= 0.01 && Math.abs(sy - 1) <= 0.01) return;
-        const anim = element.animate(
-          [{ transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, transformOrigin: "center" },
-           { transform: "translate(0, 0) scale(1, 1)", transformOrigin: "center" }],
-          { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-        );
-        animations.push(anim);
-        anim.finished.catch(() => undefined).finally(() => {
-          gridFlipAnimationsRef.current = gridFlipAnimationsRef.current.filter((a) => a !== anim);
-        });
-      });
-    }
-    gridFlipAnimationsRef.current = animations;
-  }, [homeItems, gridColumns, isLoading, isLoadingHomeFeed, isLoadingMore, mode, results, homeGridRef, searchGridRef]);
+  }, []);
 
   const zoomGridIn = useCallback(() => {
     const idx = GRID_COLUMN_OPTIONS.indexOf(gridColumnsRef.current);
@@ -136,7 +73,7 @@ export function useGridDensity(
       if (sd <= 0) return;
       cancelLongPress();
       suppressTileSelectionBriefly();
-      pinchGestureRef.current = { startColumns: gridColumnsRef.current, startDistance: sd, midpoint: pointerMidpoint(first, second) };
+      pinchGestureRef.current = { startColumns: gridColumnsRef.current, startDistance: sd };
     },
     onPointerMoveCapture: (event: React.PointerEvent<HTMLElement>) => {
       if (event.pointerType !== "touch" || !activeTouchPointersRef.current.has(event.pointerId)) return;
@@ -147,7 +84,6 @@ export function useGridDensity(
       const d = pointerDistance(first, second);
       if (d <= 0) return;
       if (event.cancelable) event.preventDefault();
-      pinch.midpoint = pointerMidpoint(first, second);
       suppressTileSelectionBriefly();
       updateGridColumns(nearestGridColumns(pinch.startColumns / (d / pinch.startDistance)));
     },

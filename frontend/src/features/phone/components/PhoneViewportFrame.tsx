@@ -181,7 +181,6 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
   }, []);
 
   const { gridColumns, gridDensityStyle, zoomGridIn, zoomGridOut, pinchHandlers, wheelHandler } = useGridDensity(
-    homeGridRef, searchGridRef, activeHomeItems, sc.results, sc.isLoading, isLoadingHomeFeed, sc.isLoadingMore || isLoadingMoreRecents, mode,
     cancelLongPress, suppressTileSelectionBriefly,
   );
 
