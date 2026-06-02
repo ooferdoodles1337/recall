@@ -2,6 +2,22 @@
    Phone viewport frame
    ============================================================ */
 
+/* Glass tokens hoisted to :root so portaled elements (Radix dropdowns,
+   sheets) that render outside .phone-rect can still resolve them. */
+:root {
+  --glass-dark-xs:    blur(8px) saturate(1.4);
+  --glass-light-xs:   blur(8px) saturate(1.8);
+  --glass-dark-sm:    blur(12px) saturate(1.4);
+  --glass-dark-md:    blur(16px) saturate(1.4);
+  --glass-light-md:   blur(16px) saturate(1.8);
+  --glass-dark-lg:    blur(20px) saturate(1.4);
+  --glass-light-lg:   blur(20px) saturate(1.8);
+  --glass-dark-xl:    blur(24px) saturate(1.4);
+  --glass-light-xl:   blur(24px) saturate(1.8);
+  --glass-light-2xl:  blur(32px) saturate(1.8);
+  --glass-scrim:      blur(12px);
+}
+
 /* iOS 26 light theme — scopes all shadcn tokens inside the phone UI.
    Font: -apple-system resolves to SF Pro on Apple devices; Inter Variable
    is the closest open-weight web equivalent on other platforms. */
@@ -101,10 +117,54 @@
      Canonical location: margin-bottom on .phone-persistent-section. */
   --phone-bar-gap: var(--sp-2);
 
+  /* Approximate rendered height of the selection tray. Both the viewport
+     scroll padding and the long-press hint offset derive from this value —
+     update here when tray content or padding changes. */
+  --selection-tray-h: 148px;
+
   /* Glass morphism tokens */
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
   --glass-edge-left: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
   --glass-edge-top-dark: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+
+  /* ── iOS 26 glass material tokens ────────────────────────────────
+     Every floating surface must use backdrop-filter: var(--glass-*).
+     Light glass (over white/gray bg): saturate(1.8) — vibrancy.
+     Dark glass (over photos/dark bg): saturate(1.4) — tinted.
+     Scrim is a pure blur with no vibrancy (modal backdrop only).
+
+     Usage:
+       backdrop-filter: var(--glass-dark-md);
+       -webkit-backdrop-filter: var(--glass-dark-md);
+
+     Token          blur   sat    typical surfaces
+     --glass-dark-xs   8px  1.4   video badge, remove-chip, album check
+     --glass-light-xs  8px  1.8   light remove-chip (light tray context)
+     --glass-dark-sm  12px  1.4   detail info pill, bottom action btns, pull indicator
+     --glass-dark-md  16px  1.4   chrome circles, side-nav, video bar
+     --glass-light-md 16px  1.8   zoom controls
+     --glass-dark-lg  20px  1.4   detail menus, neighbor label
+     --glass-light-lg 20px  1.8   search bar, compose panel, hints
+     --glass-dark-xl  24px  1.4   sensitive content overlay
+     --glass-light-xl 24px  1.8   result cards, selection tray, footer
+     --glass-light-2xl 32px 1.8   about sheet, nsfw sheet
+     --glass-scrim    12px  —     modal backdrop (no vibrancy)
+  ──────────────────────────────────────────────────────────────── */
+  --glass-dark-xs:    blur(8px) saturate(1.4);
+  --glass-light-xs:   blur(8px) saturate(1.8);
+  --glass-dark-sm:    blur(12px) saturate(1.4);
+  --glass-dark-md:    blur(16px) saturate(1.4);
+  --glass-light-md:   blur(16px) saturate(1.8);
+  --glass-dark-lg:    blur(20px) saturate(1.4);
+  --glass-light-lg:   blur(20px) saturate(1.8);
+  --glass-dark-xl:    blur(24px) saturate(1.4);
+  --glass-light-xl:   blur(24px) saturate(1.8);
+  --glass-light-2xl:  blur(32px) saturate(1.8);
+  --glass-scrim:      blur(12px);
+}
+
+.phone-rect:focus {
+  outline: none;
 }
 
 /* Flex sibling above the scroll area — NOT sticky/absolute.
@@ -154,8 +214,8 @@
 /* Suggestions panel — matching glass connected below the bar */
 .search-panel--expanded .phone-compose-section {
   background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: var(--glass-light-lg);
+  -webkit-backdrop-filter: var(--glass-light-lg);
   border-left: 0.5px solid rgba(60, 60, 67, 0.12);
   border-right: 0.5px solid rgba(60, 60, 67, 0.12);
   border-bottom: 0.5px solid rgba(60, 60, 67, 0.12);
@@ -179,6 +239,7 @@
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden !important;
+  overscroll-behavior-y: contain;
   padding: 0 0 var(--sp-8);
   scrollbar-width: none;
 }
@@ -392,23 +453,54 @@
 
 /* Full-screen gallery detail view */
 
+.detail-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 49;
+  background: #000;
+  pointer-events: none;
+}
+
 .detail-screen {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: #000;
+  overflow: hidden;
+  background: transparent;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.detail-screen:active {
+  cursor: grabbing;
 }
 
 .phone-detail-motion {
   transform-origin: center;
 }
 
-.detail-media-fill {
+.detail-media-rail {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.detail-media-fill,
+.detail-media-neighbor {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.detail-media-neighbor--previous {
+  transform: translateX(-100%);
+}
+
+.detail-media-neighbor--next {
+  transform: translateX(100%);
 }
 
 .phone-detail-media-motion {
@@ -417,7 +509,8 @@
 }
 
 .detail-media-fill img,
-.detail-media-fill video {
+.detail-media-fill video,
+.detail-media-neighbor img {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -425,6 +518,100 @@
   -webkit-touch-callout: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.detail-media-fill--sensitive-hidden img,
+.detail-media-fill--sensitive-hidden video,
+.detail-media-neighbor--sensitive-hidden img {
+  filter: blur(28px) saturate(0.7) brightness(0.56);
+  transform: scale(1.03);
+}
+
+.detail-media-neighbor-sensitive-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--r-pill);
+  background: rgba(18, 18, 20, 0.68);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.76rem;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+  backdrop-filter: var(--glass-dark-lg);
+  -webkit-backdrop-filter: var(--glass-dark-lg);
+  pointer-events: none;
+}
+
+.detail-media-neighbor-sensitive-label svg {
+  width: 15px;
+  height: 15px;
+  color: #fbbf24;
+}
+
+.detail-sensitive-prompt {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 88px 24px 96px;
+  pointer-events: none;
+}
+
+.detail-sensitive-card {
+  width: min(100%, 300px);
+  padding: 22px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 20px;
+  background: rgba(18, 18, 20, 0.72);
+  backdrop-filter: var(--glass-dark-xl);
+  -webkit-backdrop-filter: var(--glass-dark-xl);
+  box-shadow:
+    0 18px 54px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: #fff;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.detail-sensitive-icon {
+  width: 28px;
+  height: 28px;
+  color: #fbbf24;
+}
+
+.detail-sensitive-title {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.detail-sensitive-body {
+  max-width: 220px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.detail-sensitive-view {
+  min-width: 132px;
+  min-height: 44px;
+  margin-top: 4px;
+  border-radius: 999px;
 }
 
 .detail-float-top {
@@ -437,7 +624,7 @@
   gap: 12px;
   padding: 20px 16px 56px;
   background: linear-gradient(rgba(0, 0, 0, 0.62), transparent);
-  z-index: 1;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -453,8 +640,8 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: var(--glass-dark-md);
+  -webkit-backdrop-filter: var(--glass-dark-md);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
   color: #fff;
@@ -484,15 +671,15 @@
   min-width: 0;
   width: fit-content;
   max-width: calc(100% - 116px);
-  height: auto;
-  min-height: 32px;
-  padding: 6px 10px;
+  height: 40px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   border-color: rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-pill);
   background: rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-dark-sm);
+  -webkit-backdrop-filter: var(--glass-dark-sm);
 }
 
 .detail-float-info strong {
@@ -543,8 +730,8 @@
   color: #fff;
   cursor: pointer;
   font-family: var(--font-ui);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--glass-dark-sm);
+  -webkit-backdrop-filter: var(--glass-dark-sm);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
@@ -576,6 +763,58 @@
 
 .detail-float-action--primary:hover { background: rgba(255, 214, 10, 0.34); }
 
+.detail-side-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  width: 42px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  backdrop-filter: var(--glass-dark-md);
+  -webkit-backdrop-filter: var(--glass-dark-md);
+  transition: opacity 0.14s ease, background 0.14s ease, transform 0.14s ease;
+}
+
+.detail-side-nav--prev {
+  left: 14px;
+}
+
+.detail-side-nav--next {
+  right: 14px;
+}
+
+.detail-side-nav:hover {
+  background: rgba(0, 0, 0, 0.58);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.detail-side-nav svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Keyboard users on any device can reach and see the nav via focus. */
+.detail-side-nav:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .detail-screen:hover .detail-side-nav {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* --- Semantic Recall phone UI (iOS dark) --- */
 
 /* iOS-style capsule search bar — glass scoped to the pill itself.
@@ -592,8 +831,8 @@
   border: 0.5px solid rgba(60, 60, 67, 0.12);
   border-radius: var(--r-3);
   background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(1.8);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: var(--glass-light-lg);
+  -webkit-backdrop-filter: var(--glass-light-lg);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
@@ -601,6 +840,36 @@
   transition:
     border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.search-bar--no-icon,
+.search-bar--date-browse,
+.search-bar--similar {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.date-browse-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--ios-label);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.date-browse-chip svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--ios-label-secondary);
+}
+
+.date-browse-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-bar--semantic::before {
@@ -778,8 +1047,8 @@
     0 4px 14px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: var(--glass-light-md);
+  -webkit-backdrop-filter: var(--glass-light-md);
 }
 
 .phone-grid-zoom-controls::before {
@@ -850,7 +1119,6 @@
 
 .video-badge,
 .selected-num {
-  position: absolute;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -859,14 +1127,15 @@
 }
 
 .video-badge {
+  position: absolute;
   right: var(--sp-1);
   bottom: var(--sp-1);
   gap: var(--sp-1);
   min-height: 18px;
   padding: var(--sp-1) var(--sp-2);
   background: rgba(0, 0, 0, 0.52);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: var(--glass-dark-xs);
+  -webkit-backdrop-filter: var(--glass-dark-xs);
   font-family: inherit;
   font-size: 0.6rem;
   font-weight: 600;
@@ -879,8 +1148,6 @@
 }
 
 .selected-num {
-  top: var(--sp-1);
-  right: var(--sp-1);
   min-width: var(--sp-5);
   height: var(--sp-5);
   padding: 0 var(--sp-1);
@@ -890,18 +1157,6 @@
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1;
-  animation: selected-badge-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes selected-badge-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.72);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* Results footer card */
@@ -911,8 +1166,8 @@
   border: none;
   border-radius: var(--r-3);
   background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: var(--glass-light-xl);
+  -webkit-backdrop-filter: var(--glass-light-xl);
   overflow: hidden;
   box-shadow:
     0 1px 4px rgba(0, 0, 0, 0.06),
@@ -978,8 +1233,8 @@
   border: 0.5px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.76);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: var(--glass-dark-sm);
+  -webkit-backdrop-filter: var(--glass-dark-sm);
   box-shadow:
     0 2px 16px rgba(0, 0, 0, 0.10),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -1014,6 +1269,15 @@
   50%  { scale: 1.14; }
   80%  { scale: 0.97; }
   100% { scale: 1; }
+}
+
+.pull-indicator--dismissing {
+  animation: pull-dismiss-pop 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes pull-dismiss-pop {
+  0%   { scale: 1; opacity: 1; translate: -50% 0; }
+  100% { scale: 0.72; opacity: 0; translate: -50% 0; }
 }
 
 .pull-indicator-ring {
@@ -1089,8 +1353,8 @@
   border: 1px solid rgba(60, 60, 67, 0.14);
   border-radius: var(--r-4);
   background: rgba(242, 242, 247, 0.82);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: var(--glass-light-xl);
+  -webkit-backdrop-filter: var(--glass-light-xl);
   color: #000;
   box-shadow:
     0 -2px 24px rgba(0, 0, 0, 0.1),
@@ -1123,7 +1387,7 @@
 }
 
 .phone-rect--has-selection .phone-rect-viewport {
-  padding-bottom: calc(var(--sp-8) + 130px);
+  padding-bottom: calc(var(--sp-8) + var(--selection-tray-h));
 }
 
 .selection-tray-content {
@@ -1183,10 +1447,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(44, 44, 46, 0.9);
+  background: rgba(44, 44, 46, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(235, 235, 245, 0.7);
   border-radius: 50%;
+  backdrop-filter: var(--glass-dark-xs);
+  -webkit-backdrop-filter: var(--glass-dark-xs);
   pointer-events: none;
 }
 
@@ -1213,9 +1479,39 @@
 }
 
 .selection-thumb-x {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.72);
   border-color: rgba(60, 60, 67, 0.12);
   color: rgba(60, 60, 67, 0.6);
+  backdrop-filter: var(--glass-light-xs);
+  -webkit-backdrop-filter: var(--glass-light-xs);
+}
+
+/* Long-press learnability hint — floats above the selection tray */
+.long-press-hint {
+  position: absolute;
+  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + var(--selection-tray-h));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 0.5px solid rgba(60, 60, 67, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: var(--glass-light-lg);
+  -webkit-backdrop-filter: var(--glass-light-lg);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  cursor: default;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ios-label-secondary);
+  pointer-events: auto;
+  user-select: none;
 }
 
 /* iOS yellow tint CTA pill */
@@ -1565,8 +1861,8 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--glass-dark-md);
+  -webkit-backdrop-filter: var(--glass-dark-md);
 }
 
 .video-timeline::before {
@@ -1785,34 +2081,20 @@ body:has(.app-shell--phone) {
   opacity: 0.9;
 }
 
-.nsfw-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.nsfw-sheet {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  border: 0.5px solid rgba(255, 255, 255, 0.6);
-  border-radius: 14px;
-  width: min(300px, 90vw);
+.nsfw-sheet[data-slot="sheet-content"] {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: var(--glass-light-2xl);
+  -webkit-backdrop-filter: var(--glass-light-2xl);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px 14px 0 0;
+  z-index: 201;
   overflow: hidden;
-  box-shadow:
-    0 12px 48px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .nsfw-sheet-header {
-  padding: 24px 20px 18px;
+  padding: 24px 20px 20px;
   text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
 
 .nsfw-sheet-icon {
@@ -1839,48 +2121,62 @@ body:has(.app-shell--phone) {
 }
 
 .nsfw-sheet-actions {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 16px 16px max(env(safe-area-inset-bottom), 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .nsfw-sheet-btn {
   display: block;
   width: 100%;
-  padding: 14px 20px;
-  background: none;
   border: none;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
   cursor: pointer;
   font-size: 0.9375rem;
   font-family: inherit;
   text-align: center;
-  transition: background 0.1s;
+  border-radius: 12px;
+  transition: opacity 0.1s;
 }
 
-.nsfw-sheet-btn:first-child {
-  border-top: none;
-}
-
-.nsfw-sheet-btn:active {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.nsfw-sheet-btn--reveal-all {
-  color: #d97706;
-}
-
-.nsfw-sheet-btn--reveal-one {
-  color: #2563eb;
+.nsfw-sheet-btn--view {
+  padding: 14px 20px;
+  background: #2563eb;
+  color: #fff;
   font-weight: 600;
+}
+
+.nsfw-sheet-btn--view:active {
+  opacity: 0.82;
 }
 
 .nsfw-sheet-btn--cancel {
-  color: #111827;
-  font-weight: 700;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #374151;
+  font-weight: 500;
 }
 
-.nsfw-sheet-btn--mark-safe {
-  color: #16a34a;
-  font-weight: 600;
+.nsfw-sheet-btn--cancel:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.nsfw-sheet-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 4px;
+}
+
+.nsfw-sheet-btn--reveal-all {
+  padding: 6px 20px;
+  background: none;
+  color: #d97706;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.nsfw-sheet-btn--reveal-all:active {
+  opacity: 0.65;
 }
 
 /* About bottom sheet — frosted glass, slides up from bottom */
@@ -1893,8 +2189,8 @@ body:has(.app-shell--phone) {
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: var(--glass-scrim);
+  -webkit-backdrop-filter: var(--glass-scrim);
 }
 
 .about-sheet {
@@ -1905,13 +2201,17 @@ body:has(.app-shell--phone) {
   flex-direction: column;
   border-radius: var(--r-5, 20px) var(--r-5, 20px) 0 0;
   background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  backdrop-filter: var(--glass-light-2xl);
+  -webkit-backdrop-filter: var(--glass-light-2xl);
   border-top: 0.5px solid rgba(255, 255, 255, 0.6);
   box-shadow:
     0 -12px 48px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   color: #000;
+}
+
+.about-sheet[data-slot="sheet-content"] {
+  z-index: 101;
 }
 
 .about-sheet--full {
@@ -2219,8 +2519,8 @@ body:has(.app-shell--phone) {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.22);
   color: transparent;
-  backdrop-filter: blur(10px) saturate(1.5);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  backdrop-filter: var(--glass-dark-xs);
+  -webkit-backdrop-filter: var(--glass-dark-xs);
 }
 
 .album-card--selected .album-card-check {
@@ -2252,8 +2552,8 @@ body:has(.app-shell--phone) {
   padding: var(--sp-3, 12px) var(--sp-4, 16px) max(var(--sp-4, 16px), env(safe-area-inset-bottom));
   border-top: 0.5px solid rgba(60, 60, 67, 0.14);
   background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: var(--glass-light-xl);
+  -webkit-backdrop-filter: var(--glass-light-xl);
 }
 
 .album-picker-btn {
@@ -2370,6 +2670,68 @@ body:has(.app-shell--phone) {
 .detail-float-info-spacer {
   flex: 1;
   min-width: 0;
+}
+
+/* Dark glass dropdown for detail view — portaled to body so must be self-contained */
+
+.detail-menu {
+  min-width: 168px;
+  background: rgba(22, 22, 28, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-radius: var(--r-2, 8px) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: var(--glass-dark-lg);
+  -webkit-backdrop-filter: var(--glass-dark-lg);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.detail-menu [data-slot="dropdown-menu-item"] {
+  color: rgba(255, 255, 255, 0.88);
+  border-radius: 6px;
+}
+
+.detail-menu [data-slot="dropdown-menu-item"][data-highlighted] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+.detail-menu [data-slot="dropdown-menu-separator"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Similar search context chip — replaces text input in the search bar */
+
+.similar-source-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.similar-source-thumb {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ios-fill, rgba(118, 118, 128, 0.12));
+}
+
+.similar-source-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground, rgba(60, 60, 67, 0.6));
+  font-size: 0.92rem;
 }
 
 /* Dropdown menu animation keyframes for tailwind animate-in/out */

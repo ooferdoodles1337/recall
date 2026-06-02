@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { useCallback, useMemo, useState } from "react";
 import { CheckIcon } from "lucide-react";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { MOCK_ALBUMS, albumThumbnailUrl } from "./phoneUtils";
 
 interface IndexedAlbumsSheetProps {
@@ -32,17 +38,6 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
     onSave(MOCK_ALBUMS.filter((album) => draft.has(album.id)).map((album) => album.id));
   }, [draft, onSave]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onCancel();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onCancel]);
-
   const selectedCount = draft.size;
   const dirty = useMemo(() => {
     const initial = new Set(initialSelectedIds);
@@ -52,28 +47,17 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
   }, [draft, initialSelectedIds]);
 
   return (
-    <motion.div
-      className="about-backdrop"
-      role="dialog"
-      aria-modal
-      aria-label="Indexed albums"
-      onClick={onCancel}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-    >
-      <motion.div
+    <Sheet open onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
         className="about-sheet about-sheet--full"
-        onClick={(e) => e.stopPropagation()}
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 30 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       >
         <div className="settings-sheet-titlebar">
-          <h2 className="settings-sheet-title">Indexed Albums</h2>
-          <p className="settings-sheet-subtitle">Select the albums you want to be indexed</p>
+          <SheetTitle className="settings-sheet-title">Indexed Albums</SheetTitle>
+          <SheetDescription className="settings-sheet-subtitle">
+            Select the albums you want to be indexed
+          </SheetDescription>
         </div>
 
         <div className="about-sheet-scroll album-picker-scroll">
@@ -109,9 +93,11 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
         </div>
 
         <div className="album-picker-footer">
-          <button type="button" className="album-picker-btn album-picker-btn--cancel" onClick={onCancel}>
-            Cancel
-          </button>
+          <SheetClose asChild>
+            <button type="button" className="album-picker-btn album-picker-btn--cancel">
+              Cancel
+            </button>
+          </SheetClose>
           <button
             type="button"
             className="album-picker-btn album-picker-btn--save"
@@ -121,7 +107,7 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
             Save{selectedCount > 0 ? ` (${selectedCount})` : ""}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </SheetContent>
+    </Sheet>
   );
 }

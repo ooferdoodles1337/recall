@@ -1,3 +1,4 @@
+import re
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -7,6 +8,7 @@ from services.catalog import db as catalog
 from services.search import text_index
 
 router = APIRouter()
+_DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}(?:-\d{2})?$")
 
 
 class _OrganizationPatch(BaseModel):
@@ -31,10 +33,19 @@ class CatalogItemPatch(BaseModel):
 def list_items(
     media_type: Annotated[Literal["image", "video"] | None, Query()] = None,
     favorite: Annotated[bool | None, Query()] = None,
+    date_prefix: Annotated[str | None, Query()] = None,
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
     limit: Annotated[int | None, Query(ge=1, le=500)] = None,
 ):
-    results = catalog.list_library_items(media_type=media_type, favorite=favorite, order=order, limit=limit)
+    if date_prefix is not None and not _DATE_PREFIX_RE.fullmatch(date_prefix):
+        raise HTTPException(status_code=400, detail="date_prefix must be YYYY-MM or YYYY-MM-DD")
+    results = catalog.list_library_items(
+        media_type=media_type,
+        favorite=favorite,
+        date_prefix=date_prefix,
+        order=order,
+        limit=limit,
+    )
     return {"count": len(results), "results": results}
 
 

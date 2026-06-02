@@ -34,6 +34,11 @@ async function commitSearch(query: string, user = userEvent.setup()) {
   await user.keyboard("{Enter}");
 }
 
+// Wait for the 250ms scroll-grace period (real setTimeout) to expire.
+async function advancePastScrollGrace() {
+  await act(async () => { await new Promise<void>(resolve => setTimeout(resolve, 260)); });
+}
+
 async function openDetailFromButton(button: HTMLElement) {
   vi.useFakeTimers();
   fireEvent.pointerDown(button, {
@@ -46,6 +51,37 @@ async function openDetailFromButton(button: HTMLElement) {
     await vi.advanceTimersByTimeAsync(550);
   });
   vi.useRealTimers();
+}
+
+async function swipeDetail(label: RegExp, fromX: number, toX: number) {
+  const detail = await screen.findByLabelText(label);
+  fireEvent.pointerDown(detail, {
+    clientX: fromX,
+    clientY: 240,
+    pointerId: 7,
+    pointerType: "touch",
+  });
+  fireEvent.pointerUp(detail, {
+    clientX: toX,
+    clientY: 242,
+    pointerId: 7,
+    pointerType: "touch",
+  });
+}
+
+async function touchSwipeDetail(label: RegExp, fromX: number, toX: number) {
+  const detail = await screen.findByLabelText(label);
+  fireEvent.touchStart(detail, {
+    touches: [{ clientX: fromX, clientY: 240 }],
+  });
+  fireEvent.touchEnd(detail, {
+    changedTouches: [{ clientX: toX, clientY: 242 }],
+  });
+}
+
+async function clickVisibleBack() {
+  const buttons = screen.getAllByRole("button", { name: "Back" });
+  await userEvent.click(buttons[buttons.length - 1]);
 }
 
 function dispatchSyntheticPointer(
@@ -132,8 +168,9 @@ describe("PhoneViewportFrame interactions", () => {
     await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(await screen.findByRole("heading", { name: "Recall" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Recent searches" }));
-    expect(screen.getByRole("button", { name: "sunset picnic" })).toBeInTheDocument();
+    // Tap the search bar to open compose — history shows automatically (CP-3)
+    await user.click(currentSearchInput());
+    expect(await screen.findByRole("button", { name: "sunset picnic" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Remove sunset picnic" }));
     await waitFor(() => {
@@ -144,8 +181,9 @@ describe("PhoneViewportFrame interactions", () => {
     window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(["mountain", "coffee"]));
     renderPhone();
     await waitForPhoneHome();
-    await user.click(screen.getByRole("button", { name: "Recent searches" }));
-    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    // Tap the search bar to open compose — history shows automatically (CP-3)
+    await user.click(currentSearchInput());
+    await user.click(await screen.findByRole("button", { name: "Clear all" }));
     expect(JSON.parse(window.localStorage.getItem(SEARCH_HISTORY_KEY) ?? "[]")).toEqual([]);
   });
 
@@ -194,7 +232,9 @@ describe("PhoneViewportFrame interactions", () => {
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await user.click(screen.getByRole("button", { name: /Same Date/i }));
     expect((await screen.findAllByRole("button", { name: /Select Dated picnic photo/i })).length).toBeGreaterThan(0);
-    expect(phoneMockState.requests.some((request) => request.includes("q=2024-03-18"))).toBe(true);
+    expect(screen.getByLabelText("Showing March 18, 2024")).toBeInTheDocument();
+    expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?date_prefix=2024-03-18"))).toBe(true);
+    expect(phoneMockState.requests.some((request) => request.includes("q=2024-03-18"))).toBe(false);
     secondView.unmount();
 
     renderPhone();
@@ -204,21 +244,120 @@ describe("PhoneViewportFrame interactions", () => {
     expect(phoneMockState.requests.some((request) => request.includes("/search/similar/dated-favorite"))).toBe(true);
   });
 
+  it("swipes between detail items from favorites and search result grids", async () => {
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await touchSwipeDetail(/Favorite 01 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Favorite 02 detail view/i)).toBeInTheDocument();
+
+    await swipeDetail(/Favorite 02 detail view/i, 160, 320);
+    expect(await screen.findByLabelText(/Favorite 01 detail view/i)).toBeInTheDocument();
+
+    await clickVisibleBack();
+    await commitSearch("sunset");
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await swipeDetail(/Sunset pier photo detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Shared picnic blanket detail view/i)).toBeInTheDocument();
+  });
+
+  it("shows a blurred prompt when swiping detail to an NSFW item", async () => {
+    const user = userEvent.setup();
+    const sensitiveFavorite = phoneMockState.favoriteItems.find((item) => item.id === "sensitive-favorite");
+    if (!sensitiveFavorite) throw new Error("Missing sensitive fixture");
+    const sensitiveSearch = {
+      ...sensitiveFavorite,
+      id: "search-sensitive",
+      distance: 0.2,
+      metadata: {
+        ...sensitiveFavorite.metadata,
+        asset: {
+          ...sensitiveFavorite.metadata.asset,
+          filename: "search-sensitive.jpg",
+        },
+        search: {
+          description: "Search sensitive",
+          phrases: ["search", "sensitive"],
+        },
+      },
+    };
+    phoneMockState.favoriteItems = [phoneMockState.favoriteItems[0], sensitiveFavorite, phoneMockState.favoriteItems[1]];
+    phoneMockState.semanticResults = [phoneMockState.semanticResults[0], sensitiveSearch];
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await swipeDetail(/Favorite 01 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Sensitive favorite detail view/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View" }));
+    expect((await screen.findAllByRole("button", { name: "More actions" })).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Sensitive Content" })).not.toBeInTheDocument();
+    });
+
+    await clickVisibleBack();
+    await commitSearch("sunset", user);
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await swipeDetail(/Sunset pier photo detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Search sensitive detail view/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
+  });
+
   it("guards NSFW tiles until revealing one item or all sensitive items", async () => {
     const user = userEvent.setup();
     renderPhone();
 
     await user.click((await screen.findAllByRole("button", { name: /Sensitive content/i }))[0]);
-    const oneDialog = await screen.findByRole("dialog", { name: "Sensitive content warning" });
-    await user.click(within(oneDialog).getByRole("button", { name: "Reveal This One" }));
+    const oneDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
+    await user.click(within(oneDialog).getByRole("button", { name: "View" }));
     expect(await screen.findByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: /Sensitive content/i })[0]);
-    const allDialog = await screen.findByRole("dialog", { name: "Sensitive content warning" });
-    await user.click(within(allDialog).getByRole("button", { name: "Reveal for Session" }));
+    const allDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
+    await user.click(within(allDialog).getByRole("button", { name: /Show all sensitive/i }));
 
     expect(await screen.findByRole("button", { name: /Select Second sensitive favorite/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
+  });
+
+  it("blurs a favorite tile after marking it NSFW from detail", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+
+    await waitFor(() => {
+      expect(phoneMockState.favoriteItems.find((item) => item.id === "favorite-01")?.metadata.safety?.state).toBe("nsfw");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(document.querySelector('[data-phone-grid-item="favorite-01"]')).toHaveAccessibleName(/Sensitive content/i);
+    });
+    expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
+  });
+
+  it("blurs a search result tile after marking it NSFW from detail", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await commitSearch("sunset", user);
+    await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+
+    await waitFor(() => {
+      expect(phoneMockState.semanticResults.find((item) => item.id === "sunset-result")?.metadata.safety?.state).toBe("nsfw");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(document.querySelector('[data-phone-grid-item="sunset-result"]')).toHaveAccessibleName(/Sensitive content/i);
+    });
+    expect(screen.queryByRole("button", { name: /Select Sunset pier photo/i })).not.toBeInTheDocument();
   });
 
   it("shows video detail playback controls without breaking Back, Similar, or Send", async () => {
@@ -257,16 +396,19 @@ describe("PhoneViewportFrame interactions", () => {
     expect(document.querySelector(".phone-compose-section")).toBeInTheDocument();
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
 
     await waitFor(() => {
       expect(document.querySelector(".phone-compose-section")).not.toBeInTheDocument();
     });
-    expect(document.querySelector(".search-panel--expanded")).toBeInTheDocument();
+    // search-panel--expanded is removed with the panel (showComposePanel=false drives the condition)
+    expect(document.querySelector(".search-panel--expanded")).not.toBeInTheDocument();
     expect(document.activeElement).toBe(currentSearchInput());
 
     scrollTopSpy.mockReturnValue(0);
+    await advancePastScrollGrace();
     fireEvent.scroll(viewport);
 
     await waitFor(() => {
@@ -288,6 +430,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
     await waitFor(() => {
@@ -312,6 +455,7 @@ describe("PhoneViewportFrame interactions", () => {
     });
 
     const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    await advancePastScrollGrace();
     const scrollTopSpy = vi.spyOn(viewport, "scrollTop", "get").mockReturnValue(80);
     fireEvent.scroll(viewport);
     scrollTopSpy.mockRestore();

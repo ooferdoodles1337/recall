@@ -11,6 +11,7 @@ describe("PhoneSearchBar", () => {
   const defaultProps = {
     value: "",
     showHistory: false,
+    showHistoryIcon: true,
     onToggleHistory: vi.fn(),
     onFocus: vi.fn(),
     onChange: vi.fn(),

@@ -7,6 +7,7 @@ export const FAVORITES_COUNT = 34;
 export const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 export const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
 export const INDEXED_ALBUMS_KEY = "recall.indexedAlbums.v1";
+export const LONG_PRESS_HINT_KEY = "recall.longPressHint.v1";
 export const OVERSCROLL_THRESHOLD = 80;
 
 export const LONG_PRESS_MS = 500;
@@ -17,6 +18,8 @@ export const SUGGESTION_DEBOUNCE_MS = 140;
 export const HIDE_COMPOSE_SCROLL_THRESHOLD = 60;
 export const PREFETCH_TRIGGER_REMAINING = 200;
 export const VIDEO_CHROME_HIDE_MS = 2400;
+export const DETAIL_SWIPE_THRESHOLD = 56;
+export const DETAIL_SWIPE_VERTICAL_TOLERANCE = 48;
 
 export type GridColumns = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -133,6 +136,14 @@ export function writeIndexedAlbums(ids: string[]) {
   } catch {
     // Persistence is a nice-to-have for this mock; ignore quota/availability errors.
   }
+}
+
+export function readLongPressHintDismissed(): boolean {
+  return localStorage.getItem(LONG_PRESS_HINT_KEY) === "1";
+}
+
+export function writeLongPressHintDismissed(): void {
+  localStorage.setItem(LONG_PRESS_HINT_KEY, "1");
 }
 
 export function readSearchHistory(): string[] {
@@ -255,7 +266,42 @@ export function itemTitle(item: RecallMediaItem) {
 }
 
 export function itemDateLabel(item: RecallMediaItem) {
-  return item.metadata.capture?.date ?? item.metadata.capture?.year_month ?? null;
+  const prefix = datePrefixForItem(item);
+  return prefix ? formatDatePrefix(prefix) : null;
+}
+
+export function datePrefixForItem(item: RecallMediaItem) {
+  const capture = item.metadata.capture;
+  const sortKey = capture?.sort_key ?? capture?.taken_at;
+  if (typeof sortKey === "string" && /^\d{4}-\d{2}-\d{2}/.test(sortKey)) return sortKey.slice(0, 10);
+  if (typeof capture?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(capture.date)) return capture.date;
+  if (typeof capture?.year_month === "string" && /^\d{4}-\d{2}$/.test(capture.year_month)) return capture.year_month;
+  return null;
+}
+
+export function formatDatePrefix(prefix: string): string {
+  const dayMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(prefix);
+  if (dayMatch) {
+    const [, year, month, day] = dayMatch;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))));
+  }
+
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(prefix);
+  if (monthMatch) {
+    const [, year, month] = monthMatch;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(Date.UTC(Number(year), Number(month) - 1, 1)));
+  }
+
+  return prefix;
 }
 
 export function durationLabel(seconds?: number) {

@@ -1,6 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  CalendarIcon,
   ClockIcon,
   HistoryIcon,
   Loader2Icon,
@@ -37,12 +38,16 @@ interface PhoneSearchBarProps {
   className?: string;
   clearLabel?: string;
   showHistory: boolean;
+  showHistoryIcon: boolean;
   isSearching?: boolean;
+  dateBrowseLabel?: string | null;
+  similarThumbnailUrl?: string | null;
   onToggleHistory: () => void;
   onFocus: () => void;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onClear: () => void;
+  onSimilarChipTap?: () => void;
 }
 
 export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarProps>(function PhoneSearchBar(
@@ -51,29 +56,86 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
     className,
     clearLabel = "Clear search",
     showHistory,
+    showHistoryIcon,
     isSearching = false,
+    dateBrowseLabel,
+    similarThumbnailUrl,
     onToggleHistory,
     onFocus,
     onChange,
     onSubmit,
     onClear,
+    onSimilarChipTap,
   },
   ref,
 ) {
+  if (dateBrowseLabel) {
+    return (
+      <div className={`search-bar search-bar--semantic search-bar--date-browse${className ? ` ${className}` : ""}`}>
+        <div className="date-browse-chip" aria-label={`Showing ${dateBrowseLabel}`}>
+          <CalendarIcon aria-hidden />
+          <span>{dateBrowseLabel}</span>
+        </div>
+        <Button
+          className="clear-search-btn"
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={onClear}
+          aria-label={clearLabel}
+        >
+          <XIcon />
+        </Button>
+      </div>
+    );
+  }
+
+  if (similarThumbnailUrl !== undefined) {
+    return (
+      <div className={`search-bar search-bar--semantic search-bar--similar${className ? ` ${className}` : ""}`}>
+        <button
+          className="similar-source-chip"
+          type="button"
+          onClick={onSimilarChipTap}
+          aria-label="Similar search — tap to start a new search"
+        >
+          {similarThumbnailUrl ? (
+            <img className="similar-source-thumb" src={similarThumbnailUrl} alt="" draggable={false} />
+          ) : (
+            <span className="similar-source-thumb" aria-hidden />
+          )}
+          <span className="similar-source-label">Similar</span>
+        </button>
+        <Button
+          className="clear-search-btn"
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={onClear}
+          aria-label={clearLabel}
+        >
+          <XIcon />
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
-      <Button
-        className={`history-btn${showHistory ? " history-btn--active" : ""}`}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Recent searches"
-        aria-pressed={showHistory}
-        onClick={onToggleHistory}
-        disabled={isSearching}
-      >
-        {isSearching ? <Loader2Icon className="animate-spin" /> : <HistoryIcon />}
-      </Button>
+    <div className={`search-bar search-bar--semantic${showHistoryIcon ? "" : " search-bar--no-icon"}${className ? ` ${className}` : ""}`}>
+      {showHistoryIcon ? (
+        <Button
+          className={`history-btn${showHistory ? " history-btn--active" : ""}`}
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Recent searches"
+          aria-pressed={showHistory}
+          onClick={onToggleHistory}
+          disabled={isSearching}
+        >
+          {isSearching ? <Loader2Icon className="animate-spin" /> : <HistoryIcon />}
+        </Button>
+      ) : null}
       <Input
         ref={ref}
         aria-label="Search your media"

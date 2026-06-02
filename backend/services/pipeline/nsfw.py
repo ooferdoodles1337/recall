@@ -3,11 +3,14 @@ import time
 from pathlib import Path
 from typing import Any
 
+import io
+
 from PIL import Image
 
 import config
 from services.catalog import db as catalog
 from services.catalog import schema as metadata_schema
+from services.pipeline.media import HEIC_EXTENSIONS, _heic_to_jpeg_bytes
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +63,11 @@ def detect_image(path: Path) -> dict:
         ) from exc
 
     model, transforms, class_names = _load_model()
-    with Image.open(path) as raw:
+    if path.suffix.lower() in HEIC_EXTENSIONS:
+        raw = Image.open(io.BytesIO(_heic_to_jpeg_bytes(str(path))))
+    else:
+        raw = Image.open(path)
+    with raw:
         image = raw.convert("RGB")
         tensor = transforms(image).unsqueeze(0)
 

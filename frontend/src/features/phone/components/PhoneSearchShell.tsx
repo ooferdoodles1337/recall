@@ -23,7 +23,7 @@ export function PhoneSearchShell({
 }: PhoneSearchShellProps) {
   return (
     <div className="phone-persistent-section phone-persistent-search">
-      <div className={`search-panel${mode === "compose" ? " search-panel--expanded" : ""}`}>
+      <div className={`search-panel${mode === "compose" && showComposePanel ? " search-panel--expanded" : ""}`}>
         {renderSearchBar()}
         <AnimatePresence initial={false}>
           {mode === "compose" && showComposePanel ? (

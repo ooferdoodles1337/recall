@@ -19,7 +19,7 @@ def test_list_items_returns_count_and_results(monkeypatch):
     from routes.catalog import list_items
 
     items = [_item("a", "2024-03-18T10:00:00"), _item("b", "2024-03-17T10:00:00")]
-    monkeypatch.setattr("services.catalog.db.list_library_items", lambda media_type=None, favorite=None, order="desc", limit=None: items)
+    monkeypatch.setattr("services.catalog.db.list_library_items", lambda media_type=None, favorite=None, date_prefix=None, order="desc", limit=None: items)
 
     body = list_items()
 
@@ -32,15 +32,26 @@ def test_list_items_passes_filters(monkeypatch):
 
     calls = []
 
-    def fake_list(media_type=None, favorite=None, order="desc", limit=None):
-        calls.append((media_type, favorite, order, limit))
+    def fake_list(media_type=None, favorite=None, date_prefix=None, order="desc", limit=None):
+        calls.append((media_type, favorite, date_prefix, order, limit))
         return []
 
     monkeypatch.setattr("services.catalog.db.list_library_items", fake_list)
 
-    list_items(media_type="video", favorite=True, order="asc", limit=25)
+    list_items(media_type="video", favorite=True, date_prefix="2024-03-18", order="asc", limit=25)
 
-    assert calls == [("video", True, "asc", 25)]
+    assert calls == [("video", True, "2024-03-18", "asc", 25)]
+
+
+def test_list_items_rejects_invalid_date_prefix(monkeypatch):
+    from routes.catalog import list_items
+
+    monkeypatch.setattr("services.catalog.db.list_library_items", lambda **kwargs: [])
+
+    with pytest.raises(HTTPException) as exc:
+        list_items(date_prefix="2024-03-18%")
+
+    assert exc.value.status_code == 400
 
 
 def test_get_item_returns_item(monkeypatch):

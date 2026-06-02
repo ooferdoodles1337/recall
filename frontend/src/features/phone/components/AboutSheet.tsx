@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from "motion/react";
 import {
   CalendarIcon,
   CameraIcon,
@@ -10,6 +9,7 @@ import {
   VideoIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { RecallMediaItem } from "@/shared/types/recall";
 
 interface AboutSheetProps {
@@ -89,115 +89,98 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
   const mime = asset?.mime_type;
 
   return (
-    <AnimatePresence>
-      {item && (
-        <motion.div
-          className="about-backdrop"
-          role="dialog"
-          aria-modal
-          aria-label="About this media"
-          onClick={onClose}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <motion.div
-            className="about-sheet"
-            onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div className="about-sheet-header" onClick={onClose}>
-              <div className="about-sheet-handle" aria-hidden />
-              <button className="about-sheet-done" type="button" onClick={(e) => { e.stopPropagation(); onClose(); }}>
-                Done
-              </button>
-            </div>
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="bottom" className="about-sheet" showCloseButton={false}>
+        <SheetTitle className="sr-only">About this media</SheetTitle>
 
-            <div className="about-sheet-scroll">
-              {description ? (
-                <section className="about-section">
-                  <p className="about-desc">{description}</p>
-                </section>
+        <div className="about-sheet-header" onClick={onClose}>
+          <div className="about-sheet-handle" aria-hidden />
+          <SheetClose asChild>
+            <button className="about-sheet-done" type="button" onClick={(e) => e.stopPropagation()}>
+              Done
+            </button>
+          </SheetClose>
+        </div>
+
+        <div className="about-sheet-scroll">
+          {description ? (
+            <section className="about-section">
+              <p className="about-desc">{description}</p>
+            </section>
+          ) : null}
+
+          <section className="about-section">
+            <h3 className="about-section-title">When & Where</h3>
+            <div className="about-field-list">
+              {date ? (
+                <div className="about-field">
+                  <CalendarIcon className="about-field-icon" />
+                  <span>{formatDate(date)}</span>
+                </div>
               ) : null}
-
-              <section className="about-section">
-                <h3 className="about-section-title">When & Where</h3>
-                <div className="about-field-list">
-                  {date ? (
-                    <div className="about-field">
-                      <CalendarIcon className="about-field-icon" />
-                      <span>{formatDate(date)}</span>
-                    </div>
-                  ) : null}
-                  {loc ? (
-                    <div className="about-field">
-                      <MapPinIcon className="about-field-icon" />
-                      <span>{loc}</span>
-                    </div>
-                  ) : null}
-                  {!date && !loc ? (
-                    <span className="about-empty">No date or location data</span>
-                  ) : null}
+              {loc ? (
+                <div className="about-field">
+                  <MapPinIcon className="about-field-icon" />
+                  <span>{loc}</span>
                 </div>
-              </section>
-
-              <section className="about-section">
-                <h3 className="about-section-title">File Info</h3>
-                <div className="about-field-list">
-                  <div className="about-field">
-                    <CameraIcon className="about-field-icon" />
-                    <span>{mimeLabel(mime)}</span>
-                  </div>
-                  {dims ? (
-                    <div className="about-field">
-                      <ImageIcon className="about-field-icon" />
-                      <span>{dims}</span>
-                    </div>
-                  ) : null}
-                  {dur ? (
-                    <div className="about-field">
-                      <VideoIcon className="about-field-icon" />
-                      <span>{dur}</span>
-                    </div>
-                  ) : null}
-                  {filename ? (
-                    <div className="about-field">
-                      <FileIcon className="about-field-icon" />
-                      <span className="about-filename">{filename}</span>
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-
-              <section className="about-section">
-                <h3 className="about-section-title">Status</h3>
-                <div className="about-field-list">
-                  <div className="about-field">
-                    {isSafe ? (
-                      <ShieldCheckIcon className="about-field-icon about-field-icon--safe" />
-                    ) : (
-                      <ShieldAlertIcon className="about-field-icon about-field-icon--nsfw" />
-                    )}
-                    <span>
-                      {isNsfw ? (
-                        <Badge variant="destructive">NSFW</Badge>
-                      ) : isSafe ? (
-                        <Badge variant="secondary">Safe</Badge>
-                      ) : (
-                        <Badge variant="outline">Not reviewed</Badge>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </section>
+              ) : null}
+              {!date && !loc ? (
+                <span className="about-empty">No date or location data</span>
+              ) : null}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </section>
+
+          <section className="about-section">
+            <h3 className="about-section-title">File Info</h3>
+            <div className="about-field-list">
+              <div className="about-field">
+                <CameraIcon className="about-field-icon" />
+                <span>{mimeLabel(mime)}</span>
+              </div>
+              {dims ? (
+                <div className="about-field">
+                  <ImageIcon className="about-field-icon" />
+                  <span>{dims}</span>
+                </div>
+              ) : null}
+              {dur ? (
+                <div className="about-field">
+                  <VideoIcon className="about-field-icon" />
+                  <span>{dur}</span>
+                </div>
+              ) : null}
+              {filename ? (
+                <div className="about-field">
+                  <FileIcon className="about-field-icon" />
+                  <span className="about-filename">{filename}</span>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="about-section">
+            <h3 className="about-section-title">Status</h3>
+            <div className="about-field-list">
+              <div className="about-field">
+                {isSafe ? (
+                  <ShieldCheckIcon className="about-field-icon about-field-icon--safe" />
+                ) : (
+                  <ShieldAlertIcon className="about-field-icon about-field-icon--nsfw" />
+                )}
+                <span>
+                  {isNsfw ? (
+                    <Badge variant="destructive">NSFW</Badge>
+                  ) : isSafe ? (
+                    <Badge variant="secondary">Safe</Badge>
+                  ) : (
+                    <Badge variant="outline">Not reviewed</Badge>
+                  )}
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

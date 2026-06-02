@@ -7,7 +7,7 @@ import {
   AUTOSEARCH_DEBOUNCE_MS, SUGGESTION_DEBOUNCE_MS, PREFETCH_TRIGGER_REMAINING,
 } from "./phoneUtils";
 import {
-  listRecentItems, searchSemantic, searchSimilarById, searchText, suggestSearches,
+  listItemsByDate, listRecentItems, searchSemantic, searchSimilarById, searchText, suggestSearches,
 } from "../api/searchApi";
 import type { PhoneModeAction, PhoneBgContent, PhoneModeState, PhoneScreen } from "../phoneReducer";
 import type { ModeTransition } from "../phoneReducer";
@@ -27,6 +27,8 @@ export type SearchControllerApi = {
   setQuery: React.Dispatch<React.SetStateAction<string>>;
   submittedQuery: string;
   setSubmittedQuery: React.Dispatch<React.SetStateAction<string>>;
+  dateBrowseContext: { prefix: string; label: string } | null;
+  similarSourceItem: RecallMediaItem | null;
   results: RecallMediaItem[];
   setResults: React.Dispatch<React.SetStateAction<RecallMediaItem[]>>;
   isLoading: boolean;
@@ -43,7 +45,8 @@ export type SearchControllerApi = {
   setHistory: React.Dispatch<React.SetStateAction<string[]>>;
   suggestions: string[];
   showComposePanel: boolean;
-  setShowComposePanel: React.Dispatch<React.SetStateAction<boolean>>;
+  collapseComposePanel: () => void;
+  expandComposePanel: () => void;
   hasMore: boolean;
   refinements: string[];
   composeQuery: string;
@@ -51,13 +54,17 @@ export type SearchControllerApi = {
   activeHistory: string[];
   visibleHistory: string[];
   liveRef: React.MutableRefObject<{ hasMore: boolean; submittedQuery: string; query: string; visibleCount: number; prefetchedResults: RecallMediaItem[] | null }>;
+  updateItem: (updated: RecallMediaItem) => void;
   runSearch: (rawQuery: string, count?: number, options?: { remember?: boolean; fromAuto?: boolean }) => Promise<void>;
-  runSimilarById: (itemId: string) => Promise<void>;
+  runDateBrowse: (datePrefix: string, label: string) => Promise<void>;
+  runSimilarById: (item: RecallMediaItem) => Promise<void>;
+  clearSimilarSource: () => void;
   loadMore: () => Promise<void>;
   abortActiveSearch: () => void;
   cancelAutoSearch: () => void;
   removeHistoryItem: (item: string) => void;
   clearHistory: () => void;
+  resetSearch: () => void;
   handleAssistSearch: (nextQuery: string) => void;
   handleSearchChange: (nextQuery: string) => void;
   handleSearchSubmit: () => void;
@@ -75,6 +82,8 @@ export function useSearchController({
 
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [dateBrowseContext, setDateBrowseContext] = useState<{ prefix: string; label: string } | null>(null);
+  const [similarSourceItem, setSimilarSourceItem] = useState<RecallMediaItem | null>(null);
   const [results, setResults] = useState<RecallMediaItem[]>([]);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [history, setHistory] = useState<string[]>(() => readSearchHistory());
@@ -93,7 +102,7 @@ export function useSearchController({
   const hasPrefetchedRef = useRef(false);
   const autoSearchTimerRef = useRef<ReturnType<typeof setTimeout> | number | null>(null);
 
-  const hasMore = results.length >= visibleCount && contentMode === "results";
+  const hasMore = !dateBrowseContext && results.length >= visibleCount && contentMode === "results";
   const liveRef = useRef({ hasMore, submittedQuery, query, visibleCount, prefetchedResults });
   liveRef.current = { hasMore, submittedQuery, query, visibleCount, prefetchedResults };
 
@@ -110,13 +119,14 @@ export function useSearchController({
     const q = rawQuery.trim();
     const shouldRemember = options.remember ?? true;
     const fromAuto = options.fromAuto === true;
-    if (!q) { searchAbortRef.current?.abort(); searchAbortRef.current = null; setIsLoading(false); setSubmittedQuery(""); setResults([]); dispatch({ type: "SEARCH_CLEAR" }); return; }
+    setSimilarSourceItem(null); // SI-2: clear similar context on any new text search
+    if (!q) { searchAbortRef.current?.abort(); searchAbortRef.current = null; setIsLoading(false); setSubmittedQuery(""); setDateBrowseContext(null); setResults([]); dispatch({ type: "SEARCH_CLEAR" }); return; }
     searchAbortRef.current?.abort();
     loadMoreAbortRef.current?.abort(); loadMoreAbortRef.current = null; setIsLoadingMore(false);
     const controller = new AbortController();
     searchAbortRef.current = controller;
     setIsLoading(true); setErrorMessage(null); setResults([]); setVisibleCount(count);
-    setShowHistory(false); setSubmittedQuery(q);
+    setShowHistory(false); setDateBrowseContext(null); setSubmittedQuery(q);
     if (fromAuto) dispatch({ type: "AUTOSEARCH_COMMIT" });
     else { dispatch({ type: "SEARCH_COMMIT" }); scrollContainerRef.current?.scrollTo({ top: 0 }); topBarInputRef.current?.blur(); }
     try {
@@ -133,14 +143,37 @@ export function useSearchController({
     } finally { if (!controller.signal.aborted && searchAbortRef.current === controller) setIsLoading(false); }
   }, [dispatch, scrollContainerRef, topBarInputRef]);
 
-  const runSimilarById = useCallback(async (itemId: string) => {
+  const runDateBrowse = useCallback(async (datePrefix: string, label: string) => {
+    searchAbortRef.current?.abort();
+    loadMoreAbortRef.current?.abort(); loadMoreAbortRef.current = null; setIsLoadingMore(false);
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    setIsLoading(true); setErrorMessage(null); setResults([]); setVisibleCount(SEARCH_BATCH_SIZE);
+    setShowHistory(false); setQuery(""); setSubmittedQuery(label); setDateBrowseContext({ prefix: datePrefix, label });
+    dispatch({ type: "SEARCH_COMMIT" }); scrollContainerRef.current?.scrollTo({ top: 0 }); topBarInputRef.current?.blur();
+    try {
+      const response = await listItemsByDate(datePrefix, "asc", { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      setResults(response.results);
+    } catch {
+      if (!controller.signal.aborted) {
+        setErrorMessage("Couldn't load items from this date.");
+        setResults([]);
+      }
+    } finally {
+      if (!controller.signal.aborted && searchAbortRef.current === controller) setIsLoading(false);
+    }
+  }, [dispatch, scrollContainerRef, topBarInputRef]);
+
+  const runSimilarById = useCallback(async (item: RecallMediaItem) => {
     searchAbortRef.current?.abort();
     const controller = new AbortController();
     searchAbortRef.current = controller;
-    setIsLoading(true); setErrorMessage(null); setResults([]);
+    setIsLoading(true); setErrorMessage(null); setResults([]); setDateBrowseContext(null);
+    setSimilarSourceItem(item);
     dispatch({ type: "SIMILAR_SEARCH" }); scrollContainerRef.current?.scrollTo({ top: 0 }); setSubmittedQuery("similar items"); setQuery("");
     try {
-      const response = await searchSimilarById(itemId, SEARCH_BATCH_SIZE, { signal: controller.signal });
+      const response = await searchSimilarById(item.id, SEARCH_BATCH_SIZE, { signal: controller.signal });
       if (controller.signal.aborted) return;
       setResults(response.results);
     } catch { if (!controller.signal.aborted) { setErrorMessage("Similar search is available after this item has an indexed embedding."); setResults([]); } }
@@ -149,7 +182,7 @@ export function useSearchController({
 
   const prefetchNextBatch = useCallback(async () => {
     const { hasMore: live, submittedQuery: sq, visibleCount: vc } = liveRef.current;
-    if (!live || hasPrefetchedRef.current || !sq) return;
+    if (!live || dateBrowseContext || hasPrefetchedRef.current || !sq) return;
     hasPrefetchedRef.current = true;
     prefetchAbortRef.current?.abort();
     const controller = new AbortController();
@@ -161,7 +194,7 @@ export function useSearchController({
       const nextResults = mergeResults(sr.status === "fulfilled" ? sr.value.results : [], tr.status === "fulfilled" ? tr.value.results : []).slice(0, nextCount);
       if (nextResults.length > 0) setPrefetchedResults(nextResults);
     } catch { if (!controller.signal.aborted) hasPrefetchedRef.current = false; }
-  }, []);
+  }, [dateBrowseContext]);
 
   const loadMore = useCallback(async () => {
     const { hasMore: live, submittedQuery: sq, query: q, visibleCount: vc, prefetchedResults: cached } = liveRef.current;
@@ -186,6 +219,31 @@ export function useSearchController({
 
   const clearHistory = useCallback(() => { setHistory([]); writeSearchHistory([]); }, []);
 
+  const collapseComposePanel = useCallback(() => setShowComposePanel(false), []);
+  const expandComposePanel = useCallback(() => setShowComposePanel(true), []);
+
+  const updateItem = useCallback((updated: RecallMediaItem) => {
+    const replace = (items: RecallMediaItem[]) => items.map((item) => item.id === updated.id ? updated : item);
+    setResults(replace);
+    setPrefetchedResults((prev) => prev ? replace(prev) : prev);
+  }, []);
+
+  const clearSimilarSource = useCallback(() => setSimilarSourceItem(null), []);
+
+  const resetSearch = useCallback(() => {
+    abortActiveSearch();
+    cancelAutoSearch();
+    setQuery("");
+    setSubmittedQuery("");
+    setDateBrowseContext(null);
+    setSimilarSourceItem(null);
+    setResults([]);
+    setShowHistory(false);
+    setHistory(readSearchHistory());
+    dispatch({ type: "SEARCH_CLEAR" });
+    topBarInputRef.current?.blur();
+  }, [abortActiveSearch, cancelAutoSearch, dispatch, topBarInputRef]);
+
   const enterComposeMode = useCallback((opts: { showHistory?: boolean } = {}) => {
     if (modeRef.current !== "compose") dispatch({ type: "SEARCH_FOCUS", startQuery: query });
     setShowComposePanel(true);
@@ -209,7 +267,7 @@ export function useSearchController({
 
   const handleSearchChange = useCallback((nextQuery: string) => {
     if (nextQuery === "" && bgContentRef.current === "results") {
-      cancelAutoSearch(); abortActiveSearch(); setQuery(""); setSubmittedQuery(""); setShowHistory(false); setHistory(readSearchHistory());
+      cancelAutoSearch(); abortActiveSearch(); setQuery(""); setSubmittedQuery(""); setDateBrowseContext(null); setShowHistory(false); setHistory(readSearchHistory());
       dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur(); return;
     }
     setQuery(nextQuery); setShowHistory(false);
@@ -224,7 +282,7 @@ export function useSearchController({
   const handleSearchClear = useCallback(() => {
     cancelAutoSearch(); abortActiveSearch();
     if (modeRef.current === "compose" && bgContentRef.current !== "results") { setQuery(""); setShowHistory(true); return; }
-    setQuery(""); setSubmittedQuery(""); setShowHistory(false); setHistory(readSearchHistory());
+    setQuery(""); setSubmittedQuery(""); setDateBrowseContext(null); setSimilarSourceItem(null); setShowHistory(false); setHistory(readSearchHistory());
     dispatch({ type: "SEARCH_CLEAR" }); topBarInputRef.current?.blur();
   }, [abortActiveSearch, cancelAutoSearch, dispatch, bgContentRef, modeRef, topBarInputRef]);
 
@@ -305,15 +363,15 @@ export function useSearchController({
   const effectiveIsLoading = isLoading || (!submittedQuery && recentItemsQuery.isPending);
 
   return {
-    query, setQuery, submittedQuery, setSubmittedQuery, results: effectiveResults, setResults,
+    query, setQuery, submittedQuery, setSubmittedQuery, dateBrowseContext, similarSourceItem, results: effectiveResults, setResults,
     isLoading: effectiveIsLoading, setIsLoading, errorMessage, setErrorMessage,
     visibleCount, setVisibleCount, isLoadingMore, isAutoSearchPending,
     showHistory, setShowHistory, history, setHistory, suggestions,
-    showComposePanel, setShowComposePanel,
+    showComposePanel, collapseComposePanel, expandComposePanel,
     hasMore, refinements, composeQuery, composeSuggestions, activeHistory, visibleHistory,
-    liveRef,
-    runSearch, runSimilarById, loadMore, abortActiveSearch, cancelAutoSearch,
-    removeHistoryItem, clearHistory,
+    liveRef, updateItem,
+    runSearch, runDateBrowse, runSimilarById, clearSimilarSource, loadMore, abortActiveSearch, cancelAutoSearch,
+    removeHistoryItem, clearHistory, resetSearch,
     handleAssistSearch, handleSearchChange, handleSearchSubmit, handleSearchClear,
     handleSearchHistoryToggle, handleSearchFocus,
     enterComposeMode, closeComposeMode,
