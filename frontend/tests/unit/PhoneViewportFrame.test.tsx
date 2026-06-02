@@ -224,7 +224,7 @@ describe("PhoneViewportFrame interactions", () => {
     expect(onConfirmAnswer).toHaveBeenCalledWith("favorite-01");
   });
 
-  it("switches the home feed from favorites to recents and expands recents on scroll", async () => {
+  it("switches the home feed from favorites to recents, prefetches, and expands recents on scroll", async () => {
     const user = userEvent.setup();
     renderPhone();
 
@@ -237,12 +237,15 @@ describe("PhoneViewportFrame interactions", () => {
     expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
     expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=50"))).toBe(true);
 
-    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
-    fireEvent.scroll(viewport);
-
     await waitFor(() => {
       expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=100"))).toBe(true);
     });
+    expect(screen.getByText("50 loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Select Recent item 51/i })).not.toBeInTheDocument();
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    fireEvent.scroll(viewport);
+
     expect(await screen.findByRole("button", { name: /Select Recent item 51/i })).toBeInTheDocument();
   });
 

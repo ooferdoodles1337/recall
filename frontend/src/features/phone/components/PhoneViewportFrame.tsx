@@ -14,7 +14,7 @@ import { HiddenDialog } from "./HiddenDialog";
 import { ImageDetailView } from "./ImageDetailView";
 import { SelectionTray } from "./SelectionTray";
 import { VideoDetailView } from "./VideoDetailView";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listFavoriteItems, listRecentItems } from "../api/searchApi";
 import {
   initialPhoneModeState, phoneModeReducer,
@@ -46,6 +46,8 @@ interface PhoneViewportFrameProps {
 }
 type PhoneMode = PhoneScreen;
 const HOME_RECENTS_MAX = 500;
+const RECENTS_PREFETCH_STALE_MS = 30_000;
+const RECENTS_PREFETCH_VIEWPORT_MULTIPLIER = 2;
 const SCROLL_CHAIN_BOUNDARY_SELECTOR = ".phone-rect-viewport, .about-sheet-scroll";
 
 function isPhoneTouchSurface(target: EventTarget | null, root: HTMLElement): boolean {
@@ -76,6 +78,7 @@ function isTryingToLeaveScrollBoundary(el: HTMLElement, deltaY: number): boolean
 
 export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer, onExit }: PhoneViewportFrameProps) {
   useViewportBottomInset();
+  const queryClient = useQueryClient();
 
   const [modeState, dispatch] = useReducer(phoneModeReducer, initialPhoneModeState);
   const mode = modeState.screen;
@@ -96,11 +99,13 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     queryFn: () => listRecentItems(recentLimit),
     enabled: homeFeed === "recents",
     placeholderData: (previous) => previous,
+    staleTime: RECENTS_PREFETCH_STALE_MS,
   });
   const recentItems = recentItemsQuery.data?.results ?? [];
   const isLoadingRecents = homeFeed === "recents" && recentItemsQuery.isPending;
   const isLoadingMoreRecents = homeFeed === "recents" && recentItems.length > 0 && recentItemsQuery.isFetching;
   const hasMoreRecents = homeFeed === "recents" && recentItems.length >= recentLimit && recentLimit < HOME_RECENTS_MAX;
+  const nextRecentLimit = hasMoreRecents ? Math.min(recentLimit + SEARCH_BATCH_SIZE, HOME_RECENTS_MAX) : null;
   const activeHomeItems = homeFeed === "recents" ? recentItems : favoriteItems;
   const isLoadingHomeFeed = homeFeed === "recents" ? isLoadingRecents : isLoadingFavorites;
   const [selectedItems, setSelectedItems] = useState<RecallMediaItem[]>([]);
@@ -393,13 +398,27 @@ export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirm
     const el = scrollContainerRef.current;
     if (!el || contentMode !== "home" || homeFeed !== "recents") return;
     const handleScroll = () => {
-      if (el.scrollHeight - el.scrollTop - el.clientHeight >= PREFETCH_TRIGGER_REMAINING) return;
-      if (!hasMoreRecents || recentItemsQuery.isFetching) return;
-      setRecentLimit((limit) => Math.min(limit + SEARCH_BATCH_SIZE, HOME_RECENTS_MAX));
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const triggerDistance = Math.max(
+        PREFETCH_TRIGGER_REMAINING,
+        el.clientHeight * RECENTS_PREFETCH_VIEWPORT_MULTIPLIER,
+      );
+      if (remaining >= triggerDistance) return;
+      if (!nextRecentLimit || recentItemsQuery.isFetching) return;
+      setRecentLimit(nextRecentLimit);
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
-  }, [contentMode, hasMoreRecents, homeFeed, recentItemsQuery.isFetching]);
+  }, [contentMode, homeFeed, nextRecentLimit, recentItemsQuery.isFetching]);
+
+  useEffect(() => {
+    if (contentMode !== "home" || homeFeed !== "recents" || !nextRecentLimit || recentItemsQuery.isFetching) return;
+    void queryClient.prefetchQuery({
+      queryKey: ["catalog", "recent", nextRecentLimit],
+      queryFn: () => listRecentItems(nextRecentLimit),
+      staleTime: RECENTS_PREFETCH_STALE_MS,
+    });
+  }, [contentMode, homeFeed, nextRecentLimit, queryClient, recentItemsQuery.isFetching]);
 
   const handleHomeFeedChange = useCallback((nextFeed: HomeFeed) => {
     if (nextFeed === homeFeed) return;
