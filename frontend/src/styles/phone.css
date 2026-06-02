@@ -16,6 +16,14 @@
   --glass-light-xl:   blur(24px) saturate(1.8);
   --glass-light-2xl:  blur(32px) saturate(1.8);
   --glass-scrim:      blur(12px);
+
+  --recall-visual-viewport-bottom-inset: 0px;
+  --recall-ios-webview-bottom-fallback: 0px;
+  --recall-bottom-ui-inset: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--recall-visual-viewport-bottom-inset),
+    var(--recall-ios-webview-bottom-fallback)
+  );
 }
 
 /* iOS 26 light theme — scopes all shadcn tokens inside the phone UI.
@@ -712,7 +720,7 @@
   right: 0;
   display: flex;
   gap: 10px;
-  padding: 56px 16px 28px;
+  padding: 56px 16px max(28px, calc(var(--recall-bottom-ui-inset) + 16px));
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
   z-index: 1;
 }
@@ -1370,7 +1378,7 @@
   position: absolute;
   left: var(--sp-3);
   right: var(--sp-3);
-  bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  bottom: max(var(--sp-3), var(--recall-bottom-ui-inset));
   z-index: 35;
   min-height: 110px;
   margin: 0;
@@ -1514,7 +1522,7 @@
 /* Long-press learnability hint — floats above the selection tray */
 .long-press-hint {
   position: absolute;
-  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + var(--selection-tray-h));
+  bottom: calc(max(var(--sp-3), var(--recall-bottom-ui-inset)) + var(--selection-tray-h));
   left: 50%;
   transform: translateX(-50%);
   z-index: 36;
@@ -1915,7 +1923,7 @@
   z-index: 2;
   display: grid;
   gap: 12px;
-  padding: 40px 14px max(18px, env(safe-area-inset-bottom));
+  padding: 40px 14px max(18px, calc(var(--recall-bottom-ui-inset) + 8px));
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.82) 46%, rgba(0, 0, 0, 0.94));
 }
 
@@ -2099,7 +2107,7 @@ body:has(.app-shell--phone) {
   padding:
     0
     env(safe-area-inset-right, 0px)
-    max(24px, env(safe-area-inset-bottom))
+    max(24px, calc(var(--recall-bottom-ui-inset) + var(--sp-2)))
     env(safe-area-inset-left, 0px);
 }
 
@@ -2232,7 +2240,7 @@ body.recall-phone-scroll-locked {
 }
 
 .hidden-sheet-actions {
-  padding: 16px 16px max(env(safe-area-inset-bottom), 24px);
+  padding: 16px 16px max(var(--recall-bottom-ui-inset), 24px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2378,7 +2386,7 @@ body.recall-phone-scroll-locked {
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding: var(--sp-4, 16px) var(--sp-4, 16px) var(--sp-8, 32px);
+  padding: var(--sp-4, 16px) var(--sp-4, 16px) max(var(--sp-8, 32px), calc(var(--recall-bottom-ui-inset) + var(--sp-4, 16px)));
   scrollbar-width: thin;
 }
 
@@ -2663,7 +2671,7 @@ body.recall-phone-scroll-locked {
   display: flex;
   flex: 0 0 auto;
   gap: var(--sp-2, 8px);
-  padding: var(--sp-3, 12px) var(--sp-4, 16px) max(var(--sp-4, 16px), env(safe-area-inset-bottom));
+  padding: var(--sp-3, 12px) var(--sp-4, 16px) max(var(--sp-4, 16px), calc(var(--recall-bottom-ui-inset) + var(--sp-2, 8px)));
   border-top: 0.5px solid rgba(60, 60, 67, 0.14);
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: var(--glass-light-xl);

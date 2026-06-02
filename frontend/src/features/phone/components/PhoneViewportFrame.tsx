@@ -36,6 +36,7 @@ import { ResultsLayer } from "./ResultsLayer";
 import { LongPressHint } from "./LongPressHint";
 import { GridHandlersContext } from "./GridHandlersContext";
 import { useSearchController } from "./useSearchController";
+import { useViewportBottomInset } from "./useViewportBottomInset";
 
 interface PhoneViewportFrameProps {
   currentTarget?: RecallMediaItem;
@@ -74,6 +75,8 @@ function isTryingToLeaveScrollBoundary(el: HTMLElement, deltaY: number): boolean
 }
 
 export function PhoneViewportFrame({ currentTarget, onSelectCandidate, onConfirmAnswer, onExit }: PhoneViewportFrameProps) {
+  useViewportBottomInset();
+
   const [modeState, dispatch] = useReducer(phoneModeReducer, initialPhoneModeState);
   const mode = modeState.screen;
   const contentMode = modeState.bgContent;
