@@ -1,0 +1,124 @@
+/* Hidden content guard */
+
+.thumb-img-wrap--hidden img,
+.thumb-img-wrap--hidden .thumb-animated {
+  filter: blur(20px);
+  transform: scale(1.08);
+}
+
+.hidden-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: inherit;
+  color: white;
+  pointer-events: none;
+}
+
+.hidden-thumb-overlay svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  opacity: 0.9;
+}
+
+.hidden-sheet[data-slot="sheet-content"] {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: var(--glass-light-2xl);
+  -webkit-backdrop-filter: var(--glass-light-2xl);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px 14px 0 0;
+  z-index: 201;
+  overflow: hidden;
+}
+
+.hidden-sheet-header {
+  padding: 24px 20px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+.hidden-sheet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #d97706;
+}
+
+.hidden-sheet-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #111827;
+}
+
+.hidden-sheet-body {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.hidden-sheet-actions {
+  padding: 16px 16px max(var(--recall-bottom-ui-inset), 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hidden-sheet-btn {
+  display: block;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  text-align: center;
+  border-radius: 12px;
+  transition: opacity 0.1s;
+}
+
+.hidden-sheet-btn--view {
+  padding: 14px 20px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.hidden-sheet-btn--view:active {
+  opacity: 0.82;
+}
+
+.hidden-sheet-btn--cancel {
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #374151;
+  font-weight: 500;
+}
+
+.hidden-sheet-btn--cancel:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.hidden-sheet-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 4px;
+}
+
+.hidden-sheet-btn--reveal-all {
+  padding: 6px 20px;
+  background: none;
+  color: #d97706;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.hidden-sheet-btn--reveal-all:active {
+  opacity: 0.65;
+}
+

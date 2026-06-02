@@ -1,0 +1,85 @@
+/* Light gray background on the phone shell (iOS grouped table background) */
+.app-shell--phone {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body:has(.app-shell--phone) {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Safe-area insets — always on since phone is always fullscreen.
+   env() resolves to 0 on desktop, non-zero on notched mobile. */
+.phone-rect-viewport {
+  padding:
+    0
+    env(safe-area-inset-right, 0px)
+    max(24px, calc(var(--recall-bottom-ui-inset) + var(--sp-2)))
+    env(safe-area-inset-left, 0px);
+}
+
+.phone-persistent-section {
+  padding-top: max(var(--sp-2), env(safe-area-inset-top, 0px));
+}
+
+.phone-startpage-header {
+  padding-top: max(20px, env(safe-area-inset-top));
+}
+
+@media (max-width: 768px), (max-height: 560px) and (max-width: 1024px) {
+  body {
+    min-width: 0;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--ut-bg);
+  }
+
+  .app-shell {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    background: var(--ut-bg);
+  }
+}
+
+html.recall-phone-scroll-locked,
+body.recall-phone-scroll-locked {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body.recall-phone-scroll-locked {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Proportional spacing reduction on smaller phones.
+   Every --sp-* and --r-* derives from --r, so this scales the full grid. */
+@media (max-width: 390px) {
+  .phone-rect {
+    --r: 11px;
+  }
+  .phone-startpage-title {
+    font-size: 1.625rem; /* 26pt — scaled down from 28pt base */
+  }
+}
+
+@media (max-width: 340px) {
+  .phone-rect {
+    --r: 10px;
+  }
+  .phone-startpage-title {
+    font-size: 1.375rem; /* 22pt */
+  }
+}
+
+
+

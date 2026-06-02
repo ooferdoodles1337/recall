@@ -1,7 +1,7 @@
 import React from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useViewportBottomInset } from "@/features/phone/components/useViewportBottomInset";
+import { useViewportBottomInset } from "@/features/phone/hooks/useViewportBottomInset";
 
 const VISUAL_VIEWPORT_BOTTOM_VAR = "--recall-visual-viewport-bottom-inset";
 const IOS_WEBVIEW_FALLBACK_VAR = "--recall-ios-webview-bottom-fallback";

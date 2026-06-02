@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PhoneViewportFrame } from "@/features/phone/components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "@/features/phone/components/shell/PhoneViewportFrame";
 import { phoneMockState } from "../msw/handlers";
 
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";

@@ -2,14 +2,14 @@ import type React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { IndexedAlbumsSheet } from "@/features/phone/components/IndexedAlbumsSheet";
-import { SettingsSheet } from "@/features/phone/components/SettingsSheet";
+import { IndexedAlbumsSheet } from "@/features/phone/components/sheets/IndexedAlbumsSheet";
+import { SettingsSheet } from "@/features/phone/components/settings/SettingsSheet";
 import {
   DEFAULT_INDEXED_ALBUM_IDS,
   MOCK_ALBUMS,
   readIndexedAlbums,
   writeIndexedAlbums,
-} from "@/features/phone/components/phoneUtils";
+} from "@/features/phone/phoneUtils";
 
 beforeEach(() => {
   window.localStorage.clear();
