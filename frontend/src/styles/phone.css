@@ -16,6 +16,14 @@
   --glass-light-xl:   blur(24px) saturate(1.8);
   --glass-light-2xl:  blur(32px) saturate(1.8);
   --glass-scrim:      blur(12px);
+
+  --recall-visual-viewport-bottom-inset: 0px;
+  --recall-ios-webview-bottom-fallback: 0px;
+  --recall-bottom-ui-inset: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--recall-visual-viewport-bottom-inset),
+    var(--recall-ios-webview-bottom-fallback)
+  );
 }
 
 /* iOS 26 light theme — scopes all shadcn tokens inside the phone UI.
@@ -121,6 +129,7 @@
      scroll padding and the long-press hint offset derive from this value —
      update here when tray content or padding changes. */
   --selection-tray-h: 148px;
+  --selection-tray-bottom: max(var(--sp-3), calc(var(--recall-bottom-ui-inset) - 40px));
 
   /* Glass morphism tokens */
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
@@ -1345,7 +1354,7 @@
   position: absolute;
   left: var(--sp-3);
   right: var(--sp-3);
-  bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  bottom: var(--selection-tray-bottom);
   z-index: 35;
   min-height: 110px;
   margin: 0;
@@ -1387,7 +1396,7 @@
 }
 
 .phone-rect--has-selection .phone-rect-viewport {
-  padding-bottom: calc(var(--sp-8) + var(--selection-tray-h));
+  padding-bottom: calc(var(--sp-8) + var(--selection-tray-h) + var(--selection-tray-bottom));
 }
 
 .selection-tray-content {
@@ -1489,7 +1498,7 @@
 /* Long-press learnability hint — floats above the selection tray */
 .long-press-hint {
   position: absolute;
-  bottom: calc(max(var(--sp-3), env(safe-area-inset-bottom)) + var(--selection-tray-h));
+  bottom: calc(var(--selection-tray-bottom) + var(--selection-tray-h));
   left: 50%;
   transform: translateX(-50%);
   z-index: 36;
