@@ -36,6 +36,7 @@ uv run python -m services.catalog.refresh
 uv run python -m services.catalog.refresh --dry-run
 uv run python -m services.catalog.refresh --reverse-geocode
 uv run python -m services.catalog.refresh --regenerate-thumbnails
+uv run python -m services.catalog.refresh --infer-dates   # fill missing dates from filename timestamps
 
 # Indexing (maintainers only — requires ExifTool, FFmpeg, uv sync --group indexing)
 uv run python -m services.pipeline.indexer

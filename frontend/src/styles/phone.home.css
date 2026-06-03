@@ -1,0 +1,317 @@
+/* --- Phone start page (home mode) — iOS Large Title style --- */
+
+.phone-startpage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0 0 24px;
+}
+
+.phone-startpage-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-5) var(--sp-4) var(--sp-2);
+  width: 100%;
+}
+
+.phone-startpage-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phone-startpage-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--ios-label);
+}
+
+/* Slightly reduced from iOS Large Title (34pt) to keep weight below the search bar */
+.phone-startpage-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ios-label);
+}
+
+/* Avatar + exit button group — right side of home header */
+.phone-startpage-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.phone-avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ios-blue);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phone-avatar-btn:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+.phone-avatar-btn:active {
+  opacity: 0.62;
+}
+
+.phone-settings-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* iOS-style close button — shown only in standalone /phone route */
+.phone-exit-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(60, 60, 67, 0.08);
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  color: var(--ios-label-secondary);
+}
+
+.phone-exit-btn:hover {
+  background: rgba(60, 60, 67, 0.14);
+  border-color: rgba(60, 60, 67, 0.18);
+  color: var(--ios-label);
+}
+
+.phone-exit-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.phone-compose-section {
+  width: 100%;
+  pointer-events: auto;
+}
+
+.phone-compose-empty {
+  margin-top: var(--sp-2);
+  background: transparent;
+}
+
+/* Home feed section */
+.phone-home-feed-section {
+  width: 100%;
+  margin: var(--sp-5) 0 var(--sp-5);
+  padding: 0 var(--sp-4);
+  overflow: hidden;
+}
+
+.phone-home-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-1) var(--sp-2);
+}
+
+.phone-home-feed-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* iOS section header style */
+.phone-home-feed-title {
+  margin: 0;
+  color: var(--ios-label);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.phone-home-feed-trigger {
+  height: 32px;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 3px;
+  margin-left: calc(var(--sp-1) * -1);
+  padding: 0 var(--sp-1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ios-label);
+  text-align: left;
+}
+
+.phone-home-feed-trigger:hover,
+.phone-home-feed-trigger[data-state="open"] {
+  background: rgba(60, 60, 67, 0.08);
+  color: var(--ios-label);
+}
+
+.phone-home-feed-trigger svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ios-label-secondary);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.phone-home-feed-trigger[data-state="open"] svg {
+  color: var(--ios-label);
+  transform: rotate(180deg);
+}
+
+.phone-home-feed-menu {
+  z-index: 120;
+  min-width: 148px;
+  border-color: rgba(60, 60, 67, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  backdrop-filter: var(--glass-light-md);
+  -webkit-backdrop-filter: var(--glass-light-md);
+}
+
+.phone-home-feed-menu-item {
+  justify-content: space-between;
+  min-height: 34px;
+  color: var(--ios-label);
+  cursor: pointer;
+  letter-spacing: 0;
+}
+
+.phone-home-feed-menu-item svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ios-blue);
+}
+
+.phone-home-feed-count {
+  flex: 0 0 auto;
+  color: var(--ios-label-secondary);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Tight iOS Photos grid */
+.phone-home-feed-grid {
+  width: 100%;
+}
+
+.phone-home-feed-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: var(--ios-label-secondary);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* Row: flex, full-width interactive target */
+.phone-history-row {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* Highlight the full row width on hover, not just the button */
+.phone-history-row:hover {
+  background: rgba(60, 60, 67, 0.05);
+}
+
+/* Suppress double-highlight on the inner buttons when the row is hovered */
+.phone-history-row:hover .suggestion-item,
+.phone-history-row:hover .phone-history-item {
+  background: transparent !important;
+}
+
+/* Fix suggestion-item layout inside a row — it must share space with the X button */
+.phone-history-row .suggestion-item {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.phone-history-item {
+  display: grid;
+  grid-template-columns: var(--sp-5) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
+  text-align: left;
+  font-size: 0.9rem;
+  color: var(--ios-label);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.phone-history-item:hover {
+  background: rgba(60, 60, 67, 0.04);
+}
+
+.phone-history-item span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-history-icon {
+  flex-shrink: 0;
+  color: var(--ios-label-secondary);
+  line-height: 0;
+}
+
+.phone-history-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sp-6);
+  height: var(--sp-6);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ios-label-secondary);
+  margin-right: var(--sp-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.12s ease;
+}
+
+.phone-history-row:hover .phone-history-remove {
+  opacity: 1;
+  background: rgba(60, 60, 67, 0.08);
+}
+
+.phone-history-remove:hover {
+  background: rgba(60, 60, 67, 0.16) !important;
+  color: var(--ios-label);
+}
+
+@media (hover: none) {
+  .phone-history-remove {
+    opacity: 1;
+    background: rgba(60, 60, 67, 0.08);
+  }
+}
+

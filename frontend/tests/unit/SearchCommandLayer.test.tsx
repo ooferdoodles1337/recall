@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { PhoneSearchBar, SearchAssistPanel } from "@/features/phone/components/SearchCommandLayer";
+import { PhoneSearchBar, SearchAssistPanel } from "@/features/phone/components/search/SearchCommandLayer";
 
 // ---------------------------------------------------------------------------
 // PhoneSearchBar

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { PhoneViewportFrame } from "./components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "./components/shell/PhoneViewportFrame";
+import { navigateTo } from "@/app/routes";
 
 export function PhoneTesterUI() {
   useEffect(() => {
@@ -15,7 +16,7 @@ export function PhoneTesterUI() {
 
   return (
     <main className="app-shell--phone">
-      <PhoneViewportFrame onExit={() => { window.location.href = '/'; }} />
+      <PhoneViewportFrame onExit={() => navigateTo("test")} />
     </main>
   );
 }

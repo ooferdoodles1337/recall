@@ -1,0 +1,27 @@
+/* ============================================================
+   Phone viewport frame
+   ============================================================ */
+
+/* Glass tokens hoisted to :root so portaled elements (Radix dropdowns,
+   sheets) that render outside .phone-rect can still resolve them. */
+:root {
+  --glass-dark-xs:    blur(8px) saturate(1.4);
+  --glass-light-xs:   blur(8px) saturate(1.8);
+  --glass-dark-sm:    blur(12px) saturate(1.4);
+  --glass-dark-md:    blur(16px) saturate(1.4);
+  --glass-light-md:   blur(16px) saturate(1.8);
+  --glass-dark-lg:    blur(20px) saturate(1.4);
+  --glass-light-lg:   blur(20px) saturate(1.8);
+  --glass-dark-xl:    blur(24px) saturate(1.4);
+  --glass-light-xl:   blur(24px) saturate(1.8);
+  --glass-light-2xl:  blur(32px) saturate(1.8);
+  --glass-scrim:      blur(12px);
+
+  --recall-visual-viewport-bottom-inset: 0px;
+  --recall-ios-webview-bottom-fallback: 0px;
+  --recall-bottom-ui-inset: max(
+    env(safe-area-inset-bottom, 0px),
+    var(--recall-visual-viewport-bottom-inset),
+    var(--recall-ios-webview-bottom-fallback)
+  );
+}

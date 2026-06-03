@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import functools
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -160,6 +161,66 @@ def _normalize_taken_date(
         "taken_year_month": taken_date[:7],
         "taken_sort": taken_at,
         "taken_source": source or "unknown",
+    }
+
+
+_ANDROID_PATTERN = re.compile(r"(?:^|[^0-9])(\d{8}_\d{6})(?:[^0-9]|$)")
+# 13-digit = Unix ms, 16-digit = Unix μs; reject stems that are only those lengths
+_UNIX_MS_PATTERN = re.compile(r"^(\d{13})$")
+_UNIX_US_PATTERN = re.compile(r"^(\d{16})$")
+
+
+def infer_date_from_filename(path: str) -> dict[str, str]:
+    """Try to extract a capture date from common filename timestamp patterns.
+
+    Recognises:
+    - YYYYMMDD_HHMMSS anywhere in the stem (Android/Samsung camera)
+    - Pure 13-digit stems: Unix milliseconds (Discord/Telegram exports)
+    - Pure 16-digit stems: Unix microseconds (iOS/Android share exports)
+
+    Returns the same keys as ``_normalize_taken_date`` with
+    ``taken_source="filename"``, or an empty dict if no pattern matches.
+    """
+    stem = Path(path).stem
+    dt: datetime | None = None
+
+    # Android/camera: YYYYMMDD_HHMMSS (may have prefix/suffix)
+    m = _ANDROID_PATTERN.search(stem)
+    if m:
+        try:
+            dt = datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
+        except ValueError:
+            pass
+
+    # Unix ms timestamp (13 digits, whole stem)
+    if dt is None:
+        m = _UNIX_MS_PATTERN.match(stem)
+        if m:
+            try:
+                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000, tz=timezone.utc).replace(tzinfo=None)
+            except (ValueError, OSError):
+                pass
+
+    # Unix μs timestamp (16 digits, whole stem)
+    if dt is None:
+        m = _UNIX_US_PATTERN.match(stem)
+        if m:
+            try:
+                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000_000, tz=timezone.utc).replace(tzinfo=None)
+            except (ValueError, OSError):
+                pass
+
+    if dt is None:
+        return {}
+
+    taken_at = _format_datetime(dt)
+    taken_date = dt.date().isoformat()
+    return {
+        "taken_at": taken_at,
+        "taken_date": taken_date,
+        "taken_year_month": taken_date[:7],
+        "taken_sort": taken_at,
+        "taken_source": "filename",
     }
 
 
