@@ -1,4 +1,4 @@
-export type UserTestScreen = "welcome" | "task" | "results";
+export type UserTestScreen = "welcome" | "task";
 
 export interface TrialResult {
   trialNumber: number;

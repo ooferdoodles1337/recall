@@ -67,6 +67,21 @@ are relevant when the user first arrives but do not need to occupy permanent rea
 Keeping it non-sticky reclaims screen space for the photo grid while ensuring the search
 bar (the primary action) is always reachable.
 
+### SR-5 — Page-level pull-to-refresh is disabled
+
+The `/phone` route must never allow the browser page to overscroll far enough to
+trigger pull-to-refresh or page-level rubber-band gestures. All touch scrolling
+should be contained inside the phone viewport's intended scroll regions.
+
+At scroll boundaries, dragging past the top or bottom of a phone scroll area must
+feel inert or locally bounded; it must not chain to `html`, `body`, or the browser
+viewport. This applies to home, results, detail overlays, compose overlays,
+settings sheets, and indexed-album sheets.
+
+**Rationale:** accidental pull-to-refresh destroys the tester's current task
+state and is easy to trigger during rapid photo browsing, especially on mobile
+devices. The phone UI should behave like an app shell, not a refreshable web page.
+
 ---
 
 ## Compose panel
@@ -192,6 +207,113 @@ When the user activates compose on the home screen, the header animates out
 upward — `y: 0 → -16, opacity: 1 → 0` — while simultaneously collapsing its
 height to 0 so the search bar slides smoothly into the vacated space. When
 compose dismisses and the user returns to home, the reverse plays (HA-1).
+
+---
+
+## Home feed switcher
+
+### HF-1 — Favorites title is an interactive feed selector
+
+The home media section title is a button, not static text. It displays the
+active feed name:
+
+- `Favorites` when showing favorited media.
+- `Recents` when showing the chronological catalog feed.
+
+The title includes a small downward chevron to signal that it can be opened.
+The whole title hit area is tappable, including the text and chevron. The
+count and grid zoom controls remain on the right side of the header.
+
+### HF-2 — Tapping the title opens a compact feed menu
+
+Tapping the active feed title opens a small iOS-style menu or bottom sheet
+anchored to the section header. The menu contains exactly two options:
+
+- `Favorites`
+- `Recents`
+
+The active option is marked with a check. Selecting the current option closes
+the menu without changing scroll position. Selecting the other option switches
+the home section content.
+
+The menu must not open compose mode, blur the search bar, or change the current
+search query.
+
+### HF-3 — Favorites feed behavior
+
+`Favorites` shows only media where `metadata.organization.favorite === true`,
+ordered newest first using the same catalog chronological sort as the backend
+favorite query.
+
+The section count reads `{n} items`. If there are no favorites, show the
+existing empty home state or a favorites-specific empty grid state.
+
+Opening detail from this feed swipes through the current favorites list,
+preserving MT-2.
+
+### HF-4 — Recents feed behavior
+
+`Recents` shows catalog items ordered chronologically newest first by
+`taken_sort`, with no favorite filter. It is a long scrollable media grid, not
+a search-results screen.
+
+Recents should load enough items for immediate browsing, then fetch more as
+the user nears the bottom. Loading more recents must feel like continuing the
+home feed, not like submitting a search.
+
+The section count can either show the loaded count, such as `51 loaded`, or the
+total count if the API provides it. Avoid implying the visible count is the
+full catalog unless it is.
+
+### HF-5 — Switching feeds preserves home context
+
+Switching between `Favorites` and `Recents` keeps the app in `home` mode with
+`bgContent="home"`.
+
+Switching feeds does not:
+
+- Submit a search.
+- Clear search history.
+- Reset grid density.
+- Close the selection tray unless selected items are no longer visible.
+- Affect hidden/sensitive reveal state for already viewed items.
+
+After switching, scroll the home viewport to the top of the media section
+unless the target feed has a previously remembered scroll offset. Preferred
+behavior: remember independent scroll positions for `Favorites` and `Recents`
+during the session.
+
+### HF-6 — Detail source follows active feed
+
+When detail opens from the home section, swipe navigation uses the active home
+feed:
+
+- From `Favorites`, swipe through favorites.
+- From `Recents`, swipe through chronological recents.
+
+If the user favorites/unfavorites an item while viewing detail:
+
+- In `Favorites`, removing the favorite may remove it from the source list
+  after closing detail or after moving away from that item.
+- In `Recents`, favorite changes do not remove the item from the source list.
+
+### HF-7 — Visual treatment
+
+The feed selector should look like an iOS Photos section title: strong title
+text, subtle chevron, no large pill or card treatment.
+
+The interaction should be discoverable but quiet. Do not add explanatory helper
+text. Hover/pressed states may subtly tint the title row; mobile tap feedback
+should be immediate.
+
+### HF-8 — Accessibility
+
+The title button has an accessible name like `Choose home feed, current feed
+Favorites`.
+
+The menu uses proper menu/listbox semantics. Each option announces its selected
+state. Keyboard users can open the selector with Enter/Space, move options with
+arrow keys, and close with Escape.
 
 ---
 

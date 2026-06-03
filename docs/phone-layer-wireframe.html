@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recall Phone Layer Wireframe</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1b1f;
+      --muted: #6b6875;
+      --paper: #f7f5ef;
+      --panel: #fffdf8;
+      --line: rgba(28, 27, 31, 0.18);
+      --phone: #eeecf5;
+      --home: #6aa6b8;
+      --results: #8f7bd7;
+      --search: #f1c84c;
+      --compose: #f08a64;
+      --dismiss: #87919d;
+      --selection: #5fbe8b;
+      --hint: #e1a351;
+      --detail: #2d3142;
+      --sheet: #4f88e6;
+      --hidden: #c45b7a;
+      --pull: #46b3a3;
+      --radius: 22px;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(90deg, rgba(28, 27, 31, 0.05) 1px, transparent 1px),
+        linear-gradient(rgba(28, 27, 31, 0.05) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      color: var(--ink);
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      padding: 28px clamp(16px, 4vw, 48px) 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 253, 248, 0.78);
+      backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 300;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 3.4rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .dek {
+      margin: 10px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 0.96rem;
+      line-height: 1.5;
+    }
+
+    .mode-picker {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: 520px;
+    }
+
+    .mode-picker button,
+    .toggle-row label {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 1px 0 rgba(28, 27, 31, 0.08);
+    }
+
+    .mode-picker button {
+      padding: 0 13px;
+    }
+
+    .mode-picker button[aria-pressed="true"] {
+      background: #1c1b1f;
+      color: #fffdf8;
+      border-color: #1c1b1f;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(340px, 460px) minmax(520px, 1fr);
+      gap: clamp(18px, 3vw, 34px);
+      padding: 24px clamp(16px, 4vw, 48px) 42px;
+      align-items: start;
+    }
+
+    .stage-card,
+    .stack-card,
+    .notes-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 248, 0.88);
+      box-shadow: 0 18px 44px rgba(28, 27, 31, 0.09);
+    }
+
+    .stage-card {
+      padding: 18px;
+      position: sticky;
+      top: 132px;
+    }
+
+    .stage-title,
+    .stack-title,
+    .notes-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 0.88rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .state-label {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .phone-shell {
+      width: min(100%, 390px);
+      aspect-ratio: 390 / 844;
+      margin: 0 auto;
+      padding: 14px;
+      border-radius: 42px;
+      background: #16151a;
+      box-shadow:
+        0 24px 70px rgba(28, 27, 31, 0.28),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.09);
+    }
+
+    .phone-rect {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 30px;
+      background:
+        radial-gradient(ellipse 130% 55% at 50% -8%, rgba(255, 214, 10, 0.25), transparent 55%),
+        radial-gradient(ellipse 75% 45% at 88% 22%, rgba(255, 130, 30, 0.12), transparent 52%),
+        radial-gradient(ellipse 60% 50% at 4% 78%, rgba(80, 160, 255, 0.11), transparent 56%),
+        var(--phone);
+    }
+
+    .notch {
+      position: absolute;
+      top: 9px;
+      left: 50%;
+      z-index: 260;
+      width: 96px;
+      height: 25px;
+      transform: translateX(-50%);
+      border-radius: 0 0 18px 18px;
+      background: #16151a;
+    }
+
+    .layer {
+      position: relative;
+      border: 2px solid currentColor;
+      background: color-mix(in srgb, currentColor 13%, transparent);
+      color: #333;
+    }
+
+    .label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255, 253, 248, 0.84);
+      border: 1px solid rgba(28, 27, 31, 0.13);
+      color: #1c1b1f;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(28, 27, 31, 0.08);
+    }
+
+    .home-header {
+      z-index: 5;
+      flex: 0 0 auto;
+      height: 70px;
+      padding: 34px 16px 8px;
+      color: var(--home);
+      border-left: 0;
+      border-right: 0;
+      border-top: 0;
+    }
+
+    .home-header .label {
+      justify-content: space-between;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    .persistent-section {
+      z-index: 10;
+      flex: 0 0 auto;
+      margin-bottom: 8px;
+      padding: 0 16px;
+      color: var(--search);
+      border-left: 0;
+      border-right: 0;
+      border-top: 0;
+      background: transparent;
+    }
+
+    .search-panel {
+      border: 2px solid var(--search);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.62);
+      box-shadow: 0 8px 24px rgba(28, 27, 31, 0.09);
+      overflow: hidden;
+    }
+
+    .search-bar {
+      height: 44px;
+      display: grid;
+      grid-template-columns: 28px 1fr 28px;
+      gap: 8px;
+      align-items: center;
+      padding: 0 10px;
+    }
+
+    .search-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--search);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .search-input {
+      height: 22px;
+      border-radius: 999px;
+      background: repeating-linear-gradient(90deg, rgba(28, 27, 31, 0.25) 0 42px, transparent 42px 48px);
+      opacity: 0.7;
+    }
+
+    .compose-section {
+      display: none;
+      min-height: 132px;
+      padding: 8px;
+      border-top: 2px dashed var(--compose);
+      color: var(--compose);
+      background: rgba(240, 138, 100, 0.08);
+    }
+
+    .suggestion-row {
+      height: 30px;
+      margin: 5px 0;
+      border-radius: 8px;
+      background: rgba(240, 138, 100, 0.22);
+      border: 1px dashed rgba(240, 138, 100, 0.8);
+    }
+
+    .content-root {
+      z-index: 1;
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 0;
+      color: var(--home);
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      overflow: hidden;
+    }
+
+    .scroll-viewport {
+      height: 100%;
+      overflow: hidden;
+      padding: 0 0 32px;
+      background: rgba(255, 253, 248, 0.16);
+    }
+
+    .phone-screen {
+      min-height: 100%;
+      padding: 12px 16px 32px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 10px 0;
+    }
+
+    .section-head .label { font-size: 12px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .thumb {
+      aspect-ratio: 1;
+      border: 1px solid rgba(28, 27, 31, 0.16);
+      border-radius: 7px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.65), transparent 40%),
+        color-mix(in srgb, currentColor 34%, white);
+    }
+
+    .results-copy {
+      display: none;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .dismiss-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      color: var(--dismiss);
+      border: 2px dashed var(--dismiss);
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(135, 145, 157, 0.1) 0 10px,
+        rgba(135, 145, 157, 0.02) 10px 20px
+      );
+    }
+
+    .pull-indicator {
+      display: none;
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      z-index: 38;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: var(--pull);
+      background: rgba(255, 255, 255, 0.84);
+      border: 2px solid var(--pull);
+    }
+
+    .selection-tray {
+      display: none;
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 35;
+      min-height: 120px;
+      padding: 12px;
+      border-radius: 16px;
+      color: var(--selection);
+      background: rgba(242, 242, 247, 0.86);
+      box-shadow: 0 -8px 28px rgba(28, 27, 31, 0.16);
+    }
+
+    .tray-thumbs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .tray-thumb {
+      height: 50px;
+      border-radius: 8px;
+      border: 1px solid var(--selection);
+      background: rgba(95, 190, 139, 0.18);
+    }
+
+    .long-press-hint {
+      display: none;
+      position: absolute;
+      left: 50%;
+      bottom: 144px;
+      z-index: 36;
+      transform: translateX(-50%);
+      padding: 7px 12px;
+      border-radius: 999px;
+      color: var(--hint);
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid var(--hint);
+    }
+
+    .detail-backdrop {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 49;
+      background: rgba(0, 0, 0, 0.86);
+      color: var(--detail);
+    }
+
+    .detail-screen {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      overflow: hidden;
+      color: var(--detail);
+      border: 2px solid #bec5d8;
+    }
+
+    .detail-media {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .detail-media-box {
+      width: 78%;
+      height: 62%;
+      border: 2px solid #bec5d8;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent),
+        rgba(190, 197, 216, 0.18);
+    }
+
+    .detail-top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      min-height: 104px;
+      padding: 22px 16px;
+      background: linear-gradient(rgba(0, 0, 0, 0.72), transparent);
+      color: #fff;
+    }
+
+    .detail-bottom {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1;
+      min-height: 116px;
+      padding: 56px 16px 18px;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+      color: #fff;
+    }
+
+    .detail-side {
+      position: absolute;
+      top: 50%;
+      z-index: 4;
+      width: 42px;
+      height: 56px;
+      transform: translateY(-50%);
+      border: 2px solid #bec5d8;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.34);
+    }
+
+    .detail-side.left { left: 14px; }
+    .detail-side.right { right: 14px; }
+
+    .sensitive-prompt {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 52;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.26);
+    }
+
+    .sensitive-card {
+      width: 250px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 2px solid var(--hidden);
+      background: rgba(28, 27, 31, 0.84);
+      color: #fff;
+      text-align: center;
+    }
+
+    .about-sheet,
+    .settings-sheet,
+    .hidden-dialog {
+      display: none;
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      z-index: 101;
+      min-height: 240px;
+      padding: 14px;
+      border-radius: 22px;
+      color: var(--sheet);
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid var(--sheet);
+      box-shadow: 0 -16px 44px rgba(28, 27, 31, 0.22);
+    }
+
+    .hidden-dialog {
+      z-index: 201;
+      color: var(--hidden);
+      border-color: var(--hidden);
+    }
+
+    .sheet-lines {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .sheet-line {
+      height: 28px;
+      border-radius: 8px;
+      background: currentColor;
+      opacity: 0.13;
+    }
+
+    .mode-compose .compose-section,
+    .mode-compose-results .compose-section { display: block; }
+
+    .mode-compose .dismiss-overlay,
+    .mode-compose-results .dismiss-overlay { display: block; }
+
+    .mode-compose-results .phone-screen,
+    .mode-compose-results .persistent-section { color: var(--results); }
+
+    .mode-results .phone-screen,
+    .mode-results .persistent-section { color: var(--results); }
+
+    .mode-results .results-copy,
+    .mode-compose-results .results-copy { display: block; }
+
+    .mode-results .section-head .label:first-child,
+    .mode-compose-results .section-head .label:first-child { color: var(--results); }
+
+    .mode-results .pull-indicator { display: inline-flex; }
+
+    .mode-selection .selection-tray,
+    .mode-selection .long-press-hint { display: block; }
+
+    .mode-detail .detail-backdrop,
+    .mode-detail .detail-screen { display: block; }
+
+    .mode-sensitive .detail-backdrop,
+    .mode-sensitive .detail-screen { display: block; }
+
+    .mode-sensitive .sensitive-prompt { display: grid; }
+
+    .mode-about .about-sheet,
+    .mode-settings .settings-sheet,
+    .mode-hidden .hidden-dialog { display: block; }
+
+    .mode-about .detail-backdrop,
+    .mode-settings .detail-backdrop,
+    .mode-hidden .detail-backdrop {
+      display: block;
+      z-index: 95;
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .stack-card { padding: 18px; }
+
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .toggle-row input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .toggle-row label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+    }
+
+    .toggle-row input:checked + label {
+      background: #1c1b1f;
+      color: #fffdf8;
+      border-color: #1c1b1f;
+    }
+
+    .stack-view {
+      position: relative;
+      min-height: 560px;
+      overflow: auto;
+      padding: 16px 16px 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fbfaf6;
+    }
+
+    .axis {
+      position: absolute;
+      top: 18px;
+      bottom: 18px;
+      left: 24px;
+      width: 2px;
+      background: linear-gradient(#1c1b1f, transparent);
+    }
+
+    .axis::before {
+      content: "top";
+      position: absolute;
+      top: -6px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .axis::after {
+      content: "bottom";
+      position: absolute;
+      bottom: -4px;
+      left: 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+      padding-left: 42px;
+    }
+
+    .stack-item {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 46px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-left-width: 7px;
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 6px 16px rgba(28, 27, 31, 0.06);
+    }
+
+    .stack-item[data-visible="false"] {
+      opacity: 0.34;
+      filter: grayscale(0.8);
+    }
+
+    .z {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .stack-name {
+      font-weight: 900;
+    }
+
+    .stack-note {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .tag {
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(28, 27, 31, 0.07);
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .notes-card {
+      margin-top: 16px;
+      padding: 18px;
+    }
+
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .note {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.54);
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.82rem;
+    }
+
+    .note p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.42;
+    }
+
+    @media (max-width: 980px) {
+      header,
+      main {
+        display: block;
+      }
+
+      .mode-picker {
+        justify-content: flex-start;
+        margin-top: 16px;
+      }
+
+      .stage-card {
+        position: static;
+        margin-bottom: 18px;
+      }
+
+      .notes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Phone UI layer wireframe</h1>
+      <p class="dek">
+        A structural map of <code>PhoneViewportFrame</code>: normal-flow shell pieces,
+        scroll content, and absolute overlays. Use the states to check how the same phone
+        frame changes when compose, selection, detail, and sheets are active.
+      </p>
+    </div>
+    <nav class="mode-picker" aria-label="Wireframe states">
+      <button type="button" data-mode="home" aria-pressed="true">Home</button>
+      <button type="button" data-mode="compose">Compose + home</button>
+      <button type="button" data-mode="results">Results</button>
+      <button type="button" data-mode="compose-results">Compose + results</button>
+      <button type="button" data-mode="selection">Selection</button>
+      <button type="button" data-mode="detail">Detail</button>
+      <button type="button" data-mode="sensitive">Sensitive detail</button>
+      <button type="button" data-mode="about">Sheet</button>
+      <button type="button" data-mode="hidden">Hidden dialog</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="stage-card" aria-label="Phone preview">
+      <div class="stage-title">
+        <h2>Composited Phone</h2>
+        <span class="state-label" id="state-label">Home</span>
+      </div>
+
+      <div class="phone-shell">
+        <div class="phone-rect mode-home" id="phone">
+          <div class="notch" aria-hidden="true"></div>
+
+          <div class="pull-indicator layer" data-layer="pull">
+            <span class="label">pull-indicator z38</span>
+          </div>
+
+          <div class="home-header layer" data-layer="home-header">
+            <span class="label">PhoneHomeHeader <span>Recall / settings / exit</span></span>
+          </div>
+
+          <div class="persistent-section layer" data-layer="search-shell">
+            <div class="search-panel">
+              <div class="search-bar">
+                <span class="search-dot" aria-hidden="true"></span>
+                <span class="search-input" aria-hidden="true"></span>
+                <span class="search-dot" aria-hidden="true"></span>
+              </div>
+              <div class="compose-section">
+                <span class="label">SearchAssistPanel inside phone-compose-section</span>
+                <div class="suggestion-row"></div>
+                <div class="suggestion-row"></div>
+                <div class="suggestion-row"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="content-root layer" data-layer="scroll-area">
+            <div class="scroll-viewport">
+              <div class="phone-screen">
+                <div class="section-head">
+                  <span class="label">HomeLayer / ResultsLayer</span>
+                  <span class="label">scroll viewport</span>
+                </div>
+                <p class="results-copy">submitted query, refinements, loading and error states live above the media grid.</p>
+                <div class="grid" aria-hidden="true">
+                  <span class="thumb"></span><span class="thumb"></span><span class="thumb"></span>
+                  <span class="thumb"></span><span class="thumb"></span><span class="thumb"></span>
+                  <span class="thumb"></span><span class="thumb"></span><span class="thumb"></span>
+                  <span class="thumb"></span><span class="thumb"></span><span class="thumb"></span>
+                  <span class="thumb"></span><span class="thumb"></span><span class="thumb"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="dismiss-overlay layer" data-layer="dismiss" type="button">
+            <span class="label">phone-dismiss-overlay z20</span>
+          </button>
+
+          <div class="selection-tray layer" data-layer="selection">
+            <span class="label">SelectionTray z35</span>
+            <div class="tray-thumbs" aria-hidden="true">
+              <span class="tray-thumb"></span><span class="tray-thumb"></span><span class="tray-thumb"></span><span class="tray-thumb"></span>
+            </div>
+          </div>
+
+          <div class="long-press-hint layer" data-layer="hint">
+            <span class="label">LongPressHint z36</span>
+          </div>
+
+          <div class="detail-backdrop" data-layer="detail-backdrop"></div>
+          <div class="detail-screen layer" data-layer="detail-screen">
+            <div class="detail-media">
+              <div class="detail-media-box"></div>
+            </div>
+            <div class="detail-top"><span class="label">detail top chrome z3</span></div>
+            <div class="detail-bottom"><span class="label">detail action row z1</span></div>
+            <div class="detail-side left"></div>
+            <div class="detail-side right"></div>
+          </div>
+
+          <div class="sensitive-prompt" data-layer="sensitive">
+            <div class="sensitive-card">
+              <span class="label">Sensitive prompt</span>
+              <p>Blurred media remains in-place behind this card.</p>
+            </div>
+          </div>
+
+          <div class="about-sheet layer" data-layer="sheet">
+            <span class="label">AboutSheet / SettingsSheet z101</span>
+            <div class="sheet-lines" aria-hidden="true">
+              <span class="sheet-line"></span><span class="sheet-line"></span><span class="sheet-line"></span>
+            </div>
+          </div>
+
+          <div class="settings-sheet layer" data-layer="sheet">
+            <span class="label">SettingsSheet z101</span>
+            <div class="sheet-lines" aria-hidden="true">
+              <span class="sheet-line"></span><span class="sheet-line"></span><span class="sheet-line"></span>
+            </div>
+          </div>
+
+          <div class="hidden-dialog layer" data-layer="hidden">
+            <span class="label">HiddenDialog z201</span>
+            <div class="sheet-lines" aria-hidden="true">
+              <span class="sheet-line"></span><span class="sheet-line"></span><span class="sheet-line"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <section class="stack-card" aria-label="Layer stack">
+        <div class="stack-title">
+          <h2>Exploded Stack</h2>
+          <span class="state-label">highest z-index first</span>
+        </div>
+        <div class="toggle-row">
+          <input id="only-visible" type="checkbox" />
+          <label for="only-visible">Dim hidden layers</label>
+        </div>
+        <div class="stack-view">
+          <div class="axis" aria-hidden="true"></div>
+          <div class="stack" id="stack"></div>
+        </div>
+      </section>
+
+      <section class="notes-card" aria-label="Structural notes">
+        <div class="notes-title">
+          <h2>Reading Notes</h2>
+        </div>
+        <div class="notes-grid">
+          <article class="note">
+            <strong>Normal flow</strong>
+            <p>Header, persistent search, and scroll content are flex children inside <code>.phone-rect</code>. The search bar is not sticky; it stays visible because the scroll viewport is the flex child below it.</p>
+          </article>
+          <article class="note">
+            <strong>Compose</strong>
+            <p>The search bar and suggestions become one <code>.search-panel</code>. Background content remains in the scroll area; results are dimmed when compose sits over results.</p>
+          </article>
+          <article class="note">
+            <strong>Selection</strong>
+            <p><code>SelectionTray</code> is absolute at z35. The viewport gets extra bottom padding so selected media does not disappear behind the tray.</p>
+          </article>
+          <article class="note">
+            <strong>Detail and sheets</strong>
+            <p>Detail covers the whole phone at z50, above the black backdrop at z49. Bottom sheets are portaled in the app, but represented here as phone overlays at z101 or z201.</p>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const layers = [
+      { id: "hidden", z: 201, name: "HiddenDialog", note: "Safety sheet for hidden media. Highest app surface.", color: "var(--hidden)", modes: ["hidden"], tag: "absolute / sheet" },
+      { id: "sheet", z: 101, name: "AboutSheet / SettingsSheet / IndexedAlbumsSheet", note: "Portaled bottom sheets in the app; shown as phone overlays here.", color: "var(--sheet)", modes: ["about", "settings"], tag: "fixed portal" },
+      { id: "detail-screen", z: 50, name: "ImageDetailView / VideoDetailView", note: "Full-screen detail surface with its own internal media, top chrome, bottom actions, and side nav.", color: "var(--detail)", modes: ["detail", "sensitive"], tag: "absolute" },
+      { id: "detail-backdrop", z: 49, name: "detail-backdrop", note: "Black backdrop under detail media.", color: "var(--detail)", modes: ["detail", "sensitive", "about", "settings", "hidden"], tag: "absolute" },
+      { id: "pull", z: 38, name: "pull-indicator", note: "Visible near the bottom while loading more results.", color: "var(--pull)", modes: ["results"], tag: "absolute" },
+      { id: "hint", z: 36, name: "LongPressHint", note: "Floats above the selection tray.", color: "var(--hint)", modes: ["selection"], tag: "absolute" },
+      { id: "selection", z: 35, name: "SelectionTray", note: "Bottom action sheet for selected thumbnails.", color: "var(--selection)", modes: ["selection"], tag: "absolute" },
+      { id: "dismiss", z: 20, name: "phone-dismiss-overlay", note: "Transparent click target used to dismiss compose overlays.", color: "var(--dismiss)", modes: ["compose", "compose-results"], tag: "absolute button" },
+      { id: "search-shell", z: "flow", name: "PhoneSearchShell / phone-persistent-section", note: "Flex child above the scroll area. Contains PhoneSearchBar and optional SearchAssistPanel.", color: "var(--search)", modes: ["home", "compose", "results", "compose-results", "selection", "about", "settings", "hidden"], tag: "normal flow" },
+      { id: "home-header", z: "flow", name: "PhoneHomeHeader", note: "Normal-flow header above the search bar only when home is at scroll top.", color: "var(--home)", modes: ["home", "compose", "selection", "about", "settings", "hidden"], tag: "normal flow" },
+      { id: "scroll-area", z: "flow", name: "ScrollArea / phone-rect-viewport", note: "Scrollable home or results layer. HomeLayer and ResultsLayer swap inside this region.", color: "var(--home)", modes: ["home", "compose", "results", "compose-results", "selection", "about", "settings", "hidden"], tag: "normal flow" },
+      { id: "phone", z: "base", name: "phone-rect", note: "Relative flex shell, background, clipping, design tokens, and overscroll containment.", color: "var(--phone)", modes: ["home", "compose", "results", "compose-results", "selection", "detail", "sensitive", "about", "settings", "hidden"], tag: "root" }
+    ];
+
+    const labels = {
+      home: "Home",
+      compose: "Compose over home",
+      results: "Results",
+      "compose-results": "Compose over results",
+      selection: "Selection tray",
+      detail: "Detail",
+      sensitive: "Sensitive detail",
+      about: "Bottom sheet",
+      settings: "Settings sheet",
+      hidden: "Hidden dialog"
+    };
+
+    const phone = document.getElementById("phone");
+    const stateLabel = document.getElementById("state-label");
+    const buttons = document.querySelectorAll("[data-mode]");
+    const stack = document.getElementById("stack");
+    const onlyVisible = document.getElementById("only-visible");
+    let currentMode = "home";
+
+    function isVisible(layer, mode) {
+      if (mode === "settings" && layer.modes.includes("settings")) return true;
+      return layer.modes.includes(mode);
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      phone.className = "phone-rect mode-" + mode;
+      stateLabel.textContent = labels[mode] || mode;
+      buttons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+      });
+      renderStack();
+    }
+
+    function renderStack() {
+      stack.innerHTML = "";
+      layers.forEach((layer) => {
+        const visible = isVisible(layer, currentMode);
+        const item = document.createElement("article");
+        item.className = "stack-item";
+        item.dataset.visible = String(visible || !onlyVisible.checked);
+        item.style.borderLeftColor = layer.color;
+        item.innerHTML = `
+          <div class="z">${layer.z === "flow" ? "flow" : "z" + layer.z}</div>
+          <div>
+            <div class="stack-name">${layer.name}</div>
+            <div class="stack-note">${layer.note}</div>
+          </div>
+          <span class="tag">${visible ? "visible" : layer.tag}</span>
+        `;
+        stack.appendChild(item);
+      });
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => setMode(button.dataset.mode));
+    });
+    onlyVisible.addEventListener("change", renderStack);
+    setMode("home");
+  </script>
+</body>
+</html>

@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import config
 from services.catalog import db as catalog
 from services.catalog import extractor as metadata_svc
+from services.catalog.extractor import infer_date_from_filename
 from services.catalog import schema as metadata_schema
 from services.utils.coerce import as_float as _as_float
 from services.pipeline.media import classify_extension, generate_thumbnail, is_animated
@@ -118,6 +119,7 @@ def refresh_catalog(
     extract: bool = False,
     regenerate_thumbnails: bool = False,
     reverse_geocode: bool = False,
+    infer_dates: bool = False,
     dry_run: bool = False,
 ) -> dict[str, int]:
     """Rewrite SQLite metadata using local data only.
@@ -126,7 +128,7 @@ def refresh_catalog(
     """
     catalog.configure(catalog_db_path)
     items = catalog.get_all_items_with_metadata()
-    stats = {"total": len(items), "updated": 0, "geocoded": 0, "unchanged": 0, "missing_files": 0, "failed": 0}
+    stats = {"total": len(items), "updated": 0, "geocoded": 0, "dates_inferred": 0, "unchanged": 0, "missing_files": 0, "failed": 0}
 
     for item in items:
         item_id = item["id"]
@@ -176,6 +178,19 @@ def refresh_catalog(
                 if geocoded:
                     stats["geocoded"] += 1
 
+            if infer_dates:
+                current_source = (rebuilt.get("capture") or {}).get("source", "")
+                if current_source in ("filesystem_mtime", "unknown", ""):
+                    inferred = infer_date_from_filename(str(abs_path))
+                    if inferred:
+                        capture = rebuilt.setdefault("capture", {})
+                        capture["taken_at"] = inferred["taken_at"]
+                        capture["date"] = inferred["taken_date"]
+                        capture["year_month"] = inferred["taken_year_month"]
+                        capture["sort_key"] = inferred["taken_sort"]
+                        capture["source"] = inferred["taken_source"]
+                        stats["dates_inferred"] += 1
+
             if rebuilt == existing:
                 stats["unchanged"] += 1
                 continue
@@ -192,10 +207,11 @@ def refresh_catalog(
 
     action = "would refresh" if dry_run else "refreshed"
     log.info(
-        "catalog refresh complete: %s=%d geocoded=%d unchanged=%d missing_files=%d failed=%d total=%d",
+        "catalog refresh complete: %s=%d geocoded=%d dates_inferred=%d unchanged=%d missing_files=%d failed=%d total=%d",
         action,
         stats["updated"],
         stats["geocoded"],
+        stats["dates_inferred"],
         stats["unchanged"],
         stats["missing_files"],
         stats["failed"],
@@ -227,6 +243,11 @@ if __name__ == "__main__":
         help="Regenerate local WebP thumbnails while refreshing metadata",
     )
     parser.add_argument(
+        "--infer-dates",
+        action="store_true",
+        help="Infer capture date from filename for items that lack EXIF date (Unix-ms/μs timestamps, YYYYMMDD_HHMMSS)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Report which rows would change without writing to SQLite",
@@ -237,5 +258,6 @@ if __name__ == "__main__":
         extract=args.extract,
         regenerate_thumbnails=args.regenerate_thumbnails,
         reverse_geocode=args.reverse_geocode,
+        infer_dates=args.infer_dates,
         dry_run=args.dry_run,
     )

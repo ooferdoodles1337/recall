@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PhoneViewportFrame } from "@/features/phone/components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "@/features/phone/components/shell/PhoneViewportFrame";
 import type { TrialResult } from "../types";
 
 const RESULTS_KEY = "recall.trialResults.v1";
@@ -27,7 +27,7 @@ function formatElapsed(ms: number): string {
 }
 
 interface TaskScreenProps {
-  onExit: (results: TrialResult[]) => void;
+  onExit: () => void;
 }
 
 export function TaskScreen({ onExit }: TaskScreenProps) {
@@ -115,7 +115,7 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
             {results.length > 0 && (
               <Button
                 variant="outline"
-                onClick={() => onExit(results)}
+                onClick={onExit}
                 className="trial-exit-btn"
               >
                 Finish Session
@@ -181,8 +181,8 @@ export function TaskScreen({ onExit }: TaskScreenProps) {
                 <>
                   <Separator />
                   <div className="trial-avg px-4 py-3">
-                    <span className="results-avg-label">Average</span>
-                    <span className="results-avg-value">
+                    <span className="trial-avg-label">Average</span>
+                    <span className="trial-avg-value">
                       {formatElapsed(results.reduce((sum, r) => sum + r.elapsedMs, 0) / results.length)}
                     </span>
                   </div>

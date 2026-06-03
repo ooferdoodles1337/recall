@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PhoneViewportFrame } from "@/features/phone/components/PhoneViewportFrame";
+import { PhoneViewportFrame } from "@/features/phone/components/shell/PhoneViewportFrame";
 import { phoneMockState } from "../msw/handlers";
 
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
@@ -61,6 +61,12 @@ async function swipeDetail(label: RegExp, fromX: number, toX: number) {
     pointerId: 7,
     pointerType: "touch",
   });
+  fireEvent.pointerMove(detail, {
+    clientX: toX,
+    clientY: 242,
+    pointerId: 7,
+    pointerType: "touch",
+  });
   fireEvent.pointerUp(detail, {
     clientX: toX,
     clientY: 242,
@@ -73,6 +79,9 @@ async function touchSwipeDetail(label: RegExp, fromX: number, toX: number) {
   const detail = await screen.findByLabelText(label);
   fireEvent.touchStart(detail, {
     touches: [{ clientX: fromX, clientY: 240 }],
+  });
+  fireEvent.touchMove(detail, {
+    touches: [{ clientX: toX, clientY: 242 }],
   });
   fireEvent.touchEnd(detail, {
     changedTouches: [{ clientX: toX, clientY: 242 }],
@@ -215,6 +224,44 @@ describe("PhoneViewportFrame interactions", () => {
     expect(onConfirmAnswer).toHaveBeenCalledWith("favorite-01");
   });
 
+  it("switches the home feed from favorites to recents, prefetches, and expands recents on scroll", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(screen.getByRole("button", { name: "Choose home feed, current feed Favorites" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Recents" }));
+
+    expect(await screen.findByRole("button", { name: "Select Recent item 1" })).toBeInTheDocument();
+    expect(screen.getByText("50 loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
+    expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=50"))).toBe(true);
+
+    await waitFor(() => {
+      expect(phoneMockState.requests.some((request) => request.includes("/catalog/items?order=desc&limit=100"))).toBe(true);
+    });
+    expect(screen.getByText("50 loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Select Recent item 51/i })).not.toBeInTheDocument();
+
+    const viewport = document.querySelector(".phone-rect-viewport") as HTMLElement;
+    fireEvent.scroll(viewport);
+
+    expect(await screen.findByRole("button", { name: /Select Recent item 51/i })).toBeInTheDocument();
+  });
+
+  it("uses recents as the detail swipe source after switching the home feed", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await waitForPhoneHome();
+    await user.click(screen.getByRole("button", { name: "Choose home feed, current feed Favorites" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "Recents" }));
+
+    await openDetailFromButton(await screen.findByRole("button", { name: "Select Recent item 1" }));
+    await touchSwipeDetail(/Recent item 1 detail view/i, 320, 160);
+    expect(await screen.findByLabelText(/Recent item 2 detail view/i)).toBeInTheDocument();
+  });
+
   it("opens detail on long press, goes back, searches same date, and runs similar search", async () => {
     const user = userEvent.setup();
     const onSelectCandidate = vi.fn();
@@ -261,7 +308,7 @@ describe("PhoneViewportFrame interactions", () => {
     expect(await screen.findByLabelText(/Shared picnic blanket detail view/i)).toBeInTheDocument();
   });
 
-  it("shows a blurred prompt when swiping detail to an NSFW item", async () => {
+  it("shows a blurred prompt when swiping detail to a hidden item", async () => {
     const user = userEvent.setup();
     const sensitiveFavorite = phoneMockState.favoriteItems.find((item) => item.id === "sensitive-favorite");
     if (!sensitiveFavorite) throw new Error("Missing sensitive fixture");
@@ -288,12 +335,12 @@ describe("PhoneViewportFrame interactions", () => {
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await swipeDetail(/Favorite 01 detail view/i, 320, 160);
     expect(await screen.findByLabelText(/Sensitive favorite detail view/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Hidden" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "View" }));
     expect((await screen.findAllByRole("button", { name: "More actions" })).length).toBeGreaterThan(0);
     await waitFor(() => {
-      expect(screen.queryByRole("heading", { name: "Sensitive Content" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Hidden" })).not.toBeInTheDocument();
     });
 
     await clickVisibleBack();
@@ -301,33 +348,33 @@ describe("PhoneViewportFrame interactions", () => {
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
     await swipeDetail(/Sunset pier photo detail view/i, 320, 160);
     expect(await screen.findByLabelText(/Search sensitive detail view/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Sensitive Content" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Hidden" })).toBeInTheDocument();
   });
 
-  it("guards NSFW tiles until revealing one item or all sensitive items", async () => {
+  it("guards hidden tiles until revealing one item or all hidden items", async () => {
     const user = userEvent.setup();
     renderPhone();
 
-    await user.click((await screen.findAllByRole("button", { name: /Sensitive content/i }))[0]);
-    const oneDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
+    await user.click((await screen.findAllByRole("button", { name: /Hidden/i }))[0]);
+    const oneDialog = await screen.findByRole("dialog", { name: "Hidden" });
     await user.click(within(oneDialog).getByRole("button", { name: "View" }));
     expect(await screen.findByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole("button", { name: /Sensitive content/i })[0]);
-    const allDialog = await screen.findByRole("dialog", { name: "Sensitive Content" });
-    await user.click(within(allDialog).getByRole("button", { name: /Show all sensitive/i }));
+    await user.click(screen.getAllByRole("button", { name: /Hidden/i })[0]);
+    const allDialog = await screen.findByRole("dialog", { name: "Hidden" });
+    await user.click(within(allDialog).getByRole("button", { name: /Show all hidden/i }));
 
     expect(await screen.findByRole("button", { name: /Select Second sensitive favorite/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
   });
 
-  it("blurs a favorite tile after marking it NSFW from detail", async () => {
+  it("blurs a favorite tile after marking it hidden from detail", async () => {
     const user = userEvent.setup();
     renderPhone();
 
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as Hidden/i }));
 
     await waitFor(() => {
       expect(phoneMockState.favoriteItems.find((item) => item.id === "favorite-01")?.metadata.safety?.state).toBe("nsfw");
@@ -335,19 +382,19 @@ describe("PhoneViewportFrame interactions", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
-      expect(document.querySelector('[data-phone-grid-item="favorite-01"]')).toHaveAccessibleName(/Sensitive content/i);
+      expect(document.querySelector('[data-phone-grid-item="favorite-01"]')).toHaveAccessibleName(/Hidden/i);
     });
     expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
   });
 
-  it("blurs a search result tile after marking it NSFW from detail", async () => {
+  it("blurs a search result tile after marking it hidden from detail", async () => {
     const user = userEvent.setup();
     renderPhone();
 
     await commitSearch("sunset", user);
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Mark as NSFW/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /Mark as Hidden/i }));
 
     await waitFor(() => {
       expect(phoneMockState.semanticResults.find((item) => item.id === "sunset-result")?.metadata.safety?.state).toBe("nsfw");
@@ -355,7 +402,7 @@ describe("PhoneViewportFrame interactions", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
-      expect(document.querySelector('[data-phone-grid-item="sunset-result"]')).toHaveAccessibleName(/Sensitive content/i);
+      expect(document.querySelector('[data-phone-grid-item="sunset-result"]')).toHaveAccessibleName(/Hidden/i);
     });
     expect(screen.queryByRole("button", { name: /Select Sunset pier photo/i })).not.toBeInTheDocument();
   });
@@ -524,7 +571,7 @@ describe("PhoneViewportFrame interactions", () => {
     expect(phone).toHaveStyle({ "--phone-grid-columns": "6" });
     expect(window.localStorage.getItem(GRID_COLUMNS_STORAGE_KEY)).toBe("6");
 
-    const gestureZone = screen.getByTestId("phone-favorites-grid-zone");
+    const gestureZone = screen.getByTestId("phone-home-feed-grid-zone");
     dispatchSyntheticPointer(gestureZone, "pointerdown", {
       pointerId: 1,
       pointerType: "touch",

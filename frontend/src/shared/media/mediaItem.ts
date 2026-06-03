@@ -28,3 +28,19 @@ export function isAnimatedImage(item: RecallMediaItem): boolean {
 export function resolvedAnimatedThumbnailUrl(item: RecallMediaItem): string | null {
   return resolveRecallLink(item.links?.animated_thumbnail);
 }
+
+export function isFavorite(item: RecallMediaItem): boolean {
+  return item.metadata.organization?.favorite === true;
+}
+
+export function isNsfw(item: RecallMediaItem): boolean {
+  return item.metadata.safety?.state === "nsfw";
+}
+
+export function getDurationSeconds(item: RecallMediaItem): number | null {
+  return item.metadata.asset?.duration_seconds ?? null;
+}
+
+export function getAltText(item: RecallMediaItem): string {
+  return item.metadata.search?.description ?? "";
+}

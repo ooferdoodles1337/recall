@@ -85,12 +85,12 @@ export const videoFavorite = makePhoneItem("video-favorite", "Favorite video cli
   mediaType: "video",
 });
 
-export const nsfwFavorite = makePhoneItem("sensitive-favorite", "Sensitive favorite", {
+export const hiddenFavorite = makePhoneItem("sensitive-favorite", "Sensitive favorite", {
   favorite: true,
   nsfw: true,
 });
 
-export const nsfwSecondFavorite = makePhoneItem("sensitive-second", "Second sensitive favorite", {
+export const hiddenSecondFavorite = makePhoneItem("sensitive-second", "Second sensitive favorite", {
   favorite: true,
   nsfw: true,
 });
@@ -100,8 +100,8 @@ export const favoriteItems: RecallMediaItem[] = [
   favoriteTwo,
   datedFavorite,
   videoFavorite,
-  nsfwFavorite,
-  nsfwSecondFavorite,
+  hiddenFavorite,
+  hiddenSecondFavorite,
   ...Array.from({ length: 28 }, (_, index) =>
     makePhoneItem(`favorite-extra-${index + 1}`, `Favorite extra ${index + 1}`, {
       date: `2024-04-${String((index % 24) + 1).padStart(2, "0")}`,
@@ -134,7 +134,7 @@ export const videoResult = makePhoneItem("video-result", "Video result clip", {
   mediaType: "video",
 });
 
-export const nsfwResult = makePhoneItem("sensitive-result", "Sensitive search result", {
+export const hiddenResult = makePhoneItem("sensitive-result", "Sensitive search result", {
   nsfw: true,
 });
 
@@ -142,7 +142,7 @@ export const semanticResults: RecallSearchResult[] = [
   asSearchResult(sunsetResult, 0.02),
   asSearchResult(sharedResult, 0.05),
   asSearchResult(videoResult, 0.08),
-  asSearchResult(nsfwResult, 0.11),
+  asSearchResult(hiddenResult, 0.11),
   ...Array.from({ length: 45 }, (_, index) =>
     asSearchResult(
       makePhoneItem(`semantic-extra-${index + 1}`, `Semantic extra ${index + 1}`, {
