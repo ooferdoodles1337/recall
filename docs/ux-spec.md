@@ -371,6 +371,31 @@ the correct destination.
 
 ---
 
+## Overlays and dialogs
+
+### OD-1 — Dismiss tap on modal overlays must not fall through to the grid
+
+When a modal overlay (hidden-content dialog, settings sheet, indexed-albums picker,
+about sheet, or any other sheet/dialog rendered above the photo grid) is dismissed
+by tapping its backdrop, that tap must be fully consumed by the overlay. It must not
+propagate to the grid beneath and must not trigger any grid interaction — in
+particular it must not select a photo tile or add an item to the selection tray.
+
+**Applies to:** `HiddenDialog`, `SettingsSheet`, `IndexedAlbumsSheet`, `AboutSheet`,
+and any future sheet or alert rendered inside the phone frame.
+
+**Implementation note:** the overlay backdrop must call `event.stopPropagation()`
+(and `event.preventDefault()` where relevant) on the pointer/touch event that closes
+it. If Radix `Dialog` or `Sheet` primitives are used, verify that the `onPointerDownOutside` /
+`onInteractOutside` callbacks do not let the event through to the grid layer.
+
+**Rationale:** a modal backdrop tap is a deliberate "close this dialog" gesture, not
+a "select what is behind it" gesture. Letting the event reach the grid produces
+spurious selections that are invisible to the user (the dialog was still open when
+they tapped) and will feel like a bug.
+
+---
+
 ## Selection tray
 
 *(Existing behavior — do not regress.)*

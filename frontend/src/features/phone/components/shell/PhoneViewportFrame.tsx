@@ -156,13 +156,15 @@ export function PhoneViewportFrame(props: PhoneControllerProps) {
       </MotionConfig>
 
       {ctrl.hiddenPendingItem && (
-        <HiddenDialog item={ctrl.hiddenPendingItem} onKeepHidden={() => ctrl.setHiddenPendingItem(null)}
+        <HiddenDialog item={ctrl.hiddenPendingItem}
+          onKeepHidden={() => { ctrl.gridSelection.suppressTileSelectionBriefly(); ctrl.setHiddenPendingItem(null); }}
           onViewItem={ctrl.handleViewHiddenItem} onRevealAll={ctrl.revealAll} />
       )}
 
       <MotionConfig reducedMotion="user">
         <AnimatePresence initial={false}>
-          {detail.aboutSheetItem && <AboutSheet item={detail.aboutSheetItem} onClose={() => detail.setAboutSheetItem(null)} />}
+          {detail.aboutSheetItem && <AboutSheet item={detail.aboutSheetItem}
+            onClose={() => { ctrl.gridSelection.suppressTileSelectionBriefly(); detail.setAboutSheetItem(null); }} />}
         </AnimatePresence>
       </MotionConfig>
 
@@ -170,7 +172,7 @@ export function PhoneViewportFrame(props: PhoneControllerProps) {
         <AnimatePresence initial={false}>
           {ctrl.settingsOpen && (
             <SettingsSheet key="settings-sheet"
-              onClose={() => ctrl.setSettingsOpen(false)}
+              onClose={() => { ctrl.gridSelection.suppressTileSelectionBriefly(); ctrl.setSettingsOpen(false); }}
               indexedAlbumCount={ctrl.indexedAlbums.count}
               indexedAlbumTotal={ctrl.indexedAlbums.total}
               gridColumns={ctrl.gridContext.gridColumns}
@@ -182,8 +184,8 @@ export function PhoneViewportFrame(props: PhoneControllerProps) {
           {ctrl.albumsOpen && (
             <IndexedAlbumsSheet key="albums-sheet"
               initialSelectedIds={ctrl.indexedAlbums.selectedIds}
-              onCancel={() => ctrl.setAlbumsOpen(false)}
-              onSave={(ids) => { ctrl.indexedAlbums.save(ids); ctrl.setAlbumsOpen(false); }}
+              onCancel={() => { ctrl.gridSelection.suppressTileSelectionBriefly(); ctrl.setAlbumsOpen(false); }}
+              onSave={(ids) => { ctrl.gridSelection.suppressTileSelectionBriefly(); ctrl.indexedAlbums.save(ids); ctrl.setAlbumsOpen(false); }}
             />
           )}
         </AnimatePresence>

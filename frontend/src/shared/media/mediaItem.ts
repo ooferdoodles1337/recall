@@ -21,8 +21,7 @@ export function isVideo(item: RecallMediaItem): boolean {
 }
 
 export function isAnimatedImage(item: RecallMediaItem): boolean {
-  const mime = item.metadata.asset?.mime_type?.toLowerCase() ?? "";
-  return mime === "image/gif" || mime === "image/webp";
+  return resolveRecallLink(item.links?.animated_thumbnail) !== null;
 }
 
 export function resolvedAnimatedThumbnailUrl(item: RecallMediaItem): string | null {
