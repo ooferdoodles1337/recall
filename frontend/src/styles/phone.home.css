@@ -54,37 +54,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: inherit;
+  color: var(--ios-blue);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
 .phone-avatar-btn:focus-visible {
   outline: 2px solid #007aff;
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .phone-avatar-btn:active {
   opacity: 0.62;
 }
 
-/* Avatar for profile — circular, system gray fill */
-.phone-avatar {
-  width: 32px;
-  height: 32px;
-  background: var(--ios-sys-bg-secondary);
-  color: var(--ios-label-secondary);
-}
-
-.phone-avatar [data-slot="avatar-fallback"] {
-  background: var(--ios-sys-bg-secondary);
-  color: var(--ios-label-secondary);
+.phone-settings-icon {
+  width: 24px;
+  height: 24px;
 }
 
 /* iOS-style close button — shown only in standalone /phone route */

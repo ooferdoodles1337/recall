@@ -4,6 +4,7 @@ const VISUAL_VIEWPORT_BOTTOM_VAR = "--recall-visual-viewport-bottom-inset";
 const IOS_WEBVIEW_FALLBACK_VAR = "--recall-ios-webview-bottom-fallback";
 const OVERRIDE_QUERY_PARAM = "recallBottomOcclusion";
 const OVERRIDE_STORAGE_KEY = "recall.bottomOcclusionPx";
+const IPHONE_BROWSER_CHROME_FALLBACK_PX = 84;
 const IOS_26_WEBVIEW_FALLBACK_PX = 72;
 
 function clampInset(value: number): number {
@@ -34,10 +35,24 @@ function isIOSLikeDevice(): boolean {
   return /iP(?:hone|ad|od)/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+function isIPhoneLikeDevice(): boolean {
+  return /iP(?:hone|od)/.test(navigator.userAgent);
+}
+
+function isStandaloneApp(): boolean {
+  const standaloneNavigator = navigator as Navigator & { standalone?: boolean };
+  return standaloneNavigator.standalone === true
+    || window.matchMedia?.("(display-mode: standalone)").matches === true;
+}
+
 function parsedIOSVersion(): { major: number; minor: number } | null {
   const match = navigator.userAgent.match(/(?:iPhone OS|CPU(?: iPhone)? OS|CPU OS)\s+(\d+)[._](\d+)/);
   if (!match) return null;
   return { major: Number(match[1]), minor: Number(match[2]) };
+}
+
+function shouldApplyIPhoneBrowserChromeFallback(measuredBottom: number): boolean {
+  return measuredBottom < 24 && isIPhoneLikeDevice() && !isStandaloneApp();
 }
 
 function shouldApplyIOS26WebViewFallback(measuredBottom: number): boolean {
@@ -64,7 +79,10 @@ export function useViewportBottomInset() {
     const applyInsets = () => {
       const manualOverride = readManualOverride();
       const measuredBottom = measureVisualViewportBottomInset();
-      const fallback = manualOverride ?? (shouldApplyIOS26WebViewFallback(measuredBottom) ? IOS_26_WEBVIEW_FALLBACK_PX : 0);
+      const automaticFallback = shouldApplyIPhoneBrowserChromeFallback(measuredBottom)
+        ? IPHONE_BROWSER_CHROME_FALLBACK_PX
+        : shouldApplyIOS26WebViewFallback(measuredBottom) ? IOS_26_WEBVIEW_FALLBACK_PX : 0;
+      const fallback = manualOverride ?? automaticFallback;
 
       root.style.setProperty(VISUAL_VIEWPORT_BOTTOM_VAR, `${measuredBottom}px`);
       root.style.setProperty(IOS_WEBVIEW_FALLBACK_VAR, `${fallback}px`);

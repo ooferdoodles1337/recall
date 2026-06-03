@@ -16,8 +16,10 @@ import { ResultsLayer } from "./ResultsLayer";
 import { LongPressHint } from "../grid/LongPressHint";
 import { GridHandlersContext } from "../grid/GridHandlersContext";
 import { usePhoneController, type PhoneControllerProps } from "../../hooks/usePhoneController";
+import { useViewportBottomInset } from "../../hooks/useViewportBottomInset";
 
 export function PhoneViewportFrame(props: PhoneControllerProps) {
+  useViewportBottomInset();
   const ctrl = usePhoneController(props);
   const { mode, contentMode, modeTransition, dispatch } = ctrl;
   const { sc } = ctrl;

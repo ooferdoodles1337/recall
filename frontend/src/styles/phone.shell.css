@@ -102,6 +102,7 @@
      scroll padding and the long-press hint offset derive from this value —
      update here when tray content or padding changes. */
   --selection-tray-h: 148px;
+  --selection-tray-bottom: max(var(--sp-3), calc(var(--recall-bottom-ui-inset) - 40px));
 
   /* Glass morphism tokens */
   --glass-edge-top: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);

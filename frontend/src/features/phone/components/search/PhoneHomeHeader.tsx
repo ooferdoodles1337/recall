@@ -1,6 +1,5 @@
 import { motion } from "motion/react";
-import { SearchIcon, UserIcon, XIcon } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SearchIcon, Settings2Icon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MOTION_EASE } from "../../phoneUtils";
 
@@ -30,11 +29,7 @@ export function PhoneHomeHeader({ onExit, onOpenSettings }: PhoneHomeHeaderProps
             onClick={onOpenSettings}
             aria-label="Open settings"
           >
-            <Avatar className="phone-avatar">
-              <AvatarFallback>
-                <UserIcon className="size-3.5" />
-              </AvatarFallback>
-            </Avatar>
+            <Settings2Icon className="phone-settings-icon" aria-hidden />
           </button>
           {onExit ? (
             <Button

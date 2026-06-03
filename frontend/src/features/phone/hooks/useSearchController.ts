@@ -114,6 +114,7 @@ export function useSearchController({
     ds({ type: "SEARCH_START", submittedQuery: q, count });
     if (fromAuto) dispatch({ type: "AUTOSEARCH_COMMIT" });
     else { dispatch({ type: "SEARCH_COMMIT" }); scrollContainerRef.current?.scrollTo({ top: 0 }); topBarInputRef.current?.blur(); }
+    if (shouldRemember) { rememberSearch(q); ds({ type: "HISTORY_SET", history: readSearchHistory() }); }
     try {
       const [sr, tr] = await Promise.allSettled([searchSemantic(q, count, { signal: controller.signal }), searchText(q, Math.min(count, 30), { signal: controller.signal })]);
       if (controller.signal.aborted) return;
@@ -123,7 +124,6 @@ export function useSearchController({
         if (import.meta.env.DEV) ds({ type: "SEARCH_SUCCESS", results: Array.from({ length: SEARCH_BATCH_SIZE }).map((_, i) => makeMockItem(`${q}-${i}`, q)) });
         ds({ type: "SET_ERROR", message: "Backend unavailable. Showing sample tiles until the media bundle is indexed." });
       } else ds({ type: "SEARCH_SUCCESS", results: [] });
-      if (shouldRemember) { rememberSearch(q); ds({ type: "HISTORY_SET", history: readSearchHistory() }); }
     } finally { if (!controller.signal.aborted && searchAbortRef.current === controller) ds({ type: "SEARCH_ABORT" }); }
   }, [dispatch, scrollContainerRef, topBarInputRef]);
 
