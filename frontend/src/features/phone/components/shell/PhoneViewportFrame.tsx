@@ -30,7 +30,6 @@ export function PhoneViewportFrame(props: PhoneControllerProps) {
     const mergedClass = `${className ?? ""}${pulseClass}`.trim() || undefined;
     return (
       <PhoneSearchBar ref={ctrl.topBarInputRef} value={sc.query} className={mergedClass} clearLabel={clearLabel}
-        placeholder={isHomeContext && !sc.query ? "People, places, moments…" : undefined}
         showHistory={sc.showHistory} showHistoryIcon={ctrl.showHistoryIcon} isSearching={ctrl.isSearching}
         dateBrowseLabel={mode === "results" ? sc.dateBrowseContext?.label : null}
         similarThumbnailUrl={mode === "results" && sc.similarSourceItem
@@ -175,7 +174,8 @@ export function PhoneViewportFrame(props: PhoneControllerProps) {
               onClose={() => { ctrl.gridSelection.suppressTileSelectionBriefly(); ctrl.setSettingsOpen(false); }}
               indexedAlbumCount={ctrl.indexedAlbums.count}
               indexedAlbumTotal={ctrl.indexedAlbums.total}
-              gridColumns={ctrl.gridContext.gridColumns}
+              defaultHomeFeed={ctrl.defaultHomeFeed}
+              onChangeDefaultHomeFeed={ctrl.setDefaultHomeFeed}
               onOpenIndexedAlbums={() => ctrl.setAlbumsOpen(true)}
               onRevealAll={ctrl.revealAll}
               escapeDisabled={ctrl.albumsOpen}

@@ -76,6 +76,31 @@ class TestTextSearch:
         result = search_text(q="nothing", n=5)
         assert result["results"] == []
 
+    def test_search_by_term_exact_match_is_ordered_and_deterministic(self, monkeypatch):
+        from services.search import text_index
+
+        monkeypatch.setattr(text_index, "_term_to_ids", {"beach": {"z", "a", "m"}})
+
+        result = text_index.search_by_term("beach")
+
+        # A set gave arbitrary order; the result must be a stable, sorted list.
+        assert result == ["a", "m", "z"]
+
+    def test_search_by_term_dedupes_prefix_tier_across_terms(self, monkeypatch):
+        from services.search import text_index
+
+        monkeypatch.setattr(
+            text_index, "_term_to_ids", {"beach": {"a", "b"}, "beaches": {"b", "c"}}
+        )
+        monkeypatch.setattr(
+            text_index, "_term_list", [("beach", "a"), ("beach", "b"), ("beaches", "b"), ("beaches", "c")]
+        )
+
+        # "bea" matches neither term exactly, so it falls through to the prefix tier.
+        result = text_index.search_by_term("bea")
+
+        assert result == ["a", "b", "c"]
+
 
 class TestSchemaVersionGate:
     def test_second_configure_skips_migrations(self, tmp_path, monkeypatch):
@@ -124,7 +149,7 @@ class TestTrialsRoute:
         catalog.configure(str(tmp_path / "catalog.sqlite"))
 
         monkeypatch.setattr("services.catalog.db.get_random_ids", lambda n: ["missing-id"])
-        monkeypatch.setattr("services.catalog.db.get_item_summary", lambda _: None)
+        monkeypatch.setattr("services.catalog.db.get_item_summaries", lambda ids: {})
 
         from routes.trials import trials
         result = trials(n=1)
@@ -154,6 +179,8 @@ class TestIndexerUpsertHelper:
             path=Path("/data/media/photo.jpg"),
             original_mime="image/jpeg",
             original_media_type="image",
+            file_size=4,
+            file_mtime_ns=123,
             processed_data=b"fake",
             processed_mime="image/jpeg",
             file_metadata={"content_hash": "abc123"},

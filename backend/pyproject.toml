@@ -27,3 +27,10 @@ indexing = [
 dev = [
     "pytest>=8.0.0",
 ]
+
+[tool.uv]
+# `uv sync` installs every group by default (dev + indexing) so local development
+# and the full test suite work without remembering --group flags.
+# The participant distribution stays lean: start.sh runs `uv sync --no-default-groups`
+# to install only the runtime `dependencies` above (no Pillow/torch/etc.).
+default-groups = ["dev", "indexing"]

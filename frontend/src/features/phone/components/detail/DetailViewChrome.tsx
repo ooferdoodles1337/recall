@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { RecallMediaItem } from "@/shared/types/recall";
-import { isFavorite, isNsfw, isVideo, resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
+import { isFavorite, isNsfw, isVideo, resolvedDisplayUrl, resolvedMediaUrl, resolvedThumbnailUrl } from "@/shared/media/mediaItem";
 import {
   DETAIL_SWIPE_THRESHOLD,
   DETAIL_SWIPE_VERTICAL_TOLERANCE,
@@ -130,7 +130,7 @@ function DetailMediaPreview({ preview, position }: { preview: DetailNeighborPrev
   const { item, isSensitiveHidden } = preview;
   const src = isVideo(item)
     ? resolvedThumbnailUrl(item) ?? item.links?.thumbnail
-    : resolvedMediaUrl(item) ?? item.links?.media ?? item.links?.thumbnail;
+    : resolvedDisplayUrl(item) ?? resolvedMediaUrl(item) ?? item.links?.media ?? item.links?.thumbnail;
   if (!src) return null;
 
   return (

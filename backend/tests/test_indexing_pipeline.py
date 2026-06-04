@@ -38,6 +38,7 @@ def test_run_indexes_temp_images_into_catalog_and_chroma(tmp_path, monkeypatch):
         "services.pipeline.indexer.gemini.embed_content_batch",
         lambda items: {file_id: [0.1] * 3072 for file_id, _, _ in items},
     )
+    monkeypatch.setattr("services.pipeline.indexer.gemini.embed_content", lambda data, mime: [0.1] * 3072)
 
     run(
         force=False,

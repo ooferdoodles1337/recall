@@ -1,13 +1,14 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PhoneViewportFrame } from "@/features/phone/components/shell/PhoneViewportFrame";
 import { phoneMockState } from "../msw/handlers";
 
 const SEARCH_HISTORY_KEY = "recall.searchHistory.v1";
 const GRID_COLUMNS_STORAGE_KEY = "recall.phoneGridColumns.v1";
+const DEFAULT_HOME_FEED_KEY = "recall.defaultHomeFeed.v1";
 
 function renderPhone(props: React.ComponentProps<typeof PhoneViewportFrame> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -106,6 +107,13 @@ function dispatchSyntheticPointer(
 }
 
 describe("PhoneViewportFrame interactions", () => {
+  // These tests exercise feed-independent behavior against the rich favorite
+  // fixtures, so pin the starting feed to favorites (the home default is now
+  // recents). Default-feed behavior itself is covered separately below.
+  beforeEach(() => {
+    window.localStorage.setItem(DEFAULT_HOME_FEED_KEY, "favorites");
+  });
+
   it("shows suggestions, commits a search, and merges semantic and text results without duplicates", async () => {
     const user = userEvent.setup();
     renderPhone();
@@ -713,5 +721,46 @@ describe("PhoneViewportFrame interactions", () => {
     const viewport = document.querySelector(".phone-rect-viewport");
     expect(document.querySelector(".phone-persistent-section")).toBeInTheDocument();
     expect(viewport?.contains(document.querySelector(".phone-persistent-section"))).toBe(false);
+  });
+});
+
+describe("PhoneViewportFrame default home feed", () => {
+  it("shows favorites on home by default with no stored preference", async () => {
+    renderPhone();
+
+    expect(await screen.findByRole("button", { name: /Select Favorite 01/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Select Recent item 1" })).not.toBeInTheDocument();
+    expect(phoneMockState.requests.some((request) => request.includes("favorite=true"))).toBe(true);
+  });
+
+  it("honors a stored recents preference", async () => {
+    window.localStorage.setItem(DEFAULT_HOME_FEED_KEY, "recents");
+    renderPhone();
+
+    expect(await screen.findByRole("button", { name: "Select Recent item 1" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
+  });
+
+  it("changes and persists the default feed from the settings selector", async () => {
+    const user = userEvent.setup();
+    renderPhone();
+
+    await screen.findByRole("button", { name: /Select Favorite 01/i });
+    await user.click(screen.getByRole("button", { name: "Open settings" }));
+
+    // The selector reflects the active default.
+    const recentsRadio = await screen.findByRole("radio", { name: "Recents" });
+    const favoritesRadio = screen.getByRole("radio", { name: "Favorites" });
+    expect(favoritesRadio).toHaveAttribute("aria-checked", "true");
+    expect(recentsRadio).toHaveAttribute("aria-checked", "false");
+
+    await user.click(recentsRadio);
+
+    expect(recentsRadio).toHaveAttribute("aria-checked", "true");
+    expect(window.localStorage.getItem(DEFAULT_HOME_FEED_KEY)).toBe("recents");
+
+    // Applies to the live home grid once the sheet is dismissed.
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(await screen.findByRole("button", { name: "Select Recent item 1" })).toBeInTheDocument();
   });
 });

@@ -16,8 +16,14 @@ class TestAsInt:
     def test_none_returns_none(self):
         assert as_int(None) is None
 
-    def test_string_returns_none(self):
-        assert as_int("5") is None
+    def test_numeric_string_parses(self):
+        assert as_int("5") == 5
+
+    def test_float_string_truncates(self):
+        assert as_int("3.9") == 3
+
+    def test_non_numeric_string_returns_none(self):
+        assert as_int("abc") is None
 
 
 class TestAsFloat:

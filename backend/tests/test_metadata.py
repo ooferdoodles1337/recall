@@ -59,13 +59,13 @@ def test_extract_filters_out_list_and_dict_values(tmp_path):
     assert "XMP_Subject" not in result
 
 
-def test_extract_returns_empty_dict_on_exiftool_error(tmp_path):
+def test_extract_marks_exiftool_error(tmp_path):
     p = tmp_path / "photo.jpg"
     p.write_bytes(b"fake")
     with patch("exiftool.ExifToolHelper", side_effect=RuntimeError("not found")):
         from services.catalog.extractor import extract
         result = extract(str(p))
-    assert result == {}
+    assert result == {"extraction_failed": True}
 
 
 def test_extract_adds_geo_fields_when_gps_present(tmp_path):

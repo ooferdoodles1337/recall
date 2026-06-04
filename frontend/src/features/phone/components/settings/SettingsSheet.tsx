@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRightIcon, FolderIcon, Grid3x3Icon, InfoIcon, ShieldIcon, UserIcon } from "lucide-react";
+import { ChevronRightIcon, ClockIcon, FolderIcon, InfoIcon, ShieldIcon, UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sheet,
@@ -8,12 +8,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import type { HomeFeed } from "../../model/homeFeed";
 
 interface SettingsSheetProps {
   onClose: () => void;
   indexedAlbumCount: number;
   indexedAlbumTotal: number;
-  gridColumns: number;
+  defaultHomeFeed: HomeFeed;
+  onChangeDefaultHomeFeed: (feed: HomeFeed) => void;
   onOpenIndexedAlbums: () => void;
   onRevealAll?: () => void;
   escapeDisabled?: boolean;
@@ -30,7 +32,8 @@ export function SettingsSheet({
   onClose,
   indexedAlbumCount,
   indexedAlbumTotal,
-  gridColumns,
+  defaultHomeFeed,
+  onChangeDefaultHomeFeed,
   onOpenIndexedAlbums,
   onRevealAll,
   escapeDisabled = false,
@@ -84,6 +87,32 @@ export function SettingsSheet({
               </button>
 
               <div className="settings-row">
+                <ClockIcon className="settings-row-icon" aria-hidden />
+                <span className="settings-row-label" id="settings-home-feed-label">
+                  Home shows
+                </span>
+                <div
+                  className="settings-segmented"
+                  role="radiogroup"
+                  aria-labelledby="settings-home-feed-label"
+                >
+                  {(["recents", "favorites"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={defaultHomeFeed === option}
+                      className="settings-segment"
+                      data-active={defaultHomeFeed === option}
+                      onClick={() => onChangeDefaultHomeFeed(option)}
+                    >
+                      {option === "recents" ? "Recents" : "Favorites"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="settings-row">
                 <ShieldIcon className="settings-row-icon" aria-hidden />
                 <label className="settings-row-label" htmlFor="settings-show-sensitive">
                   Show hidden results
@@ -96,17 +125,6 @@ export function SettingsSheet({
                     if (checked) onRevealAll?.();
                   }}
                 />
-              </div>
-            </div>
-          </section>
-
-          <section className="settings-group">
-            <h3 className="settings-group-title">Appearance</h3>
-            <div className="settings-rows">
-              <div className="settings-row">
-                <Grid3x3Icon className="settings-row-icon" aria-hidden />
-                <span className="settings-row-label">Default grid density</span>
-                <span className="settings-row-value">{gridColumns} columns</span>
               </div>
             </div>
           </section>

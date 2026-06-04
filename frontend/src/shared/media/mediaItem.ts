@@ -15,6 +15,11 @@ export function resolvedMediaUrl(item: RecallMediaItem): string | null {
   return resolveRecallLink(item.links?.media);
 }
 
+/** Web-friendly full-size rendition for formats browsers can't show natively (e.g. HEIC). */
+export function resolvedDisplayUrl(item: RecallMediaItem): string | null {
+  return resolveRecallLink(item.links?.display);
+}
+
 export function isVideo(item: RecallMediaItem): boolean {
   const mime = item.metadata.asset?.mime_type ?? "";
   return mime.startsWith("video/");

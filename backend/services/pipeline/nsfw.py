@@ -79,16 +79,21 @@ def detect_image(path: Path) -> dict:
     }
 
 
-def _get_undetected() -> list[dict]:
+def _get_undetected(file_ids: list[str] | set[str] | None = None) -> list[dict]:
     all_items = catalog.get_all_items_with_metadata()
-    return [item for item in all_items if not metadata_schema.has_safety_detection(item["metadata"] or {})]
+    requested = set(file_ids) if file_ids is not None else None
+    return [
+        item for item in all_items
+        if (requested is None or item["id"] in requested)
+        and not metadata_schema.has_safety_detection(item["metadata"] or {})
+    ]
 
 
-def detect_undetected() -> None:
+def detect_undetected(file_ids: list[str] | set[str] | None = None) -> None:
     started_at = time.monotonic()
-    undetected = _get_undetected()
+    undetected = _get_undetected(file_ids=file_ids)
     if not undetected:
-        log.info("all items already have NSFW detection")
+        log.info("all requested items already have NSFW detection")
         return
 
     log.info("running NSFW detection for %d items (threshold=%.2f)", len(undetected), NSFW_THRESHOLD)

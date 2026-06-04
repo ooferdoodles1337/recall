@@ -7,8 +7,9 @@ router = APIRouter()
 
 @router.get("")
 def trials(n: int = Query(5, ge=1)):
-    targets = [catalog.get_item_summary(item_id) for item_id in catalog.get_random_ids(n)]
+    ids = catalog.get_random_ids(n)
+    summaries = catalog.get_item_summaries(ids)
     return {
         "n": n,
-        "targets": [target for target in targets if target is not None],
+        "targets": [summaries[item_id] for item_id in ids if item_id in summaries],
     }

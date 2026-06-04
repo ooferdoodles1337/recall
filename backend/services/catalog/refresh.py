@@ -4,6 +4,7 @@ import argparse
 import copy
 import logging
 import mimetypes
+import unicodedata
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -13,7 +14,13 @@ from services.catalog import extractor as metadata_svc
 from services.catalog.extractor import infer_date_from_filename
 from services.catalog import schema as metadata_schema
 from services.utils.coerce import as_float as _as_float
-from services.pipeline.media import classify_extension, generate_thumbnail, is_animated
+from services.pipeline.media import (
+    classify_extension,
+    generate_display,
+    generate_thumbnail,
+    is_animated,
+    needs_display_rendition,
+)
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -54,6 +61,16 @@ def _refresh_thumbnail(file_id: str, path: Path, media_type: str) -> str:
     thumbnail_abs = config.THUMBS_DIR / f"{file_id}.webp"
     thumbnail_abs.write_bytes(thumbnail_bytes)
     return str(thumbnail_abs.relative_to(config.DATA_DIR))
+
+
+def _refresh_display(file_id: str, path: Path) -> str | None:
+    display_bytes = generate_display(str(path))
+    if display_bytes is None:
+        return None
+    config.THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+    display_abs = config.THUMBS_DIR / f"{file_id}_display.webp"
+    display_abs.write_bytes(display_bytes)
+    return str(display_abs.relative_to(config.DATA_DIR))
 
 
 def _existing_coordinates(metadata: dict) -> tuple[float | None, float | None]:
@@ -118,6 +135,7 @@ def refresh_catalog(
     catalog_db_path: str | None = None,
     extract: bool = False,
     regenerate_thumbnails: bool = False,
+    regenerate_display: bool = False,
     reverse_geocode: bool = False,
     infer_dates: bool = False,
     dry_run: bool = False,
@@ -139,11 +157,17 @@ def refresh_catalog(
             stats["failed"] += 1
             continue
 
+        # Heal legacy decomposed (NFD) paths from Apple/HFS+ uploads: the file on
+        # disk is composed (NFC), so a non-NFC stored path fails every is_file()
+        # check (serving 404s, refresh "missing"). Normalizing here persists the
+        # NFC form via rebuild_metadata below.
+        rel_path = unicodedata.normalize("NFC", rel_path)
+
         abs_path = config.DATA_DIR / rel_path
         file_exists = abs_path.is_file()
         if not file_exists:
             stats["missing_files"] += 1
-            if extract or regenerate_thumbnails:
+            if extract or regenerate_thumbnails or regenerate_display:
                 log.warning("media file missing for %s, preserving stored local metadata: %s", item_id, abs_path)
 
         detected_media_type = classify_extension(abs_path.suffix)
@@ -173,6 +197,11 @@ def refresh_catalog(
                 thumbnail_path=thumbnail_path,
                 embedding_mime_type=embedding_mime_type,
             )
+            if regenerate_display and file_exists and needs_display_rendition(rel_path):
+                display_rel = _refresh_display(item_id, abs_path)
+                if display_rel:
+                    rebuilt.setdefault("asset", {}).setdefault("paths", {})["display"] = display_rel
+
             if reverse_geocode:
                 rebuilt, geocoded = _with_reverse_geocode(rebuilt)
                 if geocoded:
@@ -243,6 +272,11 @@ if __name__ == "__main__":
         help="Regenerate local WebP thumbnails while refreshing metadata",
     )
     parser.add_argument(
+        "--regenerate-display",
+        action="store_true",
+        help="Regenerate web-friendly display renditions for HEIC-like items while refreshing metadata",
+    )
+    parser.add_argument(
         "--infer-dates",
         action="store_true",
         help="Infer capture date from filename for items that lack EXIF date (Unix-ms/μs timestamps, YYYYMMDD_HHMMSS)",
@@ -257,6 +291,7 @@ if __name__ == "__main__":
         catalog_db_path=args.catalog_db_path,
         extract=args.extract,
         regenerate_thumbnails=args.regenerate_thumbnails,
+        regenerate_display=args.regenerate_display,
         reverse_geocode=args.reverse_geocode,
         infer_dates=args.infer_dates,
         dry_run=args.dry_run,

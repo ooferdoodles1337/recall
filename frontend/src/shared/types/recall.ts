@@ -4,6 +4,7 @@ export interface RecallMediaLinks {
   media?: string;
   thumbnail?: string;
   animated_thumbnail?: string;
+  display?: string;
 }
 
 export interface RecallMediaMetadata {

@@ -36,6 +36,7 @@ uv run python -m services.catalog.refresh
 uv run python -m services.catalog.refresh --dry-run
 uv run python -m services.catalog.refresh --reverse-geocode
 uv run python -m services.catalog.refresh --regenerate-thumbnails
+uv run python -m services.catalog.refresh --regenerate-display   # regenerate HEIC display renditions
 uv run python -m services.catalog.refresh --infer-dates   # fill missing dates from filename timestamps
 
 # Indexing (maintainers only — requires ExifTool, FFmpeg, uv sync --group indexing)
@@ -94,6 +95,8 @@ The Vite dev server proxies `/search`, `/catalog`, `/media`, `/health`, `/trials
 **ChromaDB constraint:** all metadata values must be `str | int | float | bool`. `extractor._sanitize_value` enforces this; EXIF keys with colons/spaces/dashes are normalized to underscores (e.g. `EXIF:Make` → `EXIF_Make`).
 
 **Videos longer than 128 s** are truncated before embedding. Animated GIF/PNG are transcoded to MP4.
+
+**HEIC/HEIF** can't be shown by browsers, so indexing also writes a full-size (≤ 2048 px) WebP **display rendition** to `data/thumbnails/{uuid}_display.webp`, recorded at `asset.paths.display` and served via `GET /media/{id}/display` (`links.display`). The phone detail view (`ImageDetailView`/`DetailViewChrome`) prefers `display` over the raw `media` URL; web-native formats have no display rendition and fall back to `media`. Generated only at index/refresh time (`indexer --regenerate-display` / `refresh --regenerate-display`) so the runtime server needs no image deps. The 320 px thumbnail is unaffected.
 
 **Two Gemini clients** (kept separate due to API version incompatibility):
 - `services/providers/gemini.py` — embedding only (`embed_text`, `embed_content`, `embed_content_batch`), uses default API.

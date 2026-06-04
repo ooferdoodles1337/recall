@@ -17,6 +17,7 @@ _PROMOTED_METADATA_KEYS = {
     "content_hash",
     "thumbnail_path",
     "animated_thumbnail_path",
+    "display_path",
     "description",
     "search_terms",
     "width",
@@ -32,6 +33,8 @@ _PROMOTED_METADATA_KEYS = {
     "geo_country",
     "geo_country_code",
     "embedding_mime_type",
+    "file_size",
+    "file_mtime_ns",
 }
 
 
@@ -114,6 +117,7 @@ def build_metadata(
 
     thumbnail_path = extra.get("thumbnail_path")
     animated_thumbnail_path = extra.get("animated_thumbnail_path")
+    display_path = extra.get("display_path")
     content_hash = extra.get("content_hash")
 
     asset_paths: dict[str, str] = {"original": path}
@@ -121,6 +125,8 @@ def build_metadata(
         asset_paths["thumbnail"] = thumbnail_path
     if isinstance(animated_thumbnail_path, str) and animated_thumbnail_path:
         asset_paths["animated_thumbnail"] = animated_thumbnail_path
+    if isinstance(display_path, str) and display_path:
+        asset_paths["display"] = display_path
 
     asset: dict[str, Any] = {
         "filename": filename,
@@ -170,6 +176,27 @@ def build_metadata(
     if location:
         capture["location"] = location
 
+    system: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "indexed_at": _now_iso(),
+        "embedding": {
+            "provider": "gemini",
+            "model": EMBEDDING_MODEL,
+            "dimensions": EMBEDDING_DIMENSIONS,
+        },
+    }
+    file_size_value = _as_int(extra.get("file_size"))
+    file_mtime_ns_value = _as_int(extra.get("file_mtime_ns"))
+    if file_size_value is not None or file_mtime_ns_value is not None:
+        file_state: dict[str, Any] = {}
+        if file_size_value is not None:
+            file_state["size"] = file_size_value
+        if file_mtime_ns_value is not None:
+            file_state["mtime_ns"] = file_mtime_ns_value
+        system["file"] = file_state
+    if isinstance(content_hash, str) and content_hash:
+        system["content_hash"] = content_hash
+
     metadata: dict[str, Any] = {
         "asset": asset,
         "capture": capture,
@@ -185,18 +212,8 @@ def build_metadata(
         "raw": {
             "exif": extracted,
         },
-        "system": {
-            "schema_version": SCHEMA_VERSION,
-            "indexed_at": _now_iso(),
-            "embedding": {
-                "provider": "gemini",
-                "model": EMBEDDING_MODEL,
-                "dimensions": EMBEDDING_DIMENSIONS,
-            },
-        },
+        "system": system,
     }
-    if isinstance(content_hash, str) and content_hash:
-        metadata["system"]["content_hash"] = content_hash
     return metadata
 
 
@@ -210,6 +227,12 @@ def _flat_extra_from_existing(metadata: dict[str, Any], *, include_raw: bool = T
     value = content_hash(metadata)
     if value:
         extra["content_hash"] = value
+    value = file_size(metadata)
+    if value is not None:
+        extra["file_size"] = value
+    value = file_mtime_ns(metadata)
+    if value is not None:
+        extra["file_mtime_ns"] = value
 
     value = thumbnail_path(metadata)
     if value:
@@ -218,6 +241,10 @@ def _flat_extra_from_existing(metadata: dict[str, Any], *, include_raw: bool = T
     value = animated_thumbnail_path(metadata)
     if value:
         extra["animated_thumbnail_path"] = value
+
+    value = display_path(metadata)
+    if value:
+        extra["display_path"] = value
 
     asset = metadata.get("asset")
     if isinstance(asset, dict):
@@ -333,6 +360,8 @@ def response_links(file_id: str, metadata: dict[str, Any]) -> dict[str, str]:
         links["thumbnail"] = f"/media/{file_id}/thumbnail"
     if animated_thumbnail_path(metadata):
         links["animated_thumbnail"] = f"/media/{file_id}/animated-thumbnail"
+    if display_path(metadata):
+        links["display"] = f"/media/{file_id}/display"
     return links
 
 
@@ -375,60 +404,52 @@ def nsfw_patch(detection: dict[str, Any]) -> dict[str, Any]:
     return {"safety": safety_from_detection(detection)}
 
 
-def asset_path(metadata: dict[str, Any]) -> str | None:
+def _asset_path(metadata: dict[str, Any], key: str) -> str | None:
     paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
     if not isinstance(paths, dict):
         return None
-    value = paths.get("original")
+    value = paths.get(key)
     return value if isinstance(value, str) else None
+
+
+def _asset_str(metadata: dict[str, Any], key: str) -> str | None:
+    asset = metadata.get("asset")
+    if not isinstance(asset, dict):
+        return None
+    value = asset.get(key)
+    return value if isinstance(value, str) else None
+
+
+def asset_path(metadata: dict[str, Any]) -> str | None:
+    return _asset_path(metadata, "original")
 
 
 def thumbnail_path(metadata: dict[str, Any]) -> str | None:
-    paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
-    if not isinstance(paths, dict):
-        return None
-    value = paths.get("thumbnail")
-    return value if isinstance(value, str) else None
+    return _asset_path(metadata, "thumbnail")
 
 
 def animated_thumbnail_path(metadata: dict[str, Any]) -> str | None:
-    paths = metadata.get("asset", {}).get("paths") if isinstance(metadata.get("asset"), dict) else None
-    if not isinstance(paths, dict):
-        return None
-    value = paths.get("animated_thumbnail")
-    return value if isinstance(value, str) else None
+    return _asset_path(metadata, "animated_thumbnail")
+
+
+def display_path(metadata: dict[str, Any]) -> str | None:
+    return _asset_path(metadata, "display")
 
 
 def filename(metadata: dict[str, Any]) -> str | None:
-    asset = metadata.get("asset")
-    if not isinstance(asset, dict):
-        return None
-    value = asset.get("filename")
-    return value if isinstance(value, str) else None
+    return _asset_str(metadata, "filename")
 
 
 def mime_type(metadata: dict[str, Any]) -> str | None:
-    asset = metadata.get("asset")
-    if not isinstance(asset, dict):
-        return None
-    value = asset.get("mime_type")
-    return value if isinstance(value, str) else None
+    return _asset_str(metadata, "mime_type")
 
 
 def embedding_mime_type(metadata: dict[str, Any]) -> str | None:
-    asset = metadata.get("asset")
-    if not isinstance(asset, dict):
-        return None
-    value = asset.get("embedding_mime_type")
-    return value if isinstance(value, str) else None
+    return _asset_str(metadata, "embedding_mime_type")
 
 
 def media_type(metadata: dict[str, Any]) -> str | None:
-    asset = metadata.get("asset")
-    if not isinstance(asset, dict):
-        return None
-    value = asset.get("media_type")
-    return value if isinstance(value, str) else None
+    return _asset_str(metadata, "media_type")
 
 
 def content_hash(metadata: dict[str, Any]) -> str | None:
@@ -437,6 +458,22 @@ def content_hash(metadata: dict[str, Any]) -> str | None:
         return None
     value = system.get("content_hash")
     return value if isinstance(value, str) else None
+
+
+def file_size(metadata: dict[str, Any]) -> int | None:
+    system = metadata.get("system")
+    file_state = system.get("file") if isinstance(system, dict) else None
+    if not isinstance(file_state, dict):
+        return None
+    return _as_int(file_state.get("size"))
+
+
+def file_mtime_ns(metadata: dict[str, Any]) -> int | None:
+    system = metadata.get("system")
+    file_state = system.get("file") if isinstance(system, dict) else None
+    if not isinstance(file_state, dict):
+        return None
+    return _as_int(file_state.get("mtime_ns"))
 
 
 def taken_sort(metadata: dict[str, Any]) -> str | None:

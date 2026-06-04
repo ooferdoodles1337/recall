@@ -84,6 +84,7 @@ uv run python -m services.catalog.refresh --dry-run
 uv run python -m services.catalog.refresh --reverse-geocode        # fill place names from stored GPS metadata
 uv run python -m services.catalog.refresh --extract                  # also re-run local ExifTool extraction
 uv run python -m services.catalog.refresh --regenerate-thumbnails    # also regenerate local WebP thumbnails
+uv run python -m services.catalog.refresh --regenerate-display       # also regenerate web-friendly display renditions (HEIC)
 ```
 
 `services.catalog.refresh` preserves item UUIDs, Chroma vector IDs, existing annotation text/search phrases, safety metadata, favorites/folders, and embedding metadata. It is intended for local schema/catalog migrations, not for changed media bytes; if the actual media file content changed, re-run the indexer so the embedding matches the file.
@@ -93,8 +94,9 @@ Options:
 - `--annotate` — after indexing, run the annotation pass to generate descriptions and internal search phrases for any unannotated items (requires `GEMINI_API_KEY`)
 - `--annotate-sample <N>` — annotate a random sample of N unannotated items (implies `--annotate`)
 - `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
-- `--regen-thumbnails` — regenerate all thumbnails in-place without touching embeddings or other catalog data, then exit
-- `--regen-animated-thumbnails` — generate/regenerate animated WebP thumbnails for qualifying GIF items, then exit
+- `--regenerate-thumbnails` — regenerate all thumbnails in-place without touching embeddings or other catalog data, then exit
+- `--regenerate-animated-thumbnails` — generate/regenerate animated WebP thumbnails for qualifying GIF items, then exit
+- `--regenerate-display` — generate/regenerate web-friendly full-size display renditions for HEIC-like items, then exit
 - `--prune-missing` — remove catalog and ChromaDB entries whose source files are missing from disk, then exit
 - `--dry-run` — with `--prune-missing`: log what would be removed without actually deleting anything
 - `--db-path <path>` — use a different ChromaDB directory (default: `backend/data/databases/chroma_db`)
@@ -121,7 +123,7 @@ The indexer:
 4. Processes images/videos into an embeddable format (transcodes if needed)
 5. Embeds content via `gemini-embedding-2`, automatically splitting large runs into multiple JSONL input files for Gemini Batch API
 6. Extracts EXIF/XMP metadata and, if `--reverse-geocode` is passed, reverse-geocodes GPS coordinates
-7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`
+7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`. For HEIC/HEIF (which browsers can't display natively), also generates a full-size (≤ 2048 px) WebP **display rendition** at `backend/data/thumbnails/{uuid}_display.webp`, served via `GET /media/{id}/display` and used by the detail view
 8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
 9. If `--annotate` is passed, annotates unannotated items with synchronous Gemini `generate_content` calls in packs of up to 100 images or 5 videos.
    Media in each pack is uploaded to the Gemini Files API concurrently, then referenced by file URI in the prompt.
@@ -134,7 +136,7 @@ On `--force`, the existing UUID for that hash is reused so the record is updated
 
 | Type | Extensions |
 |------|-----------|
-| Image | `.jpg` `.jpeg` `.png` `.apng` `.webp` `.gif` `.jfif` |
+| Image | `.jpg` `.jpeg` `.png` `.apng` `.webp` `.gif` `.jfif` `.heic` `.heif` |
 | Video | `.mp4` `.m4v` `.mov` `.avi` `.mkv` `.wmv` `.flv` `.webm` `.3gp` |
 
 Animated PNGs/GIFs and videos longer than 128 seconds are transcoded to MP4 before embedding. Transcoding uses the FFmpeg executable bundled by the existing `imageio[ffmpeg]` indexing dependency.

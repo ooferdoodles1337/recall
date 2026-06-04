@@ -1128,8 +1128,6 @@ Visible sections:
 - `Search & Indexing`:
   - `Indexed Albums` row with selected count.
   - `Show sensitive results` switch.
-- `Appearance`:
-  - `Default grid density` value.
 - `About`:
   - `Recall`.
   - `Version 1.0`.
@@ -1146,7 +1144,6 @@ Prototype-only notes:
 - Account is fake.
 - Version is static.
 - Indexed albums do not affect backend indexing.
-- Default grid density row displays current density but does not edit it from settings.
 
 ### 14.2 Indexed Albums Sheet
 

@@ -8,6 +8,17 @@ def as_int(value: Any) -> int | None:
         return value
     if isinstance(value, float):
         return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            try:
+                return int(float(stripped))
+            except (OverflowError, ValueError):
+                return None
     return None
 
 

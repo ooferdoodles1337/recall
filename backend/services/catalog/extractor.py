@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -192,13 +192,15 @@ def infer_date_from_filename(path: str) -> dict[str, str]:
         except ValueError:
             pass
 
-    # Unix ms timestamp (13 digits, whole stem)
+    # Unix ms timestamp (13 digits, whole stem). Resolve to naive local time so
+    # it is comparable to EXIF camera timestamps (naive local) and the
+    # filesystem-mtime fallback, which the taken_sort key string-compares.
     if dt is None:
         m = _UNIX_MS_PATTERN.match(stem)
         if m:
             try:
-                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000, tz=timezone.utc).replace(tzinfo=None)
-            except (ValueError, OSError):
+                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000)
+            except (ValueError, OSError, OverflowError):
                 pass
 
     # Unix μs timestamp (16 digits, whole stem)
@@ -206,8 +208,8 @@ def infer_date_from_filename(path: str) -> dict[str, str]:
         m = _UNIX_US_PATTERN.match(stem)
         if m:
             try:
-                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000_000, tz=timezone.utc).replace(tzinfo=None)
-            except (ValueError, OSError):
+                dt = datetime.fromtimestamp(int(m.group(1)) / 1_000_000)
+            except (ValueError, OSError, OverflowError):
                 pass
 
     if dt is None:
@@ -330,7 +332,7 @@ def extract(path: str, *, reverse_geocode: bool = True) -> dict[str, str | int |
             raw = raw_list[0] if raw_list else {}
     except Exception as exc:
         log.warning("exiftool extraction failed for %s: %s", path, exc, exc_info=True)
-        return {}
+        return {"extraction_failed": True}
 
     result: dict[str, str | int | float | bool] = {}
     for raw_key, raw_value in raw.items():

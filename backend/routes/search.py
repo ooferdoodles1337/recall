@@ -27,12 +27,13 @@ def search_semantic(q: str = Query(..., description="Search query text"), n: int
     results = chroma.search(embedding, n_results=n)
     ids = results["ids"][0]
     distances = results["distances"][0]
+    summaries = catalog.get_item_summaries(ids)
     return {
         "query": q,
         "results": [
             format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
-            if (item := catalog.get_item_summary(doc_id)) is not None
+            if (item := summaries.get(doc_id)) is not None
         ],
     }
 
@@ -55,9 +56,8 @@ def search_text(
     if not matched_ids:
         return {"query": q, "results": []}
 
-    items = [catalog.get_item_summary(item_id) for item_id in matched_ids]
-    items = [item for item in items if item is not None]
-    items = items[:n]
+    summaries = catalog.get_item_summaries(matched_ids)
+    items = [summaries[item_id] for item_id in matched_ids if item_id in summaries][:n]
 
     return {
         "query": q,
@@ -73,12 +73,13 @@ def search_similar_by_id(id: str, n: int = Query(5, ge=1)):
     results = chroma.search(embedding, n_results=n + 1)
     ids = results["ids"][0]
     distances = results["distances"][0]
+    summaries = catalog.get_item_summaries(ids)
     return {
         "query_id": id,
         "results": [
             format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
-            if doc_id != id and (item := catalog.get_item_summary(doc_id)) is not None
+            if doc_id != id and (item := summaries.get(doc_id)) is not None
         ][:n],
     }
 
@@ -100,6 +101,9 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
+
+        # Imported lazily: services.pipeline.media pulls in indexing-only deps
+        # (PIL/pillow-heif/imageio[ffmpeg]) not present in the runtime install.
         from services.pipeline.media import process_image
 
         processed = process_image(tmp_path)
@@ -111,11 +115,12 @@ async def search_similar_upload(file: UploadFile, n: int = Query(5, ge=1)):
     results = chroma.search(embedding, n_results=n)
     ids = results["ids"][0]
     distances = results["distances"][0]
+    summaries = catalog.get_item_summaries(ids)
     return {
         "query_filename": file.filename,
         "results": [
             format_result(item, dist)
             for doc_id, dist in zip(ids, distances)
-            if (item := catalog.get_item_summary(doc_id)) is not None
+            if (item := summaries.get(doc_id)) is not None
         ],
     }

@@ -1,5 +1,5 @@
 import type { RecallMediaItem } from "@/shared/types/recall";
-import { resolvedMediaUrl } from "@/shared/media/mediaItem";
+import { resolvedDisplayUrl, resolvedMediaUrl } from "@/shared/media/mediaItem";
 import { itemTitle } from "../../phoneUtils";
 import { DetailActionRow, DetailScreen, type DetailNeighborPreview } from "./DetailViewChrome";
 
@@ -73,7 +73,7 @@ export function ImageDetailView({
         />
       }
     >
-      <img src={resolvedMediaUrl(item) ?? item.links?.media ?? item.links?.thumbnail} alt={itemTitle(item)} onContextMenu={(e) => e.preventDefault()} />
+      <img src={resolvedDisplayUrl(item) ?? resolvedMediaUrl(item) ?? item.links?.media ?? item.links?.thumbnail} alt={itemTitle(item)} onContextMenu={(e) => e.preventDefault()} />
     </DetailScreen>
   );
 }

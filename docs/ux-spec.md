@@ -438,7 +438,6 @@ the profile:
 - *Search & Indexing*: **"Indexed Albums"** (value = `{selected} of {total}`,
   chevron → opens picker) and "Show sensitive results" (cosmetic `Switch`, not
   persisted).
-- *Appearance*: "Default grid density" (reflects current `gridColumns`, read-only).
 - *About*: app name + version (static).
 
 Only "Indexed Albums" navigates; everything else is cosmetic.

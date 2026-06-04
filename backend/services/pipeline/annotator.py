@@ -81,9 +81,14 @@ class PackedAnnotationResponse(BaseModel):
     annotations: list[SingleImageAnnotation]
 
 
-def _get_unannotated() -> list[dict]:
+def _get_unannotated(file_ids: list[str] | set[str] | None = None) -> list[dict]:
     all_items = catalog.get_all_items_with_metadata()
-    return [item for item in all_items if not metadata_schema.search_description(item["metadata"] or {})]
+    requested = set(file_ids) if file_ids is not None else None
+    return [
+        item for item in all_items
+        if (requested is None or item["id"] in requested)
+        and not metadata_schema.search_description(item["metadata"] or {})
+    ]
 
 
 def _write_temp_processed_media(file_id: str, processed: ProcessedFile) -> AnnotationMedia:
@@ -171,11 +176,11 @@ def _write_annotations(
         log.warning("%d items were not annotated (expected %d)", len(expected_ids) - len(annotations), len(expected_ids))
 
 
-def annotate_unannotated(limit: int | None = None) -> None:
+def annotate_unannotated(limit: int | None = None, file_ids: list[str] | set[str] | None = None) -> None:
     started_at = time.monotonic()
-    unannotated = _get_unannotated()
+    unannotated = _get_unannotated(file_ids=file_ids)
     if not unannotated:
-        log.info("all items already annotated")
+        log.info("all requested items already annotated")
         return
 
     if limit is not None and limit < len(unannotated):

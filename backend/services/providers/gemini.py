@@ -26,7 +26,10 @@ DEFAULT_EMBEDDING_BATCH_MAX_JSONL_BYTES = 512 * 1024 * 1024
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY must be set before calling Gemini embedding APIs")
+        _client = genai.Client(api_key=api_key)
     return _client
 
 

@@ -79,7 +79,10 @@ def test_get_items_batch_returns_found_and_missing(monkeypatch):
     from routes.catalog import BatchRequest, get_items_batch
 
     store = {"a": _item("a"), "b": _item("b")}
-    monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: store.get(id))
+    monkeypatch.setattr(
+        "services.catalog.db.get_item_summaries",
+        lambda ids: {id: store[id] for id in ids if id in store},
+    )
 
     body = get_items_batch(BatchRequest(ids=["a", "b", "c"]))
 
@@ -113,7 +116,10 @@ def test_trials_returns_random_target_summaries(monkeypatch):
     from routes.trials import trials
 
     monkeypatch.setattr("services.catalog.db.get_random_ids", lambda n: ["a", "b"])
-    monkeypatch.setattr("services.catalog.db.get_item_summary", lambda id: _item(id))
+    monkeypatch.setattr(
+        "services.catalog.db.get_item_summaries",
+        lambda ids: {id: _item(id) for id in ids},
+    )
 
     result = trials(n=2)
 

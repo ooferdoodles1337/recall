@@ -71,6 +71,8 @@ export function usePhoneController({
     isLoading: isLoadingHomeFeed,
     isLoadingMore: isLoadingMoreRecents,
     changeFeed: handleHomeFeedChange,
+    defaultFeed: defaultHomeFeed,
+    setDefaultFeed: setDefaultHomeFeed,
   } = useHomeFeed({
     contentMode,
     scrollContainerRef,
@@ -311,6 +313,7 @@ export function usePhoneController({
     isSearching, showHistoryIcon, showSearchPulse,
     // home feed
     homeFeed, activeHomeItems, isLoadingHomeFeed, isLoadingMoreRecents, handleHomeFeedChange,
+    defaultHomeFeed, setDefaultHomeFeed,
     // detail
     detail, detailNavDirection,
     isVideo, resolvedMediaUrl, mediaLayoutId,

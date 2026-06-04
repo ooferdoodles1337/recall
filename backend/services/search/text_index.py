@@ -93,23 +93,31 @@ def suggest(query: str, n: int = 5) -> list[str]:
     return prefix_results + fuzzy_results
 
 
-def search_by_term(query: str) -> set[str]:
+def search_by_term(query: str) -> list[str]:
+    """Return matching item ids in a deterministic, tiered order.
+
+    Tiers (best first): exact term match, then prefix matches, then fuzzy
+    matches. Ids are deduplicated across tiers and sorted within each tier so
+    the result is stable across runs (a plain set was not).
+    """
     normalized = query.strip().lower()
-    ids: set[str] = set()
 
-    if normalized in _term_to_ids:
-        ids.update(_term_to_ids[normalized])
-        return ids
+    exact = _term_to_ids.get(normalized)
+    if exact:
+        return sorted(exact)
 
-    prefix_terms = prefix_suggestions(normalized, n=10)
-    for term in prefix_terms:
-        ids.update(_term_to_ids.get(term, set()))
+    def _collect(terms: list[str]) -> list[str]:
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for term in terms:
+            for item_id in sorted(_term_to_ids.get(term, set())):
+                if item_id not in seen:
+                    seen.add(item_id)
+                    ordered.append(item_id)
+        return ordered
 
-    if ids:
-        return ids
+    prefix_ids = _collect(prefix_suggestions(normalized, n=10))
+    if prefix_ids:
+        return prefix_ids
 
-    fuzzy_terms = fuzzy_suggestions(normalized, n=5)
-    for term in fuzzy_terms:
-        ids.update(_term_to_ids.get(term, set()))
-
-    return ids
+    return _collect(fuzzy_suggestions(normalized, n=5))

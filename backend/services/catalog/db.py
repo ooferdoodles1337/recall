@@ -23,14 +23,12 @@ from services.catalog._db_serialization import (
     _SUMMARY_COLUMNS,
     _metadata_json,
     _promoted_params,
+    _search_phrases_from_row,
     metadata_for_storage,
     row_to_item,
     row_to_stored_item,
     row_to_summary_item,
 )
-
-# Re-export for tests that monkeypatch this module directly
-_PROMOTED_COLUMN_DEFS = None  # accessed via _db_serialization; alias not needed externally
 
 _db_path: Path | None = None
 
@@ -78,6 +76,8 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             filename TEXT,
             mime_type TEXT,
             embedding_mime_type TEXT,
+            file_size INTEGER,
+            file_mtime_ns INTEGER,
             width INTEGER,
             height INTEGER,
             duration_seconds REAL,
@@ -200,6 +200,33 @@ def get_item_summary(file_id: str) -> dict | None:
     return row_to_summary_item(row) if row else None
 
 
+# SQLite's default SQLITE_MAX_VARIABLE_NUMBER is 999 on older builds; stay well under it.
+_MAX_SQL_VARIABLES = 900
+
+
+def get_item_summaries(file_ids: list[str]) -> dict[str, dict]:
+    """Fetch summaries for many ids in a single connection (chunked IN queries).
+
+    Returns a dict keyed by id; missing ids are simply absent. Callers preserve
+    their own ordering, so this never imposes a result order.
+    """
+    if not file_ids:
+        return {}
+    columns = ", ".join(_SUMMARY_COLUMNS)
+    summaries: dict[str, dict] = {}
+    with _connect() as conn:
+        for start in range(0, len(file_ids), _MAX_SQL_VARIABLES):
+            chunk = file_ids[start:start + _MAX_SQL_VARIABLES]
+            placeholders = ", ".join("?" for _ in chunk)
+            rows = conn.execute(
+                f"SELECT {columns} FROM media_items WHERE id IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            for row in rows:
+                summaries[row["id"]] = row_to_summary_item(row)
+    return summaries
+
+
 def get_id_by_hash(content_hash: str) -> str | None:
     with _connect() as conn:
         row = conn.execute(
@@ -207,6 +234,27 @@ def get_id_by_hash(content_hash: str) -> str | None:
             (content_hash,),
         ).fetchone()
     return row["id"] if row else None
+
+
+def get_index_records() -> list[dict]:
+    """Return lightweight file-state records used by incremental indexing."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, asset_path, content_hash, file_size, file_mtime_ns
+            FROM media_items
+            """
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "asset_path": row["asset_path"],
+            "content_hash": row["content_hash"],
+            "file_size": row["file_size"],
+            "file_mtime_ns": row["file_mtime_ns"],
+        }
+        for row in rows
+    ]
 
 
 def get_all_items_with_metadata() -> list[dict]:
@@ -219,17 +267,6 @@ def get_all_search_terms() -> list[tuple[str, list[str]]]:
     with _connect() as conn:
         rows = conn.execute("SELECT id, search_phrases_json FROM media_items").fetchall()
     return [(row["id"], _search_phrases_from_row(row)) for row in rows]
-
-
-def _search_phrases_from_row(row: sqlite3.Row) -> list[str]:
-    value = row["search_phrases_json"]
-    if not isinstance(value, str) or not value:
-        return []
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        return []
-    return [item for item in parsed if isinstance(item, str)]
 
 
 def list_library_items(
@@ -340,6 +377,7 @@ def patch_item(file_id: str, patch: dict) -> dict:
 
     existing_metadata = json.loads(row["metadata_json"])
     merged = metadata_schema.merge_metadata(existing_metadata, patch)
+    _validate_required_fields(file_id, merged)
 
     with _connect() as conn:
         _update_metadata_row(conn, file_id, merged)
@@ -391,6 +429,26 @@ def update_animated_thumbnail_path(file_id: str, animated_thumbnail_path: str | 
         conn.execute(
             "UPDATE media_items SET animated_thumbnail_path = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (animated_thumbnail_path, _metadata_json(metadata), file_id),
+        )
+
+
+def update_display_path(file_id: str, display_path: str | None) -> None:
+    """Set or clear the display rendition path for a single item (metadata_json only)."""
+    with _connect() as conn:
+        row = conn.execute("SELECT metadata_json FROM media_items WHERE id = ?", (file_id,)).fetchone()
+        if row is None:
+            return
+        metadata = json.loads(row["metadata_json"])
+        asset = metadata.get("asset")
+        if isinstance(asset, dict):
+            paths = asset.setdefault("paths", {})
+            if display_path:
+                paths["display"] = display_path
+            else:
+                paths.pop("display", None)
+        conn.execute(
+            "UPDATE media_items SET metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (_metadata_json(metadata), file_id),
         )
 
 

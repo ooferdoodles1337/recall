@@ -9,6 +9,8 @@ import {
   HOME_RECENTS_MAX,
   RECENTS_PREFETCH_STALE_MS,
   RECENTS_PREFETCH_VIEWPORT_MULTIPLIER,
+  readDefaultHomeFeed,
+  writeDefaultHomeFeed,
   type HomeFeed,
 } from "../model/homeFeed";
 import { phoneQueryKeys } from "../model/queryKeys";
@@ -27,7 +29,8 @@ export function useHomeFeed({
   onScrollRestored,
 }: UseHomeFeedOptions) {
   const queryClient = useQueryClient();
-  const [feed, setFeed] = useState<HomeFeed>("favorites");
+  const [defaultFeed, setDefaultFeedState] = useState<HomeFeed>(readDefaultHomeFeed);
+  const [feed, setFeed] = useState<HomeFeed>(defaultFeed);
   const [recentLimit, setRecentLimit] = useState(SEARCH_BATCH_SIZE);
   const feedScrollTopRef = useRef<Record<HomeFeed, number>>({ favorites: 0, recents: 0 });
 
@@ -94,6 +97,13 @@ export function useHomeFeed({
     }, 0);
   }, [favoriteItems, feed, onFeedSwitchItems, onScrollRestored, recentItems, scrollContainerRef]);
 
+  // The persisted default for future sessions; also applies to the live grid now.
+  const setDefaultFeed = useCallback((nextFeed: HomeFeed) => {
+    setDefaultFeedState(nextFeed);
+    writeDefaultHomeFeed(nextFeed);
+    changeFeed(nextFeed);
+  }, [changeFeed]);
+
   return {
     feed,
     items,
@@ -102,5 +112,7 @@ export function useHomeFeed({
     favoriteItems,
     recentItems,
     changeFeed,
+    defaultFeed,
+    setDefaultFeed,
   };
 }

@@ -320,3 +320,54 @@ def test_generate_thumbnail_video_returns_webp():
     thumb = Image.open(io.BytesIO(result))
     assert thumb.format == "WEBP"
     assert max(thumb.size) <= 320
+
+
+# --- Display renditions (HEIC) ---
+
+def make_heic_bytes(width=10, height=10) -> bytes:
+    # register_heif_opener() runs on import of services.pipeline.media
+    import services.pipeline.media  # noqa: F401
+    img = Image.new("RGB", (width, height), color=(120, 60, 200))
+    buf = io.BytesIO()
+    try:
+        img.save(buf, format="HEIF")
+    except (OSError, ValueError) as exc:
+        pytest.skip(f"HEIF encoding unavailable: {exc}")
+    return buf.getvalue()
+
+
+def test_needs_display_rendition_for_heic():
+    from services.pipeline.media import needs_display_rendition
+    assert needs_display_rendition("photo.heic") is True
+    assert needs_display_rendition("photo.HEIF") is True
+    assert needs_display_rendition("photo.jpg") is False
+    assert needs_display_rendition("clip.mp4") is False
+
+
+def test_generate_display_returns_none_for_web_native(tmp_path):
+    p = tmp_path / "test.jpg"
+    p.write_bytes(make_jpeg_bytes())
+    from services.pipeline.media import generate_display
+    assert generate_display(str(p)) is None
+
+
+def test_generate_display_heic_returns_webp(tmp_path):
+    p = tmp_path / "test.heic"
+    p.write_bytes(make_heic_bytes(width=64, height=48))
+    from services.pipeline.media import generate_display
+    result = generate_display(str(p))
+    assert result is not None
+    img = Image.open(io.BytesIO(result))
+    assert img.format == "WEBP"
+    assert img.size == (64, 48)
+
+
+def test_generate_display_heic_downscales_long_edge(tmp_path):
+    from services.pipeline.media import DISPLAY_RENDITION_MAX_EDGE, generate_display
+    p = tmp_path / "big.heic"
+    p.write_bytes(make_heic_bytes(width=4000, height=2000))
+    result = generate_display(str(p))
+    assert result is not None
+    img = Image.open(io.BytesIO(result))
+    assert max(img.size) == DISPLAY_RENDITION_MAX_EDGE
+    assert img.size == (DISPLAY_RENDITION_MAX_EDGE, DISPLAY_RENDITION_MAX_EDGE // 2)

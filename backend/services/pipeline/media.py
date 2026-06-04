@@ -170,6 +170,38 @@ def generate_thumbnail(path: str, media_type: str) -> bytes:
     return buf.getvalue()
 
 
+# Formats browsers can't display natively, so the detail view needs a
+# pre-rendered web-friendly full-size copy ("display rendition").
+DISPLAY_RENDITION_EXTENSIONS = {".heic", ".heif"}
+DISPLAY_RENDITION_MAX_EDGE = 2048  # long-edge cap; only downscales, never upscales
+DISPLAY_RENDITION_QUALITY = 82
+
+
+def needs_display_rendition(path: str) -> bool:
+    """True when the source format can't be shown directly by browsers."""
+    return Path(path).suffix.lower() in DISPLAY_RENDITION_EXTENSIONS
+
+
+def generate_display(path: str) -> bytes | None:
+    """Render a web-friendly full-size WebP for formats browsers can't show.
+
+    Returns None for formats that browsers already display natively (callers
+    keep serving the original in that case).
+    """
+    if not needs_display_rendition(path):
+        return None
+    with Image.open(path) as raw:
+        img = ImageOps.exif_transpose(raw).convert("RGB")
+    longest = max(img.width, img.height)
+    if longest > DISPLAY_RENDITION_MAX_EDGE:
+        scale = DISPLAY_RENDITION_MAX_EDGE / longest
+        new_size = (round(img.width * scale), round(img.height * scale))
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=DISPLAY_RENDITION_QUALITY)
+    return buf.getvalue()
+
+
 ANIMATED_THUMBNAIL_MAX_SOURCE_BYTES = 5 * 1024 * 1024  # skip GIFs larger than 5 MB
 ANIMATED_THUMBNAIL_MAX_FRAMES = 200                     # cap frame extraction
 

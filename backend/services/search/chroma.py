@@ -29,6 +29,7 @@ def reset_collection() -> None:
 def _collection() -> chromadb.Collection:
     if content_collection is None:
         configure()
+    assert content_collection is not None
     return content_collection
 
 
