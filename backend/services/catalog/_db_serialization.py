@@ -16,9 +16,12 @@ _PROMOTED_COLUMN_DEFS: dict[str, str] = {
     "asset_path": "TEXT",
     "thumbnail_path": "TEXT",
     "animated_thumbnail_path": "TEXT",
+    "display_path": "TEXT",
     "filename": "TEXT",
     "mime_type": "TEXT",
     "embedding_mime_type": "TEXT",
+    "file_size": "INTEGER",
+    "file_mtime_ns": "INTEGER",
     "width": "INTEGER",
     "height": "INTEGER",
     "duration_seconds": "REAL",
@@ -128,9 +131,12 @@ def _promoted_values(metadata: dict) -> dict[str, Any]:
         "asset_path": metadata_schema.asset_path(metadata),
         "thumbnail_path": metadata_schema.thumbnail_path(metadata),
         "animated_thumbnail_path": metadata_schema.animated_thumbnail_path(metadata),
+        "display_path": metadata_schema.display_path(metadata),
         "filename": metadata_schema.filename(metadata),
         "mime_type": metadata_schema.mime_type(metadata),
         "embedding_mime_type": metadata_schema.embedding_mime_type(metadata),
+        "file_size": metadata_schema.file_size(metadata),
+        "file_mtime_ns": metadata_schema.file_mtime_ns(metadata),
         "width": _asset_number(metadata, "width", integer=True),
         "height": _asset_number(metadata, "height", integer=True),
         "duration_seconds": _asset_number(metadata, "duration_seconds", integer=False),
@@ -219,6 +225,8 @@ def row_to_summary_item(row: sqlite3.Row) -> dict:
         asset_paths["thumbnail"] = row["thumbnail_path"]
     if row["animated_thumbnail_path"]:
         asset_paths["animated_thumbnail"] = row["animated_thumbnail_path"]
+    if row["display_path"]:
+        asset_paths["display"] = row["display_path"]
 
     asset: dict[str, Any] = {
         "filename": row["filename"],

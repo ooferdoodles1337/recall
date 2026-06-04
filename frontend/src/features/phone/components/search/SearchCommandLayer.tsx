@@ -123,7 +123,7 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
   }
 
   return (
-    <div className={`search-bar search-bar--semantic${showHistoryIcon ? "" : " search-bar--no-icon"}${className ? ` ${className}` : ""}`}>
+    <div className={`search-bar search-bar--semantic${className ? ` ${className}` : ""}`}>
       {showHistoryIcon ? (
         <Button
           className={`history-btn${showHistory ? " history-btn--active" : ""}`}
@@ -137,7 +137,11 @@ export const PhoneSearchBar = React.forwardRef<HTMLInputElement, PhoneSearchBarP
         >
           {isSearching ? <Loader2Icon className="animate-spin" /> : <HistoryIcon />}
         </Button>
-      ) : null}
+      ) : (
+        <span className="search-icon" aria-hidden>
+          <SearchIcon />
+        </span>
+      )}
       <Input
         ref={ref}
         aria-label="Search your media"

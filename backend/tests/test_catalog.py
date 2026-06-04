@@ -33,6 +33,8 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
             "geo_country": "France",
             "EXIF_Make": "Nikon",
             "Composite_GPSLatitude": 48.8566,
+            "file_size": 12345,
+            "file_mtime_ns": 67890,
         },
     )
 
@@ -49,11 +51,36 @@ def test_upsert_and_get_item_round_trips_metadata(catalog_db):
     assert item["metadata"]["capture"]["date"] == "2024-03-18"
     assert item["metadata"]["capture"]["location"]["city"] == "Paris"
     assert item["metadata"]["system"]["content_hash"] == "hash-1"
+    assert item["metadata"]["system"]["file"] == {"size": 12345, "mtime_ns": 67890}
     assert item["metadata"]["system"]["schema_version"] == 2
     assert item["metadata"]["raw"]["exif"] == {
         "EXIF_Make": "Nikon",
         "Composite_GPSLatitude": 48.8566,
     }
+
+
+def test_summary_preserves_display_rendition_link(catalog_db):
+    """HEIC items expose a web-friendly display rendition; the summary serialization
+    path (used by the home feed and search results) must keep its link, not just the
+    full-metadata path."""
+    catalog_db.upsert_item(
+        file_id="heic-1",
+        path="media/submitted/photo.HEIC",
+        filename="photo.HEIC",
+        mime_type="image/heic",
+        media_type="image",
+        extra_metadata={
+            "content_hash": "hash-heic",
+            "thumbnail_path": "thumbnails/heic-1.webp",
+            "display_path": "thumbnails/heic-1_display.webp",
+        },
+    )
+
+    summary = catalog_db.get_item_summary("heic-1")
+    assert summary["metadata"]["asset"]["paths"]["display"] == "thumbnails/heic-1_display.webp"
+    assert summary["links"]["display"] == "/media/heic-1/display"
+    # The summary path must agree with the full-metadata path.
+    assert summary["links"]["display"] == catalog_db.get_item("heic-1")["links"]["display"]
 
 
 def test_get_id_by_hash_uses_catalog_content_hash(catalog_db):
@@ -356,6 +383,34 @@ def test_configure_migrates_legacy_catalog_columns(tmp_path):
     assert "raw" not in summary["metadata"]
     assert summary["metadata"]["capture"]["location"]["city"] == "Paris"
     assert summary["metadata"]["organization"]["favorite"] is True
+
+
+def test_get_item_summaries_batch_returns_keyed_dict(catalog_db):
+    for i in range(3):
+        catalog_db.upsert_item(
+            f"item-{i}", f"media/photo{i}.jpg", f"photo{i}.jpg",
+            "image/jpeg", "image", extra_metadata={"content_hash": f"hash-{i}"},
+        )
+
+    summaries = catalog_db.get_item_summaries(["item-0", "item-2", "missing"])
+
+    assert set(summaries) == {"item-0", "item-2"}
+    assert summaries["item-0"]["id"] == "item-0"
+
+
+def test_get_item_summaries_empty_input_skips_query(catalog_db):
+    assert catalog_db.get_item_summaries([]) == {}
+
+
+def test_patch_item_rejects_clearing_required_fields(catalog_db):
+    catalog_db.upsert_item(
+        "item-1", "media/photo.jpg", "photo.jpg",
+        "image/jpeg", "image", extra_metadata={"content_hash": "hash-1"},
+    )
+
+    # Blanking a required asset/system field must be refused, not silently stored.
+    with pytest.raises(ValueError):
+        catalog_db.patch_item("item-1", {"asset": {"paths": {"original": ""}}})
 
 
 def test_reset_deletes_catalog_data(catalog_db):
