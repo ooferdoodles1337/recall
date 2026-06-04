@@ -661,12 +661,15 @@ def run(
     reverse_geocode: bool = False,
     embedding_batch_max_jsonl_bytes: int = gemini.DEFAULT_EMBEDDING_BATCH_MAX_JSONL_BYTES,
     embedding_inline_threshold: int = 4,
+    annotation_concurrency: int = 3,
     postprocess_scope: str = "new",
 ) -> None:
     if embedding_batch_max_jsonl_bytes <= 0:
         raise ValueError("embedding_batch_max_jsonl_bytes must be positive")
     if embedding_inline_threshold < 0:
         raise ValueError("embedding_inline_threshold cannot be negative")
+    if annotation_concurrency <= 0:
+        raise ValueError("annotation_concurrency must be positive")
     if postprocess_scope not in {"new", "all"}:
         raise ValueError("postprocess_scope must be 'new' or 'all'")
 
@@ -857,7 +860,11 @@ def run(
         if scoped_ids or postprocess_scope == "all" or annotate_sample:
             scope_label = "newly indexed items" if scoped_ids is not None else "all unannotated items"
             log.info("starting annotation pass for %s", scope_label)
-            annotator.annotate_unannotated(limit=annotate_sample, file_ids=scoped_ids)
+            annotator.annotate_unannotated(
+                limit=annotate_sample,
+                file_ids=scoped_ids,
+                annotation_concurrency=annotation_concurrency,
+            )
         else:
             log.info("annotation pass skipped: no newly indexed items")
 
@@ -964,6 +971,12 @@ if __name__ == "__main__":
         help="Run annotation/NSFW post-processing on newly indexed items only or all missing items (default: new)",
     )
     parser.add_argument(
+        "--annotation-concurrency",
+        type=int,
+        default=3,
+        help="Maximum annotation packs to process concurrently (default: 3; set 1 for serial debugging)",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
@@ -995,5 +1008,6 @@ if __name__ == "__main__":
         reverse_geocode=args.reverse_geocode,
         embedding_batch_max_jsonl_bytes=int(args.embedding_batch_max_jsonl_mb * 1024 * 1024),
         embedding_inline_threshold=args.embedding_inline_threshold,
+        annotation_concurrency=args.annotation_concurrency,
         postprocess_scope=args.postprocess_scope,
     )

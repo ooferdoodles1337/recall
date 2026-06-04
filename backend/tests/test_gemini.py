@@ -78,7 +78,8 @@ def test_embed_content_batch_returns_embeddings():
         json.dumps({"key": "k1", "response": {"embedding": {"values": [0.1] * 3072}}}),
         json.dumps({"key": "k2", "response": {"embedding": {"values": [0.2] * 3072}}}),
     ]
-    with patch("services.providers.gemini._client", _make_batch_client(result_lines)):
+    mock_client = _make_batch_client(result_lines)
+    with patch("services.providers.gemini._client", mock_client):
         from services.providers.gemini import embed_content_batch
         result = embed_content_batch(items)
 
@@ -86,6 +87,9 @@ def test_embed_content_batch_returns_embeddings():
     assert len(result["k1"]) == 3072
     assert result["k1"][0] == 0.1
     assert result["k2"][0] == 0.2
+    assert mock_client.batches.create_embeddings.call_args.kwargs["src"] == {
+        "file_name": "files/test-upload"
+    }
 
 
 def test_embed_content_batch_skips_per_item_errors():

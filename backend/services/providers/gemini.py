@@ -21,6 +21,7 @@ _MODEL = "gemini-embedding-2"
 _client: genai.Client | None = None
 MAX_BATCH_INPUT_FILE_BYTES = 2_000_000_000
 DEFAULT_EMBEDDING_BATCH_MAX_JSONL_BYTES = 512 * 1024 * 1024
+EMBEDDING_BATCH_POLL_INTERVAL = 10
 
 
 def _get_client() -> genai.Client:
@@ -143,7 +144,7 @@ def _run_embedding_batch_job(
 
     batch_job = client.batches.create_embeddings(
         model=_MODEL,
-        src=types.EmbeddingsBatchJobSource(file_name=uploaded.name),
+        src={"file_name": uploaded.name},
         config={"display_name": f"recall-index-batch-{chunk_index:04d}"},
     )
     log.info("batch embedding job submitted: %s", batch_job.name)
@@ -155,13 +156,14 @@ def _run_embedding_batch_job(
             break
         poll_count += 1
         log.info(
-            "batch job %s state=%s poll=%d elapsed=%.1fs, waiting 30s...",
+            "batch job %s state=%s poll=%d elapsed=%.1fs, waiting %ds...",
             batch_job.name,
             batch_job.state.name,
             poll_count,
             time.monotonic() - started_at,
+            EMBEDDING_BATCH_POLL_INTERVAL,
         )
-        time.sleep(30)
+        time.sleep(EMBEDDING_BATCH_POLL_INTERVAL)
 
     if batch_job.state.name != "JOB_STATE_SUCCEEDED":
         raise RuntimeError(f"Batch embedding job {batch_job.name} ended with state {batch_job.state.name}")

@@ -1,4 +1,5 @@
 import json
+import asyncio
 
 import chromadb
 import pytest
@@ -191,7 +192,7 @@ def test_annotate_unannotated_writes_each_pack_before_next(tmp_path, monkeypatch
         item = catalog.get_item(item_id)
         return ((item["metadata"].get("search") or {}).get("description"))
 
-    def fake_annotate_pack(pack, model, prompt, schema):
+    async def fake_annotate_pack_async(pack, model, prompt, schema):
         calls.append(pack)
         descriptions_seen_at_call.append([description(item_id) for item_id in ids])
         return json.dumps({
@@ -206,14 +207,66 @@ def test_annotate_unannotated_writes_each_pack_before_next(tmp_path, monkeypatch
         })
 
     monkeypatch.setattr(annotator, "IMAGE_PACK_SIZE", 1)
-    monkeypatch.setattr("services.pipeline.annotator.gemini_annotation.annotate_pack", fake_annotate_pack)
+    monkeypatch.setattr("services.pipeline.annotator.gemini_annotation.annotate_pack_async", fake_annotate_pack_async)
 
-    annotator.annotate_unannotated()
+    annotator.annotate_unannotated(annotation_concurrency=1)
 
     assert len(calls) == 2
     assert all(len(pack) == 1 for pack in calls)
     assert descriptions_seen_at_call[0] == [None, None]
     assert descriptions_seen_at_call[1][0] == "description item-1"
+    for item_id in ids:
+        item = catalog.get_item(item_id)
+        assert item["metadata"]["search"]["description"] == f"description {item_id}"
+
+
+def test_annotate_unannotated_can_run_packs_concurrently(tmp_path, monkeypatch):
+    import config
+    import services.catalog.db as catalog
+    from services.pipeline import annotator
+
+    data_dir = tmp_path / "data"
+    media_dir = data_dir / "media"
+    media_dir.mkdir(parents=True)
+    monkeypatch.setattr(config, "DATA_DIR", data_dir)
+    ids = ["item-1", "item-2"]
+    for i, item_id in enumerate(ids):
+        path = media_dir / f"{item_id}.jpg"
+        path.write_bytes(b"jpeg-bytes")
+        catalog.upsert_item(
+            file_id=item_id,
+            path=f"media/{item_id}.jpg",
+            filename=f"{item_id}.jpg",
+            mime_type="image/jpeg",
+            media_type="image",
+            extra_metadata={"content_hash": f"hash-{i}"},
+        )
+
+    both_started = asyncio.Event()
+    calls = []
+
+    async def fake_annotate_pack_async(pack, model, prompt, schema):
+        calls.append(pack)
+        if len(calls) == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), timeout=2)
+        return json.dumps({
+            "annotations": [
+                {
+                    "file_id": file_id,
+                    "description": f"description {file_id}",
+                    "search_terms": [file_id],
+                }
+                for file_id, _, _ in pack
+            ]
+        })
+
+    monkeypatch.setattr(annotator, "IMAGE_PACK_SIZE", 1)
+    monkeypatch.setattr("services.pipeline.annotator.gemini_annotation.annotate_pack_async", fake_annotate_pack_async)
+
+    annotator.annotate_unannotated(annotation_concurrency=2)
+
+    assert len(calls) == 2
     for item_id in ids:
         item = catalog.get_item(item_id)
         assert item["metadata"]["search"]["description"] == f"description {item_id}"

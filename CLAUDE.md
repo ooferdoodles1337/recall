@@ -98,9 +98,9 @@ The Vite dev server proxies `/search`, `/catalog`, `/media`, `/health`, `/trials
 
 **HEIC/HEIF** can't be shown by browsers, so indexing also writes a full-size (≤ 2048 px) WebP **display rendition** to `data/thumbnails/{uuid}_display.webp`, recorded at `asset.paths.display` and served via `GET /media/{id}/display` (`links.display`). The phone detail view (`ImageDetailView`/`DetailViewChrome`) prefers `display` over the raw `media` URL; web-native formats have no display rendition and fall back to `media`. Generated only at index/refresh time (`indexer --regenerate-display` / `refresh --regenerate-display`) so the runtime server needs no image deps. The 320 px thumbnail is unaffected.
 
-**Two Gemini clients** (kept separate due to API version incompatibility):
-- `services/providers/gemini.py` — embedding only (`embed_text`, `embed_content`, `embed_content_batch`), uses default API.
-- `services/providers/gemini_annotation.py` — annotation batch jobs, requires `http_options={"api_version": "v1alpha"}`.
+**Two Gemini clients** (kept separate due to API version requirements):
+- `services/providers/gemini.py` — embedding only (`embed_text`, `embed_content`, `embed_content_batch`), including Batch API calls, uses default API.
+- `services/providers/gemini_annotation.py` — annotation generation, requires `http_options={"api_version": "v1alpha"}`.
 
 ### SQLite schema notes
 

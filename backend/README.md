@@ -91,9 +91,10 @@ uv run python -m services.catalog.refresh --regenerate-display       # also rege
 
 Options:
 - `--force` — re-index files that are already indexed
-- `--annotate` — after indexing, run the annotation pass to generate descriptions and internal search phrases for any unannotated items (requires `GEMINI_API_KEY`)
-- `--annotate-sample <N>` — annotate a random sample of N unannotated items (implies `--annotate`)
-- `--detect-nsfw` — after indexing, run local NSFW detection for items without checked `safety` metadata
+- `--no-annotate` — skip the annotation pass that generates descriptions and internal search phrases (annotation runs by default and requires `GEMINI_API_KEY`)
+- `--annotate-sample <N>` — annotate a random sample of N unannotated items
+- `--annotation-concurrency <N>` — process up to N annotation packs concurrently (default: `3`; set `1` for serial debugging)
+- `--no-detect-nsfw` — skip local NSFW detection for items without checked `safety` metadata (detection runs by default)
 - `--regenerate-thumbnails` — regenerate all thumbnails in-place without touching embeddings or other catalog data, then exit
 - `--regenerate-animated-thumbnails` — generate/regenerate animated WebP thumbnails for qualifying GIF items, then exit
 - `--regenerate-display` — generate/regenerate web-friendly full-size display renditions for HEIC-like items, then exit
@@ -125,10 +126,10 @@ The indexer:
 6. Extracts EXIF/XMP metadata and, if `--reverse-geocode` is passed, reverse-geocodes GPS coordinates
 7. Generates a 320 px WebP thumbnail (first frame for videos) and writes it to `backend/data/thumbnails/{uuid}.webp`. For HEIC/HEIF (which browsers can't display natively), also generates a full-size (≤ 2048 px) WebP **display rendition** at `backend/data/thumbnails/{uuid}_display.webp`, served via `GET /media/{id}/display` and used by the detail view
 8. Upserts metadata into SQLite using a UUID primary key and upserts the content embedding into ChromaDB with the same UUID
-9. If `--annotate` is passed, annotates unannotated items with synchronous Gemini `generate_content` calls in packs of up to 100 images or 5 videos.
-   Media in each pack is uploaded to the Gemini Files API concurrently, then referenced by file URI in the prompt.
+9. Unless `--no-annotate` is passed, annotates unannotated items with Gemini `generate_content` calls in packs of up to 10 images or 5 videos.
+   Media in each pack is uploaded to the Gemini Files API concurrently, and up to `--annotation-concurrency` packs run at the same time.
    The pass writes `metadata.search.description` and `metadata.search.phrases` after each pack so interrupted runs can resume from remaining unannotated items
-10. If `--detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without checked `metadata.safety` and writes the UI state, score, labels, and model info. Images are analyzed directly; videos are analyzed through their generated thumbnail.
+10. Unless `--no-detect-nsfw` is passed, runs `Marqo/nsfw-image-detection-384` locally through TIMM for items without checked `metadata.safety` and writes the UI state, score, labels, and model info. Images are analyzed directly; videos are analyzed through their generated thumbnail.
 
 On `--force`, the existing UUID for that hash is reused so the record is updated in place rather than duplicated.
 
