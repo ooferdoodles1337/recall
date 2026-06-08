@@ -496,7 +496,7 @@
   color: var(--ios-label-secondary, rgba(60, 60, 67, 0.6));
 }
 
-.about-field-icon--safe {
+.about-field-icon--shown {
   color: #16a34a;
 }
 
@@ -541,6 +541,29 @@
 .detail-menu [data-slot="dropdown-menu-item"] {
   color: rgba(255, 255, 255, 0.88);
   border-radius: 6px;
+}
+
+.detail-menu [data-slot="dropdown-menu-item"] > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.detail-menu .detail-menu-toggle-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 38px;
+}
+
+.detail-menu-toggle-label {
+  min-width: 0;
+  cursor: default;
+}
+
+.detail-menu-switch {
+  transform: scale(0.84);
+  transform-origin: right center;
 }
 
 .detail-menu [data-slot="dropdown-menu-item"][data-highlighted] {

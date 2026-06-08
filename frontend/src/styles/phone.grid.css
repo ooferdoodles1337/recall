@@ -31,6 +31,7 @@
 }
 
 .video-badge,
+.selection-circle,
 .selected-num {
   display: inline-flex;
   align-items: center;
@@ -60,9 +61,22 @@
   letter-spacing: 0.04em;
 }
 
+.selection-circle {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    0 1px 5px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  backdrop-filter: var(--glass-dark-xs);
+  -webkit-backdrop-filter: var(--glass-dark-xs);
+  pointer-events: none;
+}
+
 .selected-num {
-  min-width: var(--sp-5);
-  height: var(--sp-5);
+  min-width: 28px;
+  height: 28px;
   padding: 0 var(--sp-1);
   background: var(--ios-tint);
   color: #000;
@@ -251,4 +265,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-

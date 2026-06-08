@@ -1,11 +1,11 @@
 import {
   CalendarIcon,
   CameraIcon,
+  EyeIcon,
+  EyeOffIcon,
   FileIcon,
   ImageIcon,
   MapPinIcon,
-  ShieldAlertIcon,
-  ShieldCheckIcon,
   VideoIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -162,16 +162,16 @@ export function AboutSheet({ item, onClose }: AboutSheetProps) {
             <h3 className="about-section-title">Status</h3>
             <div className="about-field-list">
               <div className="about-field">
-                {isSafe ? (
-                  <ShieldCheckIcon className="about-field-icon about-field-icon--safe" />
+                {!isHidden ? (
+                  <EyeIcon className="about-field-icon about-field-icon--shown" />
                 ) : (
-                  <ShieldAlertIcon className="about-field-icon about-field-icon--hidden" />
+                  <EyeOffIcon className="about-field-icon about-field-icon--hidden" />
                 )}
                 <span>
                   {isHidden ? (
                     <Badge variant="destructive">Hidden</Badge>
                   ) : isSafe ? (
-                    <Badge variant="secondary">Safe</Badge>
+                    <Badge variant="secondary">Shown</Badge>
                   ) : (
                     <Badge variant="outline">Not reviewed</Badge>
                   )}

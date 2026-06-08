@@ -94,6 +94,11 @@ export function usePhoneDetail(deps: Dependencies): DetailApi {
     onSuccess: (updated, { item, state }) => {
       publishUpdatedItem(updated);
       if (state === "safe") { revealSafe(item.id); setHiddenPendingItem(null); }
+      if (state === "nsfw") {
+        dispatch({ type: "DETAIL_CLOSE" });
+        setDetailItem(null);
+        setAboutSheetItem(null);
+      }
     },
     onError: () => setErrorMessage("Couldn't update content rating — please try again."),
   });

@@ -376,39 +376,43 @@ describe("PhoneViewportFrame interactions", () => {
     expect(screen.getByRole("button", { name: /Select Sensitive favorite/i })).toBeInTheDocument();
   });
 
-  it("blurs a favorite tile after marking it hidden from detail", async () => {
+  it("exits detail and blurs a favorite tile after switching it to hidden", async () => {
     const user = userEvent.setup();
     renderPhone();
 
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Favorite 01/i }));
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Mark as Hidden/i }));
+    await user.click(await screen.findByRole("switch", { name: /Hide item is off/i }));
 
     await waitFor(() => {
       expect(phoneMockState.favoriteItems.find((item) => item.id === "favorite-01")?.metadata.safety?.state).toBe("nsfw");
     });
 
-    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    });
     await waitFor(() => {
       expect(document.querySelector('[data-phone-grid-item="favorite-01"]')).toHaveAccessibleName(/Hidden/i);
     });
     expect(screen.queryByRole("button", { name: /Select Favorite 01/i })).not.toBeInTheDocument();
   });
 
-  it("blurs a search result tile after marking it hidden from detail", async () => {
+  it("exits detail and blurs a search result tile after switching it to hidden", async () => {
     const user = userEvent.setup();
     renderPhone();
 
     await commitSearch("sunset", user);
     await openDetailFromButton(await screen.findByRole("button", { name: /Select Sunset pier photo/i }));
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Mark as Hidden/i }));
+    await user.click(await screen.findByRole("switch", { name: /Hide item is off/i }));
 
     await waitFor(() => {
       expect(phoneMockState.semanticResults.find((item) => item.id === "sunset-result")?.metadata.safety?.state).toBe("nsfw");
     });
 
-    await user.click(screen.getByRole("button", { name: "Back" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    });
     await waitFor(() => {
       expect(document.querySelector('[data-phone-grid-item="sunset-result"]')).toHaveAccessibleName(/Hidden/i);
     });

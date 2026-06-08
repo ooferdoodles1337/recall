@@ -96,7 +96,17 @@ const ThumbCell = React.memo(function ThumbCell({
           <Badge variant="secondary" className="video-badge video-badge--gif">GIF</Badge>
         ) : null}
         <AnimatePresence>
-          {!isBlurred && selected && (
+          {!isBlurred && !selected ? (
+            <motion.span
+              className="selection-circle"
+              aria-hidden
+              style={{ position: "absolute", top: "var(--sp-1)", right: "var(--sp-1)" }}
+              initial={{ opacity: 0, scale: 0.72 }}
+              animate={{ opacity: 1, scale: 1, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } }}
+              exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } }}
+            />
+          ) : null}
+          {!isBlurred && selected ? (
             <motion.div
               style={{ position: "absolute", top: "var(--sp-1)", right: "var(--sp-1)" }}
               initial={{ opacity: 0, scale: 0.72 }}
@@ -105,7 +115,7 @@ const ThumbCell = React.memo(function ThumbCell({
             >
               <Badge variant="default" className="selected-num" aria-hidden>{selectionIndex + 1}</Badge>
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </Button>
     </motion.div>

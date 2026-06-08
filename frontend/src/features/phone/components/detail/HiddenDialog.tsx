@@ -1,4 +1,4 @@
-import { ShieldAlertIcon } from "lucide-react";
+import { EyeOffIcon } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -6,7 +6,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import type { RecallMediaItem } from "@/shared/types/recall";
-import { isVideo } from "@/shared/media/mediaItem";
 
 interface HiddenDialogProps {
   item: RecallMediaItem;
@@ -16,17 +15,16 @@ interface HiddenDialogProps {
 }
 
 export function HiddenDialog({ item, onKeepHidden, onViewItem, onRevealAll }: HiddenDialogProps) {
-  const mediaType = isVideo(item) ? "video" : "photo";
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onKeepHidden(); }}>
       <SheetContent side="bottom" showCloseButton={false} className="hidden-sheet p-0">
         <div className="hidden-sheet-header">
           <div className="hidden-sheet-icon" aria-hidden>
-            <ShieldAlertIcon />
+            <EyeOffIcon />
           </div>
           <SheetTitle className="hidden-sheet-title">Hidden</SheetTitle>
           <SheetDescription className="hidden-sheet-body">
-            This {mediaType} was flagged by automated review.
+            This item is hidden until you choose to view it.
           </SheetDescription>
         </div>
         <div className="hidden-sheet-actions">

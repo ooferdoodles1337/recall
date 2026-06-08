@@ -145,16 +145,16 @@ slides the next item in from the right while the current item exits left; going
 back mirrors the direction. Regular open/close transitions keep the existing
 detail fade/shared-media motion.
 
-### MT-3 — NSFW detail swipe interstitial
+### MT-3 — Hidden detail swipe interstitial
 
-Swiping to an NSFW item must not skip the item and must not reveal it directly.
+Swiping to a hidden item must not skip the item and must not reveal it directly.
 Instead, detail lands on that item with the media blurred and a centered
-"Sensitive Content" prompt. The prompt has a single explicit "View" action that
+"Hidden" prompt. The prompt has a single explicit "View" action that
 reveals only that item for the session. Back and horizontal swipe navigation
 remain available from the blurred interstitial.
 
 **Rationale:** search and favorites should feel like continuous media sequences,
-but swipe navigation must not bypass the safety gate. The blurred in-place prompt
+but swipe navigation must not bypass the hidden-content gate. The blurred in-place prompt
 preserves spatial context while requiring deliberate consent before viewing.
 
 ---
@@ -276,7 +276,7 @@ Switching feeds does not:
 - Clear search history.
 - Reset grid density.
 - Close the selection tray unless selected items are no longer visible.
-- Affect hidden/sensitive reveal state for already viewed items.
+- Affect hidden reveal state for already viewed items.
 
 After switching, scroll the home viewport to the top of the media section
 unless the target feed has a previously remembered scroll offset. Preferred
@@ -396,13 +396,106 @@ they tapped) and will feel like a bug.
 
 ---
 
+## Thumbnail selection
+
+### TS-1 — Every selectable thumbnail shows an empty selection circle
+
+Every non-hidden media thumbnail in home, recents, favorites, and results grids
+shows a visible empty circular selection affordance in its top-right corner, even
+before anything is selected.
+
+The empty circle is the same physical target that becomes the numbered selected
+badge after selection. It should resemble the multi-select affordance used in
+messaging/photo pickers such as KakaoTalk and Instagram:
+
+- Circular outline, transparent or lightly frosted fill.
+- White or high-contrast stroke that remains legible on light and dark images.
+- Fixed position at the thumbnail's top-right corner.
+- Stable size across grid densities, large enough to communicate tappability.
+- No explanatory helper text in the grid.
+
+The affordance must appear on all selectable grid items so users can infer that
+short tapping selects. Do not reveal it only on hover, after long press, or after
+the first selection.
+
+### TS-2 — Short tap selects; long tap opens detail
+
+The thumbnail interaction model is:
+
+- Short tap on a thumbnail or its selection circle toggles selection.
+- Long tap / long press opens the fullscreen detail view.
+- Keyboard Enter/Space on a thumbnail toggles selection.
+
+This reverses the ambiguity users reported in testing: selection is the visible,
+default short-tap action; fullscreen/detail is the deliberate long-press action.
+The always-visible empty circle is the primary signifier for this model.
+
+### TS-3 — Selected state uses ordered numbered badges
+
+When a thumbnail is selected, the empty circle is replaced in the same corner by
+the existing numbered badge (`1`, `2`, `3`, ...), representing the order in which
+items were selected.
+
+The selected badge must not shift the thumbnail layout or change the tile's
+measured size. Deselecting an item restores the empty circle. Remaining selected
+items renumber to preserve contiguous ordering.
+
+### TS-4 — Hidden thumbnails do not expose selection until reviewed
+
+Hidden thumbnails that are still gated by an interstitial show their hidden-state
+affordance instead of the empty selection circle. Tapping them follows the
+hidden-content review flow, not selection. Once the item is revealed and is selectable,
+it follows TS-1 through TS-3.
+
+### TS-5 — Accessibility
+
+The thumbnail control's accessible name reflects the current selection action:
+`Select {title}` when unselected and `Deselect {title}` when selected. The control
+exposes pressed/selected state for assistive technology. The visual empty circle
+is decorative if the whole thumbnail is the button, or it may be the button itself
+if the implementation supports both circle and image hit targets consistently.
+
 ## Selection tray
 
 *(Existing behavior — do not regress.)*
-- Long-press or checkbox tap adds item to selection tray.
 - Tray appears at bottom when ≥ 1 item selected.
 - "Use selected" button submits selection and fires result callback.
 - Tray is dismissed by tapping outside or pressing Escape.
+
+---
+
+## Hidden content controls
+
+### HC-1 — Hidden state uses eye icons, not shield icons
+
+All user-facing hidden/show controls and hidden-state labels use the eye icon
+metaphor:
+
+- `EyeOff` means the item is hidden or hidden content is being withheld.
+- `Eye` means the item is shown or hidden content can be shown.
+
+Do not use shield icons for hidden content. The feature is about visibility, not
+safety certification.
+
+### HC-2 — Detail menu uses a Hidden switch
+
+The detail "More actions" menu exposes hidden status as a single toggle row:
+label `Hidden`, switch on means hidden, switch off means shown. The row must not
+say `Mark as Safe`, `Safe`, or `NSFW`.
+
+Implementation may continue mapping the switch to backend safety states
+(`nsfw` for hidden, `safe` for shown), but those terms should not appear in this
+menu.
+
+### HC-3 — Turning Hidden on exits detail and keeps the item hidden
+
+When the user turns the `Hidden` switch on from a detail view, the app closes
+detail immediately after the hidden-state update succeeds and returns to the
+source grid. The item must appear hidden/blurred in that grid and must not remain
+visible in fullscreen.
+
+Turning `Hidden` off does not auto-close detail; the user is explicitly choosing
+to show the current item and may continue viewing it.
 
 ---
 
@@ -436,7 +529,7 @@ The menu has multiple plausible groups so the picker is never the only thing beh
 the profile:
 - *Account*: avatar + static name/email.
 - *Search & Indexing*: **"Indexed Albums"** (value = `{selected} of {total}`,
-  chevron → opens picker) and "Show sensitive results" (cosmetic `Switch`, not
+  chevron → opens picker) and "Show hidden results" (cosmetic `Switch`, not
   persisted).
 - *About*: app name + version (static).
 

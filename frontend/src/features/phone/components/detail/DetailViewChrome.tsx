@@ -5,16 +5,17 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  EyeIcon,
+  EyeOffIcon,
   InfoIcon,
   MoreHorizontalIcon,
   SearchIcon,
   SendIcon,
-  ShieldAlertIcon,
-  ShieldCheckIcon,
   StarIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,7 +146,7 @@ function DetailMediaPreview({ preview, position }: { preview: DetailNeighborPrev
       <img src={src} alt="" draggable={false} decoding="async" loading="eager" />
       {isSensitiveHidden ? (
         <div className="detail-media-neighbor-sensitive-label">
-          <ShieldAlertIcon aria-hidden />
+          <EyeOffIcon aria-hidden />
           <span>Hidden</span>
         </div>
       ) : null}
@@ -381,17 +382,24 @@ export function DetailTopBar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="detail-menu">
-              {isNsfw(item) ? (
-                <DropdownMenuItem onClick={() => onToggleSafety(item, "safe")}>
-                  <ShieldCheckIcon />
-                  Mark as Safe
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => onToggleSafety(item, "nsfw")}>
-                  <ShieldAlertIcon />
-                  Mark as Hidden
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem
+                className="detail-menu-toggle-item"
+                onSelect={(event) => event.preventDefault()}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {isNsfw(item) ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
+                <label className="detail-menu-toggle-label" htmlFor={`detail-hidden-${item.id}`}>
+                  Hidden
+                </label>
+                <Switch
+                  id={`detail-hidden-${item.id}`}
+                  className="detail-menu-switch"
+                  checked={isNsfw(item)}
+                  onClick={(event) => event.stopPropagation()}
+                  onCheckedChange={(checked) => onToggleSafety(item, checked ? "nsfw" : "safe")}
+                  aria-label={isNsfw(item) ? "Hide item is on" : "Hide item is off"}
+                />
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onOpenAbout(item)}>
                 <InfoIcon />
