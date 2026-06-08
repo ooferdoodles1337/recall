@@ -499,9 +499,9 @@ to show the current item and may continue viewing it.
 
 ---
 
-## Settings & Indexed Albums
+## Settings & Searchable Albums
 
-The "Indexed Albums" picker is a **presentational mock** — it lets a tester choose
+The "Searchable Albums" picker is a **presentational mock** — it lets a tester choose
 which simulated device albums get "indexed", mirroring Google Photos' *Back up
 device folders* screen. It has **no functional effect** (ST-6): the backend has no
 album concept (the indexer just walks `MEDIA_DIR`). It exists to make the `/phone`
@@ -528,20 +528,21 @@ touch search state (cf. MT-1 — it is purely an overlay).
 The menu has multiple plausible groups so the picker is never the only thing behind
 the profile:
 - *Account*: avatar + static name/email.
-- *Search & Indexing*: **"Indexed Albums"** (value = `{selected} of {total}`,
+- *Search*: **"Searchable Albums"** (value = `{selected} of {total}`,
   chevron → opens picker) and "Show hidden results" (cosmetic `Switch`, not
   persisted).
 - *About*: app name + version (static).
 
-Only "Indexed Albums" navigates; everything else is cosmetic.
+Only "Searchable Albums" navigates; everything else is cosmetic.
 
 **Rationale:** a settings entry point that opens straight into a single folder
 picker is confusing — users expect a settings *surface*. The picker lives as one
 row within it.
 
-### ST-4 — Indexed Albums picker
+### ST-4 — Searchable Albums picker
 A full-height slide-up sheet (own `AnimatePresence` layer, opens above Settings).
-Large title "Indexed Albums" + subtitle, a scrollable 3-column grid of album cards
+Large title "Searchable Albums" + subtitle ("Choose which albums Recall can
+search"), a scrollable 3-column grid of album cards
 (square thumbnail, selected-check badge top-right, label below), and a pinned
 Cancel/Save footer.
 - Tapping a card toggles its **draft** selected state.

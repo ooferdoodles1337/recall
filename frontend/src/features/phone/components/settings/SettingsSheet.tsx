@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRightIcon, ClockIcon, FolderIcon, InfoIcon, ShieldIcon, UserIcon } from "lucide-react";
+import { ChevronRightIcon, ClockIcon, EyeIcon, FolderIcon, InfoIcon, UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sheet,
@@ -75,11 +75,11 @@ export function SettingsSheet({
           </section>
 
           <section className="settings-group">
-            <h3 className="settings-group-title">Search &amp; Indexing</h3>
+            <h3 className="settings-group-title">Search</h3>
             <div className="settings-rows">
               <button type="button" className="settings-row settings-row--nav" onClick={onOpenIndexedAlbums}>
                 <FolderIcon className="settings-row-icon" aria-hidden />
-                <span className="settings-row-label">Indexed Albums</span>
+                <span className="settings-row-label">Searchable Albums</span>
                 <span className="settings-row-value">
                   {indexedAlbumCount} of {indexedAlbumTotal}
                 </span>
@@ -113,7 +113,7 @@ export function SettingsSheet({
               </div>
 
               <div className="settings-row">
-                <ShieldIcon className="settings-row-icon" aria-hidden />
+                <EyeIcon className="settings-row-icon" aria-hidden />
                 <label className="settings-row-label" htmlFor="settings-show-sensitive">
                   Show hidden results
                 </label>

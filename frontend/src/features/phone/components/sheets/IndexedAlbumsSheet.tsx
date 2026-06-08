@@ -54,9 +54,9 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
         className="about-sheet about-sheet--full"
       >
         <div className="settings-sheet-titlebar">
-          <SheetTitle className="settings-sheet-title">Indexed Albums</SheetTitle>
+          <SheetTitle className="settings-sheet-title">Searchable Albums</SheetTitle>
           <SheetDescription className="settings-sheet-subtitle">
-            Select the albums you want to be indexed
+            Choose which albums Recall can search
           </SheetDescription>
         </div>
 
@@ -70,7 +70,7 @@ export function IndexedAlbumsSheet({ initialSelectedIds, onCancel, onSave }: Ind
                   type="button"
                   className={`album-card${selected ? " album-card--selected" : ""}`}
                   aria-pressed={selected}
-                  aria-label={`${album.name}${selected ? ", indexed" : ", not indexed"}`}
+                  aria-label={`${album.name}${selected ? ", searchable" : ", not searchable"}`}
                   onClick={() => toggle(album.id)}
                 >
                   <span className="album-card-thumb">
